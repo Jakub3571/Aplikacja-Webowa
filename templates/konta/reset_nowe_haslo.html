@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block tytul %}Nowe hasło — Panel pracowniczy{% endblock %}
+
+{% block tresc %}
+<div class="logowanie-wrapper">
+  <section class="karta">
+    <h1>Ustaw nowe hasło</h1>
+    {% if form.errors %}
+      <div class="komunikat error">
+        Popraw błędy w formularzu:
+        <ul>
+          {% for pole, bledy in form.errors.items %}
+            {% for blad in bledy %}<li>{{ blad }}</li>{% endfor %}
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+    <form method="post" class="formularz">
+      {% csrf_token %}
+      <label for="{{ form.new_password1.id_for_label }}">Nowe hasło</label>
+      {{ form.new_password1 }}
+      {% if form.new_password1.help_text %}<p class="podpowiedz">{{ form.new_password1.help_text }}</p>{% endif %}
+      <label for="{{ form.new_password2.id_for_label }}">Powtórz nowe hasło</label>
+      {{ form.new_password2 }}
+      <button type="submit">Zapisz nowe hasło</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

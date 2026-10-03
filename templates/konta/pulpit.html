@@ -1,0 +1,12 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Start — Panel pracowniczy{% endblock %}
+
+{% block panel %}
+<section class="karta">
+  <h2>Witaj, {{ user.get_full_name|default:user.username }}!</h2>
+  <p>Jesteś zalogowany jako <strong>{{ user.username }}</strong>.</p>
+  {% if user.stanowisko %}<p>Stanowisko: {{ user.stanowisko }}</p>{% endif %}
+  {% if user.telefon %}<p>Telefon: {{ user.telefon }}</p>{% endif %}
+</section>
+{% endblock %}

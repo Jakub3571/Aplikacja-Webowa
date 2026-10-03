@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block tytul %}Hasło zmienione — Panel pracowniczy{% endblock %}
+
+{% block tresc %}
+<div class="logowanie-wrapper">
+  <section class="karta">
+    <h1>Gotowe!</h1>
+    <p class="podtytul">Twoje hasło zostało zmienione. Możesz się teraz zalogować.</p>
+    <a class="powrot" href="{% url 'logowanie' %}">→ Przejdź do logowania</a>
+  </section>
+</div>
+{% endblock %}

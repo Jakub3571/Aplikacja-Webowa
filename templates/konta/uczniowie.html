@@ -1,0 +1,221 @@
+{% extends 'konta/panel.html' %} {% block tytul %}Uczniowie — Panel
+pracowniczy{% endblock %} {% block panel %}
+<div class="uczniowie-układ">
+	<section class="karta">
+		<h2>Dodaj ucznia</h2>
+
+		{% if form.errors %}
+		<div class="komunikat error">
+			Popraw błędy w formularzu:
+			<ul>
+				{% for pole, bledy in form.errors.items %} {% for blad in bledy %}
+				<li>{{ blad }}</li>
+				{% endfor %} {% endfor %}
+			</ul>
+		</div>
+		{% endif %}
+
+		<form method="post" class="formularz" id="formularz-ucznia">
+			{% csrf_token %}
+
+			<label for="{{ form.pierwsza_lekcja.id_for_label }}"
+				>Data i godzina 1. lekcji <span class="gwiazdka">*</span></label
+			>
+			{{ form.pierwsza_lekcja }} {% if form.pierwsza_lekcja.help_text %}
+			<p class="podpowiedz">{{ form.pierwsza_lekcja.help_text }}</p>
+			{% endif %}
+
+			<label for="{{ form.przedmiot.id_for_label }}"
+				>Przedmiot <span class="gwiazdka">*</span></label
+			>
+			{{ form.przedmiot }} {% if form.przedmiot.help_text %}
+			<p class="podpowiedz">{{ form.przedmiot.help_text }}</p>
+			{% endif %}
+
+			<label for="{{ form.poziom.id_for_label }}"
+				>Poziom <span class="gwiazdka">*</span></label
+			>
+			{{ form.poziom }} {% if form.poziom.help_text %}
+			<p class="podpowiedz">{{ form.poziom.help_text }}</p>
+			{% endif %}
+
+			<label for="{{ form.imie_ucznia.id_for_label }}"
+				>Uczeń — imię <span class="gwiazdka">*</span></label
+			>
+			{{ form.imie_ucznia }} {% if form.imie_ucznia.help_text %}
+			<p class="podpowiedz">{{ form.imie_ucznia.help_text }}</p>
+			{% endif %}
+
+			<label for="{{ form.nazwisko_rodzica.id_for_label }}"
+				>Uczeń — nazwisko (rodzica) <span class="gwiazdka">*</span></label
+			>
+			{{ form.nazwisko_rodzica }} {% if form.nazwisko_rodzica.help_text %}
+			<p class="podpowiedz">{{ form.nazwisko_rodzica.help_text }}</p>
+			{% endif %}
+
+			<label for="{{ form.rodzic.id_for_label }}"
+				>Rodzic — imię i nazwisko <span class="gwiazdka">*</span></label
+			>
+			{{ form.rodzic }} {% if form.rodzic.help_text %}
+			<p class="podpowiedz">{{ form.rodzic.help_text }}</p>
+			{% endif %}
+
+			<label for="{{ form.telefon_glowny.id_for_label }}"
+				>Telefon główny <span class="gwiazdka">*</span></label
+			>
+			{{ form.telefon_glowny }} {% if form.telefon_glowny.help_text %}
+			<p class="podpowiedz">{{ form.telefon_glowny.help_text }}</p>
+			{% endif %}
+
+			<label for="{{ form.email_glowny.id_for_label }}"
+				>Email główny <span class="gwiazdka">*</span></label
+			>
+			{{ form.email_glowny }} {% if form.email_glowny.help_text %}
+			<p class="podpowiedz">{{ form.email_glowny.help_text }}</p>
+			{% endif %}
+
+			<label for="{{ form.telefon_dodatkowy.id_for_label }}"
+				>Telefon dodatkowy <span class="gwiazdka">*</span></label
+			>
+			{{ form.telefon_dodatkowy }} {% if form.telefon_dodatkowy.help_text %}
+			<p class="podpowiedz">{{ form.telefon_dodatkowy.help_text }}</p>
+			{% endif %}
+
+			<label for="{{ form.email_dodatkowy.id_for_label }}"
+				>Email dodatkowy <span class="gwiazdka">*</span></label
+			>
+			{{ form.email_dodatkowy }} {% if form.email_dodatkowy.help_text %}
+			<p class="podpowiedz">{{ form.email_dodatkowy.help_text }}</p>
+			{% endif %}
+
+			<label for="{{ form.korepetytor.id_for_label }}"
+				>Korepetytor <span class="gwiazdka">*</span></label
+			>
+			{{ form.korepetytor }} {% if form.korepetytor.help_text %}
+			<p class="podpowiedz">{{ form.korepetytor.help_text }}</p>
+			{% endif %}
+
+			<label for="{{ form.notatka_od_rodzica.id_for_label }}"
+				>Notatka od rodzica <span class="gwiazdka">*</span></label
+			>
+			{{ form.notatka_od_rodzica }} {% if form.notatka_od_rodzica.help_text %}
+			<p class="podpowiedz">{{ form.notatka_od_rodzica.help_text }}</p>
+			{% endif %}
+
+			<button type="submit">Dodaj ucznia</button>
+		</form>
+	</section>
+
+	<div class="uczniowie-bok">
+		<section class="karta">
+			<h2>Lista uczniów ({{ uczniowie|length }})</h2>
+			{% if uczniowie %}
+			<div class="tabela-wrapper">
+				<table class="tabela">
+					<thead>
+						<tr>
+							<th>Uczeń</th>
+							<th>Przedmiot</th>
+							<th>Poziom</th>
+							<th>Korepetytor</th>
+							<th>1. lekcja</th>
+							<th>Umówił</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for uczen in uczniowie %}
+						<tr>
+							<td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
+							<td>{{ uczen.przedmiot }}</td>
+							<td>{{ uczen.poziom }}</td>
+							<td>{{ uczen.korepetytor }}</td>
+							<td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+							<td>{{ uczen.kto_umowil }}</td>
+						</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+			{% else %}
+			<p>Brak uczniów w systemie. Dodaj pierwszego obok.</p>
+			{% endif %}
+		</section>
+
+		<section class="karta">
+			<h2>Dostępność nauczycieli</h2>
+			{% if nadchodzace_dostepnosci %}
+			<div class="tabela-wrapper">
+				<table class="tabela">
+					<thead>
+						<tr>
+							<th>Nauczyciel</th>
+							<th>Przedmiot</th>
+							<th>Dni</th>
+							<th>Godziny</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for termin in nadchodzace_dostepnosci %}
+						<tr>
+							<td>
+								{{ termin.nauczyciel.imie }} {{ termin.nauczyciel.nazwisko }}
+							</td>
+							<td>{{ termin.nauczyciel.przedmiot }}</td>
+							<td>
+								{% if termin.data_od == termin.data_do %} {{
+								termin.data_od|date:"d.m.Y" }} {% else %} {{
+								termin.data_od|date:"d.m.Y" }} – {{ termin.data_do|date:"d.m.Y"
+								}} {% endif %}
+							</td>
+							<td>
+								{{ termin.godzina_od|time:"H:i" }} – {{
+								termin.godzina_do|time:"H:i" }}
+							</td>
+						</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+			{% else %}
+			<p>Brak nadchodzących terminów nauczycieli.</p>
+			{% endif %}
+		</section>
+	</div>
+</div>
+
+<script>
+	const wybierzPrzedmiot = document.getElementById('id_przedmiot');
+	const formularz = document.getElementById('formularz-ucznia');
+	if (wybierzPrzedmiot && formularz) {
+		wybierzPrzedmiot.addEventListener('change', () => {
+			const ukryty = document.createElement('input');
+			ukryty.type = 'hidden';
+			ukryty.name = 'wybierz_przedmiot';
+			ukryty.value = '1';
+			formularz.appendChild(ukryty);
+			formularz.submit();
+		});
+	}
+
+	const poleDaty = document.getElementById('id_pierwsza_lekcja');
+	if (poleDaty) {
+		const przyciagnijMinuty = () => {
+			const wartosc = poleDaty.value;
+			if (!wartosc) return;
+			const [data, godzina] = wartosc.split('T');
+			if (!godzina) return;
+			const [h, m] = godzina.split(':').map(Number);
+			const noweMinuty = m < 15 ? 0 : m < 45 ? 30 : 60;
+			const noweH = (h + (noweMinuty === 60 ? 1 : 0)) % 24;
+			poleDaty.value =
+				data +
+				'T' +
+				String(noweH).padStart(2, '0') +
+				':' +
+				(noweMinuty === 60 ? '00' : String(noweMinuty).padStart(2, '0'));
+		};
+		poleDaty.addEventListener('change', przyciagnijMinuty);
+		poleDaty.addEventListener('blur', przyciagnijMinuty);
+	}
+</script>
+{% endblock %}

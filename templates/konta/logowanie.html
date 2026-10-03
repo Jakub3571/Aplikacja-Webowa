@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block tytul %}Logowanie — Panel pracowniczy{% endblock %}
+
+{% block tresc %}
+<main class="logowanie-wrapper">
+  <section class="karta">
+    <h1>Panel pracowniczy</h1>
+    <p class="podtytul">Zaloguj się, aby przejść do pulpitu</p>
+
+    {% if form.errors %}
+      <div class="komunikat error">
+        {% for blad in form.non_field_errors %}{{ blad }}{% endfor %}
+        {{ form.username.errors }}{{ form.password.errors }}
+      </div>
+    {% endif %}
+
+    <form method="post" class="formularz">
+      {% csrf_token %}
+      <label for="{{ form.username.id_for_label }}">Nazwa użytkownika</label>
+      {{ form.username }}
+      <label for="{{ form.password.id_for_label }}">Hasło</label>
+      {{ form.password }}
+      <button type="submit">Zaloguj się</button>
+    </form>
+
+    <a class="powrot" href="{% url 'reset_hasla' %}">Nie pamiętasz hasła? Wyślij link resetujący</a>
+  </section>
+</main>
+{% endblock %}

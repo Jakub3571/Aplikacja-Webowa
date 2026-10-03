@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block tytul %}Reset hasła — Panel pracowniczy{% endblock %}
+
+{% block tresc %}
+<div class="logowanie-wrapper">
+  <section class="karta">
+    <h1>Reset hasła</h1>
+    <p class="podtytul">Wpisz swój adres e-mail — wyślemy ci link do ustawienia nowego hasła.</p>
+    {% if form.errors %}
+      <div class="komunikat error">
+        Popraw błędy w formularzu:
+        <ul>
+          {% for pole, bledy in form.errors.items %}
+            {% for blad in bledy %}<li>{{ blad }}</li>{% endfor %}
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+    <form method="post" class="formularz">
+      {% csrf_token %}
+      <label for="{{ form.email.id_for_label }}">Email</label>
+      {{ form.email }}
+      <button type="submit">Wyślij link</button>
+    </form>
+    <a class="powrot" href="{% url 'logowanie' %}">← Wróć do logowania</a>
+  </section>
+</div>
+{% endblock %}

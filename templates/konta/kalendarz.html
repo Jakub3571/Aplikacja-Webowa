@@ -1,0 +1,90 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Kalendarz {{ nauczyciel.imie }} {{ nauczyciel.nazwisko }} — Panel pracowniczy{% endblock %}
+
+{% block panel %}
+<section class="karta">
+  <h2>📅 Kalendarz: {{ nauczyciel.imie }} {{ nauczyciel.nazwisko }}</h2>
+  <p class="podtytul">{{ nauczyciel.email }}{% if nauczyciel.przedmiot %} · {{ nauczyciel.przedmiot }}{% endif %}</p>
+  <a class="powrot" href="{% url 'nauczyciele' %}">← Wróć do listy nauczycieli</a>
+</section>
+
+<div class="kalendarz-uklad">
+  <section class="karta">
+    <div class="kalendarz-naglowek">
+      <a class="strzalka" href="?rok={{ poprzedni_rok }}&miesiac={{ poprzedni_miesiac }}">&larr;</a>
+      <h3>{{ nazwa_miesiaca|capfirst }} {{ rok }}</h3>
+      <a class="strzalka" href="?rok={{ nastepny_rok }}&miesiac={{ nastepny_miesiac }}">&rarr;</a>
+    </div>
+
+    <table class="kalendarz">
+      <thead>
+        <tr>
+          {% for dzien in dni_tygodnia %}<th>{{ dzien }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for tydzien in tygodnie %}
+          <tr>
+            {% for dzien in tydzien %}
+              <td class="{% if not dzien.w_tym_miesiacu %}inny-miesiac{% endif %}
+                         {% if dzien.dostepny %}dzien-dostepny{% endif %}
+                         {% if dzien.wybrany %}dzien-wybrany{% endif %}">
+                {% if dzien.w_tym_miesiacu %}
+                  <a href="?rok={{ rok }}&miesiac={{ miesiac }}&dzien={{ dzien.data.day }}">{{ dzien.data.day }}</a>
+                {% else %}
+                  {{ dzien.data.day }}
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="kalendarz-legenda"><span class="kropka-dostepny"></span> dni z wpisanymi godzinami · <span class="kropka-wybrany"></span> dzień wybrany</p>
+  </section>
+
+  <section class="karta">
+    {% if wybrany_dzien %}
+      <h3>Dzień: {{ wybrany_dzien|date:"l, d.m.Y" }}</h3>
+      <p class="podtytul">Klikaj kafelki godzin, żeby oznaczać (klik ponowny odznacza).</p>
+      <div class="kafelki-godzin">
+        {% for kafelek in kafelki %}
+          <form method="post" class="kafelek-form">
+            {% csrf_token %}
+            <input type="hidden" name="przelacz_godzine" value="1">
+            <input type="hidden" name="godzina" value="{{ kafelek.etykieta }}">
+            <button type="submit" class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %}">{{ kafelek.etykieta }}</button>
+          </form>
+        {% endfor %}
+      </div>
+    {% else %}
+      <h3>Godziny pracy</h3>
+      <p class="podtytul">Kliknij dowolny dzień w kalendarzu obok, aby oznaczać godziny, w których nauczyciel może przyjmować uczniów.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="karta">
+  <h3>Godziny w miesiącu ({{ dostepnosci|length }})</h3>
+  {% if dostepnosci %}
+    <div class="tabela-wrapper">
+      <table class="tabela">
+        <thead>
+          <tr><th>Dzień</th><th>Godzina</th></tr>
+        </thead>
+        <tbody>
+          {% for termin in dostepnosci %}
+            <tr>
+              <td>{{ termin.data_od|date:"d.m.Y" }}</td>
+              <td>{{ termin.godzina_od|time:"H:i" }} – {{ termin.godzina_do|time:"H:i" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>Brak wpisanych godzin w tym miesiącu.</p>
+  {% endif %}
+</section>
+{% endblock %}

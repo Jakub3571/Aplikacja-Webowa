@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block tytul %}Zmiana hasła — Panel pracowniczy{% endblock %}
+
+{% block tresc %}
+<main class="logowanie-wrapper">
+  <section class="karta">
+    <h1>Zmiana hasła</h1>
+
+    {% if form.errors %}
+      <div class="komunikat error">
+        {{ form.non_field_errors }}
+        {{ form.old_password.errors }}{{ form.new_password1.errors }}{{ form.new_password2.errors }}
+      </div>
+    {% endif %}
+
+    <form method="post" class="formularz">
+      {% csrf_token %}
+      <label for="{{ form.old_password.id_for_label }}">Obecne hasło</label>
+      {{ form.old_password }}
+
+      <label for="{{ form.new_password1.id_for_label }}">Nowe hasło</label>
+      {{ form.new_password1 }}
+
+      <label for="{{ form.new_password2.id_for_label }}">Powtórz nowe hasło</label>
+      {{ form.new_password2 }}
+
+      <button type="submit">Zmień hasło</button>
+      <a class="powrot" href="{% url 'pulpit' %}">Wróć do pulpitu</a>
+    </form>
+  </section>
+</main>
+{% endblock %}

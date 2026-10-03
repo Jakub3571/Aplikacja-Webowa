@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block tytul %}Link wysłany — Panel pracowniczy{% endblock %}
+
+{% block tresc %}
+<div class="logowanie-wrapper">
+  <section class="karta">
+    <h1>Sprawdź swoją skrzynkę</h1>
+    <p class="podtytul">
+      Jeśli konto z takim adresem e-mail istnieje w systemie, wysłaliśmy link do zmiany hasła.
+    </p>
+    <a class="powrot" href="{% url 'logowanie' %}">← Wróć do logowania</a>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Nauczyciele — Panel pracowniczy{% endblock %}
+
+{% block panel %}
+<div class="uczniowie-uklad">
+  <section class="karta">
+    <h2>Dodaj nauczyciela</h2>
+
+    {% if form.errors %}
+      <div class="komunikat error">
+        Popraw błędy w formularzu:
+        <ul>
+          {% for pole, bledy in form.errors.items %}
+            {% for blad in bledy %}<li>{{ blad }}</li>{% endfor %}
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <form method="post" class="formularz">
+      {% csrf_token %}
+
+      <label for="{{ form.imie.id_for_label }}">Imię <span class="gwiazdka">*</span></label>
+      {{ form.imie }}
+      {% if form.imie.help_text %}<p class="podpowiedz">{{ form.imie.help_text }}</p>{% endif %}
+
+      <label for="{{ form.nazwisko.id_for_label }}">Nazwisko <span class="gwiazdka">*</span></label>
+      {{ form.nazwisko }}
+      {% if form.nazwisko.help_text %}<p class="podpowiedz">{{ form.nazwisko.help_text }}</p>{% endif %}
+
+      <label for="{{ form.przedmiot.id_for_label }}">Przedmiot <span class="gwiazdka">*</span></label>
+      {{ form.przedmiot }}
+      {% if form.przedmiot.help_text %}<p class="podpowiedz">{{ form.przedmiot.help_text }}</p>{% endif %}
+
+      <label for="{{ form.email.id_for_label }}">Email <span class="gwiazdka">*</span></label>
+      {{ form.email }}
+      {% if form.email.help_text %}<p class="podpowiedz">{{ form.email.help_text }}</p>{% endif %}
+
+      <button type="submit">Dodaj nauczyciela</button>
+    </form>
+  </section>
+
+  <section class="karta">
+    <h2>Lista nauczycieli ({{ nauczyciele|length }})</h2>
+    {% if nauczyciele %}
+      <div class="tabela-wrapper">
+        <table class="tabela">
+          <thead>
+            <tr>
+              <th>Nauczyciel</th>
+              <th>Przedmiot</th>
+              <th>Email</th>
+              <th>Kalendarz</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for nauczyciel in nauczyciele %}
+              <tr>
+                <td>{{ nauczyciel.imie }} {{ nauczyciel.nazwisko }}</td>
+                <td>{{ nauczyciel.przedmiot }}</td>
+                <td>{{ nauczyciel.email }}</td>
+                <td><a class="ikona-kalendarza" href="{% url 'kalendarz_nauczyciela' nauczyciel.id %}" title="Zobacz kalendarz">📅</a></td>
+                <td><a class="usuwanie" href="{% url 'usun_nauczyciela' nauczyciel.id %}">usuń</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p>Brak nauczycieli w systemie. Dodaj pierwszego obok.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

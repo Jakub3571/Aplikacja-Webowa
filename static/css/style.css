@@ -1,0 +1,391 @@
+:root {
+  --tlo: #f1f5f9;
+  --karta: #ffffff;
+  --tekst: #0f172a;
+  --akcent: #2563eb;
+  --akcent-ciemny: #1d4ed8;
+  --blad: #dc2626;
+  --ramka: #cbd5e1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tlo: #0f172a;
+    --karta: #1e293b;
+    --tekst: #f1f5f9;
+    --akcent: #3b82f6;
+    --akcent-ciemny: #2563eb;
+    --blad: #f87171;
+    --ramka: #334155;
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--tlo);
+  color: var(--tekst);
+  min-height: 100vh;
+}
+
+.komunikaty {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 10;
+}
+
+.komunikat {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--karta);
+  border: 1px solid var(--ramka);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: 22rem;
+}
+
+.komunikat.error { border-left: 4px solid var(--blad); }
+.komunikat.success { border-left: 4px solid #16a34a; }
+.komunikat.info { border-left: 4px solid var(--akcent); }
+
+.logowanie-wrapper {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.opakowanie {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.opakowanie .karta { margin-top: 1rem; }
+
+@media (max-width: 640px) {
+  .opakowanie { padding: 0.5rem; }
+  .karta { padding: 1.25rem; }
+  .karta h2 { font-size: 1.15rem; }
+  .pasek { flex-direction: column; align-items: center; text-align: center; }
+  .pasek nav { justify-content: center; }
+  .zakladki { justify-content: center; }
+  .zakladki a { flex: 1 1 auto; text-align: center; }
+  .tabela { font-size: 0.8rem; }
+}
+
+.karta {
+  background: var(--karta);
+  border: 1px solid var(--ramka);
+  border-radius: 12px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 24rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.karta h1 { margin-bottom: 0.25rem; font-size: 1.5rem; }
+.karta h2 { margin-bottom: 0.5rem; }
+
+.podtytul {
+  color: var(--tekst);
+  opacity: 0.7;
+  margin-bottom: 1.5rem;
+}
+
+.formularz { display: flex; flex-direction: column; gap: 0.5rem; }
+.formularz label { font-size: 0.875rem; font-weight: 600; margin-top: 0.5rem; }
+
+.formularz input,
+.formularz select,
+.formularz textarea {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--ramka);
+  border-radius: 8px;
+  background: var(--tlo);
+  color: var(--tekst);
+  font-size: 1rem;
+  font-family: inherit;
+  width: 100%;
+}
+
+.formularz input:focus,
+.formularz select:focus,
+.formularz textarea:focus {
+  outline: 2px solid var(--akcent);
+  border-color: var(--akcent);
+}
+
+.formularz button {
+  margin-top: 1.25rem;
+  padding: 0.75rem;
+  background: var(--akcent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.formularz button:hover { background: var(--akcent-ciemny); }
+
+.powrot {
+  display: block;
+  margin-top: 0.75rem;
+  text-align: center;
+  color: var(--akcent);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.pasek {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  background: var(--karta);
+  border: 1px solid var(--ramka);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.pasek nav { display: flex; gap: 1rem; flex-wrap: wrap; }
+.pasek a { color: var(--akcent); text-decoration: none; font-weight: 600; }
+
+.zakladki {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.zakladki a {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--ramka);
+  border-radius: 8px 8px 0 0;
+  background: var(--karta);
+  color: var(--tekst);
+  text-decoration: none;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.zakladki a:hover { opacity: 1; }
+.zakladki a.aktywna {
+  opacity: 1;
+  color: var(--akcent);
+  border-bottom: 2px solid var(--akcent);
+}
+
+.panel-tresc { width: 100%; }
+
+.tabela-wrapper { overflow-x: auto; }
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.tabela th, .tabela td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--ramka);
+  text-align: left;
+}
+
+.tabela th { font-weight: 600; opacity: 0.7; }
+
+.gwiazdka { color: var(--blad); }
+
+.podpowiedz {
+  font-size: 0.8rem;
+  opacity: 0.65;
+  margin-top: 0.25rem;
+}
+
+.kalendarz-naglowek {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.kalendarz-naglowek h3 { margin: 0; }
+
+.strzalka {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--ramka);
+  border-radius: 8px;
+  color: var(--akcent);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.kalendarz { width: 100%; border-collapse: collapse; table-layout: fixed; }
+
+.kalendarz th { padding: 0.35rem; font-size: 0.8rem; opacity: 0.6; }
+
+.kalendarz td {
+  padding: 0.35rem;
+  text-align: center;
+  border: 1px solid var(--ramka);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.kalendarz td.inny-miesiac { opacity: 0.25; }
+
+.kalendarz td.dzien-dostepny {
+  background: #16a34a;
+  color: #fff;
+  font-weight: 700;
+}
+
+.kalendarz-legenda { margin-top: 0.5rem; font-size: 0.8rem; opacity: 0.7; }
+
+.kropka-dostepny {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  background: #16a34a;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.kalendarz td a { display: block; color: inherit; text-decoration: none; }
+
+.kalendarz td.dzien-wybrany {
+  outline: 3px solid var(--akcent);
+  font-weight: 700;
+}
+
+.kropka-wybrany {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 2px solid var(--akcent);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.usuwanie { color: var(--blad); }
+
+.stopka {
+  max-width: 60rem;
+  margin: 2rem auto 0;
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.stopka a { color: var(--akcent); text-decoration: none; font-weight: 600; }
+.stopka a:hover { text-decoration: underline; }
+
+.uczniowie-uklad {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.uczniowie-uklad .karta { margin-top: 0; max-width: none; }
+
+.uczniowie-bok {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .uczniowie-uklad { grid-template-columns: 1fr; }
+}
+
+.przycisk-zaplac {
+  padding: 0.3rem 0.75rem;
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.przycisk-zaplac:hover { background: #15803d; }
+
+.przycisk-usun {
+  padding: 0.3rem 0.75rem;
+  background: var(--blad);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.przycisk-usun:hover { opacity: 0.85; }
+
+.status-zaplacone { font-weight: 600; }
+.status-niezaplacone { font-weight: 600; opacity: 0.8; }
+
+.ikona-kalendarza {
+  font-size: 1.3rem;
+  text-decoration: none;
+}
+
+.kafelki-godzin {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+  gap: 0.35rem;
+}
+
+.kafelek-form { margin: 0; }
+
+.kafelek {
+  width: 100%;
+  padding: 0.4rem 0;
+  border: 1px solid var(--ramka);
+  border-radius: 999px;
+  background: var(--tlo);
+  color: var(--tekst);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.kafelek:hover { border-color: var(--akcent); }
+
+.kafelek-zaznaczony {
+  background: #16a34a;
+  color: #fff;
+  border-color: #16a34a;
+  font-weight: 700;
+}
+
+.kalendarz-uklad {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.kalendarz-uklad .karta { margin-top: 0; max-width: none; }
+
+@media (max-width: 900px) {
+  .kalendarz-uklad { grid-template-columns: 1fr; }
+}
+
+.formularz input[type="datetime-local"] {
+  border-radius: 999px;
+  padding-left: 1.1rem;
+}
