@@ -1,4 +1,6 @@
 """Formularze: logowanie, zmiana hasła, dodawanie ucznia i nauczyciela."""
+from datetime import datetime, time
+
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
 
@@ -8,8 +10,13 @@ WYBIERZ_PRZEDMIOT = [('', '— wybierz przedmiot —')] + list(PRZEDMIOTY)
 
 POZIOMY = [
     ('', '— wybierz poziom —'),
-    ('podstawowy', 'podstawowy'),
-    ('rozszerzony', 'rozszerzony'),
+    ('szkoła średnia - podstawa', 'szkoła średnia - podstawa'),
+    ('szkoła średnia - rozszerzenie', 'szkoła średnia - rozszerzenie'),
+    ('studia', 'studia'),
+]
+
+GODZINY_LEKCJI = [
+    (f'{h:02d}:{m:02d}', f'{h:02d}:{m:02d}') for h in range(24) for m in (0, 30)
 ]
 
 
@@ -52,24 +59,28 @@ class FormularzUcznia(forms.ModelForm):
         label='poziom',
         choices=POZIOMY,
     )
+    data_pierwszej_lekcji = forms.DateField(
+        label='data 1. lekcji',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+    )
+    godzina_pierwszej_lekcji = forms.ChoiceField(
+        label='godzina 1. lekcji',
+        choices=GODZINY_LEKCJI,
+    )
 
     class Meta:
         model = Uczen
         fields = [
-            'pierwsza_lekcja', 'przedmiot', 'poziom',
+            'przedmiot', 'poziom',
             'imie_ucznia', 'nazwisko_rodzica', 'rodzic',
             'telefon_glowny', 'email_glowny',
             'telefon_dodatkowy', 'email_dodatkowy',
             'korepetytor', 'notatka_od_rodzica',
         ]
         widgets = {
-            'pierwsza_lekcja': forms.DateTimeInput(
-                attrs={'type': 'datetime-local', 'step': 1800}, format='%Y-%m-%dT%H:%M',
-            ),
             'notatka_od_rodzica': forms.Textarea(attrs={'rows': 4}),
         }
         help_texts = {
-            'pierwsza_lekcja': 'Wpisz dokładną datę i godzinę 1. lekcji',
             'imie_ucznia': 'Samo imię ucznia',
             'nazwisko_rodzica': 'Nazwisko rodzica (uczeń nosi nazwisko rodzica)',
             'rodzic': 'Imię i nazwisko rodzica do kontaktu',
@@ -101,6 +112,16 @@ class FormularzUcznia(forms.ModelForm):
             pole.required = True
             pole.widget.attrs['required'] = True
 
+    def clean(self):
+        dane = super().clean()
+        data = dane.get('data_pierwszej_lekcji')
+        godzina = dane.get('godzina_pierwszej_lekcji')
+        if data and godzina:
+            godziny, minuty = godzina.split(':')
+            czas = time(int(godziny), int(minuty))
+            dane['pierwsza_lekcja'] = datetime.combine(data, czas)
+        return dane
+
 
 class FormularzNauczyciela(forms.ModelForm):
     """Formularz dodawania nauczyciela."""
@@ -109,10 +130,15 @@ class FormularzNauczyciela(forms.ModelForm):
         label='przedmiot',
         choices=WYBIERZ_PRZEDMIOT,
     )
+    stawka = forms.DecimalField(
+        label='stawka',
+        min_value=0,
+        widget=forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
+    )
 
     class Meta:
         model = Nauczyciel
-        fields = ['imie', 'nazwisko', 'przedmiot', 'email']
+        fields = ['imie', 'nazwisko', 'przedmiot', 'email', 'stawka']
         help_texts = {
             'imie': 'Imię nauczyciela',
             'nazwisko': 'Nazwisko nauczyciela',

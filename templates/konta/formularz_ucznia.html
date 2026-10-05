@@ -1,0 +1,51 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Dodaj ucznia — Panel pracowniczy{% endblock %}
+
+{% block panel %}
+<div class="uczniowie-uklad">
+  <section class="karta">
+    <h2>Dodaj ucznia</h2>
+
+    {% if form.errors %}
+    <div class="komunikat error">
+      Popraw błędy w formularzu:
+      <ul>
+        {% for pole, bledy in form.errors.items %}
+          {% for blad in bledy %}
+          <li>{{ blad }}</li>
+          {% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <form method="post" class="formularz" id="formularz-ucznia">
+      {% csrf_token %}
+
+      {% for pole in form.visible_fields %}
+      <label for="{{ pole.id_for_label }}">{{ pole.label }}{% if pole.field.required %} <span class="gwiazdka">*</span>{% endif %}</label>
+      {{ pole }}
+      {% if pole.help_text %}<p class="podpowiedz">{{ pole.help_text }}</p>{% endif %}
+      {% endfor %}
+
+      <button type="submit">Dodaj ucznia</button>
+    </form>
+  </section>
+</div>
+
+<script>
+    const wybierzPrzedmiot = document.getElementById('id_przedmiot');
+    const formularz = document.getElementById('formularz-ucznia');
+    if (wybierzPrzedmiot && formularz) {
+        wybierzPrzedmiot.addEventListener('change', () => {
+            const ukryty = document.createElement('input');
+            ukryty.type = 'hidden';
+            ukryty.name = 'wybierz_przedmiot';
+            ukryty.value = '1';
+            formularz.appendChild(ukryty);
+            formularz.submit();
+        });
+    }
+</script>
+{% endblock %}

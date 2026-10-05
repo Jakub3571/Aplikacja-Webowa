@@ -1,81 +1,174 @@
-{% extends 'konta/panel.html' %}
+{% extends 'konta/panel.html' %} {% block tytul %}Płatności — Panel
+pracowniczy{% endblock %} {% block panel %}
+<div class="platnosci-uklad">
+    <section class="karta">
+        <h2>Płatności</h2>
+        {% if uczniowie %}
+        <div class="tabela-wrapper">
+            <table class="tabela">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Uczeń</th>
+                        <th>Nauczyciel</th>
+                        <th>Wpisał</th>
+                        <th>1. lekcja</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for uczen in uczniowie %}
+                    <tr>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="uczen_id" value="{{ uczen.id }}" />
+                                <input type="hidden" name="oznacz_zaplacone" value="1" />
+                                <button type="submit" class="przycisk-zaplac">Zapłacone</button>
+                            </form>
+                        </td>
+                        <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
+                        <td>{{ uczen.korepetytor }}</td>
+                        <td>{{ uczen.kto_umowil }}</td>
+                        <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+                        <td><span class="status-niezaplacone">❌ niezapłacone</span></td>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="uczen_id" value="{{ uczen.id }}" />
+                                <input type="hidden" name="usun_ucznia" value="1" />
+                                <button type="submit" class="przycisk-usun">Usuń</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>Brak uczniów na liście płatności.</p>
+        {% endif %}
+    </section>
+</div>
 
-{% block tytul %}Płatności — Panel pracowniczy{% endblock %}
+<div class="platnosci-uklad">
+    <section class="karta">
+        <h2>Rozliczenia</h2>
+        {% if rozliczenia %}
+        <div class="tabela-wrapper">
+            <table class="tabela">
+                <thead>
+                    <tr>
+                        <th>Nauczyciel</th>
+                        <th>Uczniowie</th>
+                        <th>Zapłacone zajęcia</th>
+                        <th>Stawka</th>
+                        <th>Do wypłaty</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pozycja in rozliczenia %}
+                    <tr>
+                        <td>
+                            {{ pozycja.nauczyciel.imie }} {{ pozycja.nauczyciel.nazwisko }}
+                        </td>
+                        <td>{{ pozycja.liczba_uczniow }}</td>
+                        <td>{{ pozycja.liczba_zaplaconych }}</td>
+                        <td>{{ pozycja.nauczyciel.stawka }} zł</td>
+                        <td><strong>{{ pozycja.kwota }} zł</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="podtytul">
+            Brak rozliczeń — nauczyciele nie mają przypisanych uczniów (sprawdź
+            pisownię korepetytora u ucznia).
+        </p>
+        {% endif %}
+    </section>
+</div>
 
-{% block panel %}
+<div class="platnosci-uklad">
+    <section class="karta">
+        <h2>Zapłacone</h2>
+        {% if zaplaconi %}
+        <div class="tabela-wrapper">
+            <table class="tabela">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Uczeń</th>
+                        <th>Nauczyciel</th>
+                        <th>1. lekcja</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for uczen in zaplaconi %}
+                    <tr>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="uczen_id" value="{{ uczen.id }}" />
+                                <input type="hidden" name="odznacz_zaplacone" value="1" />
+                                <button type="submit" class="przycisk-usun">Cofnij</button>
+                            </form>
+                        </td>
+                        <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
+                        <td>{{ uczen.korepetytor }}</td>
+                        <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+                        <td><span class="status-zaplacone">✅ zapłacone</span></td>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="uczen_id" value="{{ uczen.id }}" />
+                                <input type="hidden" name="usun_ucznia" value="1" />
+                                <button type="submit" class="przycisk-usun">Usuń</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="podtytul">
+            Brak zapłaconych płatności — oznacz „Zapłacone" w tabeli powyżej.
+        </p>
+        {% endif %}
+    </section>
+</div>
+
 <section class="karta">
-  <h2>Płatności</h2>
-  {% if uczniowie %}
-    <div class="tabela-wrapper">
-      <table class="tabela">
-        <thead>
-          <tr>
-            <th></th>
-            <th>Uczeń</th>
-            <th>Nauczyciel</th>
-            <th>Wpisał</th>
-            <th>1. lekcja</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for uczen in uczniowie %}
-            <tr>
-              <td>
-                {% if not uczen.zaplacone %}
-                  <form method="post">
-                    {% csrf_token %}
-                    <input type="hidden" name="uczen_id" value="{{ uczen.id }}">
-                    <input type="hidden" name="oznacz_zaplacone" value="1">
-                    <button type="submit" class="przycisk-zaplac">Zapłacone</button>
-                  </form>
-                {% endif %}
-              </td>
-              <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
-              <td>{{ uczen.korepetytor }}</td>
-              <td>{{ uczen.kto_umowil }}</td>
-              <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
-              <td>
-                {% if uczen.zaplacone %}
-                  <span class="status-zaplacone">✅ zapłacone</span>
-                {% else %}
-                  <span class="status-niezaplacone">❌ niezapłacone</span>
-                {% endif %}
-              </td>
-              <td>
-                <form method="post">
-                  {% csrf_token %}
-                  <input type="hidden" name="uczen_id" value="{{ uczen.id }}">
-                  <input type="hidden" name="usun_ucznia" value="1">
-                  <button type="submit" class="przycisk-usun">Usuń</button>
-                </form>
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% else %}
-    <p>Brak uczniów na liście płatności.</p>
-  {% endif %}
-</section>
-
-<section class="karta">
-  <h2>Wyślij raport</h2>
-  {% if wszyscy_zaplacono and uczniowie %}
-    <p class="podtytul">Wszyscy uczniowie mają status „zapłacone" — możesz wysłać raport.</p>
-    <form method="post" class="formularz">
-      {% csrf_token %}
-      <input type="hidden" name="wyslij_raport" value="1">
-      <label for="id_email_raportu">Email odbiorcy raportu</label>
-      <input type="email" name="email_raportu" id="id_email_raportu" value="{{ email_raportu }}" required>
-      <button type="submit">Wyślij raport</button>
-    </form>
-  {% else %}
+    <h2>Wyślij raport</h2>
+    {% if zaplaconi %}
     <p class="podtytul">
-      Raport będzie możliwy do wysłania dopiero, gdy wszyscy uczniowie z listy będą mieli status „zapłacone".
+        Raport obejmie tylko płatności z kafelka „Zapłacone". Po wysłaniu znikną
+        one z listy, a niezapłacone zostaną.
     </p>
-  {% endif %}
+    <form method="post" class="formularz">
+        {% csrf_token %}
+        <input type="hidden" name="wyslij_raport" value="1" />
+        <label for="id_email_raportu">Email odbiorcy raportu</label>
+        <input
+            type="email"
+            name="email_raportu"
+            id="id_email_raportu"
+            value="{{ email_raportu }}"
+            required
+        />
+        <button type="submit">Wyślij raport</button>
+    </form>
+    {% else %}
+    <p class="podtytul">
+        Brak zapłaconych płatności — oznacz „Zapłacone" w tabeli powyżej, aby
+        wysłać raport.
+    </p>
+    {% endif %}
 </section>
+
 {% endblock %}

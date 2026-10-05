@@ -1,6 +1,6 @@
 {% extends 'konta/panel.html' %} {% block tytul %}Uczniowie — Panel
 pracowniczy{% endblock %} {% block panel %}
-<div class="uczniowie-układ">
+<div class="uczniowie-uklad">
 	<section class="karta">
 		<h2>Dodaj ucznia</h2>
 
@@ -18,12 +18,15 @@ pracowniczy{% endblock %} {% block panel %}
 		<form method="post" class="formularz" id="formularz-ucznia">
 			{% csrf_token %}
 
-			<label for="{{ form.pierwsza_lekcja.id_for_label }}"
-				>Data i godzina 1. lekcji <span class="gwiazdka">*</span></label
+			<label for="{{ form.data_pierwszej_lekcji.id_for_label }}"
+				>Data 1. lekcji <span class="gwiazdka">*</span></label
 			>
-			{{ form.pierwsza_lekcja }} {% if form.pierwsza_lekcja.help_text %}
-			<p class="podpowiedz">{{ form.pierwsza_lekcja.help_text }}</p>
-			{% endif %}
+			{{ form.data_pierwszej_lekcji }}
+
+			<label for="{{ form.godzina_pierwszej_lekcji.id_for_label }}"
+				>Godzina 1. lekcji <span class="gwiazdka">*</span></label
+			>
+			{{ form.godzina_pierwszej_lekcji }}
 
 			<label for="{{ form.przedmiot.id_for_label }}"
 				>Przedmiot <span class="gwiazdka">*</span></label
@@ -108,46 +111,21 @@ pracowniczy{% endblock %} {% block panel %}
 
 	<div class="uczniowie-bok">
 		<section class="karta">
-			<h2>Lista uczniów ({{ uczniowie|length }})</h2>
-			{% if uczniowie %}
-			<div class="tabela-wrapper">
-				<table class="tabela">
-					<thead>
-						<tr>
-							<th>Uczeń</th>
-							<th>Przedmiot</th>
-							<th>Poziom</th>
-							<th>Korepetytor</th>
-							<th>1. lekcja</th>
-							<th>Umówił</th>
-						</tr>
-					</thead>
-					<tbody>
-						{% for uczen in uczniowie %}
-						<tr>
-							<td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
-							<td>{{ uczen.przedmiot }}</td>
-							<td>{{ uczen.poziom }}</td>
-							<td>{{ uczen.korepetytor }}</td>
-							<td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
-							<td>{{ uczen.kto_umowil }}</td>
-						</tr>
-						{% endfor %}
-					</tbody>
-				</table>
-			</div>
-			{% else %}
-			<p>Brak uczniów w systemie. Dodaj pierwszego obok.</p>
-			{% endif %}
-		</section>
-
-		<section class="karta">
 			<h2>Dostępność nauczycieli</h2>
+			<div class="pole-szukania">
+				<input
+					type="text"
+					class="szukaj-tabela"
+					data-tabela="tabela-dostepnosci"
+					placeholder="Szukaj nauczyciela..."
+				/>
+			</div>
 			{% if nadchodzace_dostepnosci %}
 			<div class="tabela-wrapper">
-				<table class="tabela">
+				<table class="tabela" id="tabela-dostepnosci">
 					<thead>
 						<tr>
+							<th></th>
 							<th>Nauczyciel</th>
 							<th>Przedmiot</th>
 							<th>Dni</th>
@@ -158,18 +136,25 @@ pracowniczy{% endblock %} {% block panel %}
 						{% for termin in nadchodzace_dostepnosci %}
 						<tr>
 							<td>
+								<a
+									class="ikona-kalendarza"
+									href="{% url 'kalendarz_nauczyciela' termin.nauczyciel.id %}"
+									title="Zobacz kalendarz"
+									>📅</a
+								>
+							</td>
+							<td>
 								{{ termin.nauczyciel.imie }} {{ termin.nauczyciel.nazwisko }}
 							</td>
 							<td>{{ termin.nauczyciel.przedmiot }}</td>
 							<td>
-								{% if termin.data_od == termin.data_do %} {{
-								termin.data_od|date:"d.m.Y" }} {% else %} {{
-								termin.data_od|date:"d.m.Y" }} – {{ termin.data_do|date:"d.m.Y"
-								}} {% endif %}
+								{% if termin.dni %}{% for d in termin.dni %}{{ d|date:"d.m.Y"
+								}}{% if not forloop.last %}, {% endif %}{% endfor %}{% else
+								%}—{% endif %}
 							</td>
 							<td>
-								{{ termin.godzina_od|time:"H:i" }} – {{
-								termin.godzina_do|time:"H:i" }}
+								{% if termin.godzina_od %}{{ termin.godzina_od|time:"H:i" }} –
+								{{ termin.godzina_do|time:"H:i" }}{% else %}—{% endif %}
 							</td>
 						</tr>
 						{% endfor %}
@@ -177,11 +162,79 @@ pracowniczy{% endblock %} {% block panel %}
 				</table>
 			</div>
 			{% else %}
-			<p>Brak nadchodzących terminów nauczycieli.</p>
+			<p>Brak nauczycieli w systemie. Dodaj ich w zakładce Nauczyciele.</p>
+			{% endif %}
+		</section>
+
+		<section class="karta">
+			<h2>Lista uczniów ({{ uczniowie|length }})</h2>
+			<div class="pole-szukania">
+				<input
+					type="text"
+					class="szukaj-tabela"
+					data-tabela="tabela-uczniowie"
+					placeholder="Szukaj ucznia..."
+				/>
+			</div>
+			{% if uczniowie %}
+			<div class="tabela-wrapper">
+				<table class="tabela" id="tabela-uczniowie">
+					<thead>
+						<tr>
+							<th>Uczeń</th>
+							<th>Rodzic</th>
+							<th>Telefon główny</th>
+							<th>Email główny</th>
+							<th>Telefon dodatkowy</th>
+							<th>Email dodatkowy</th>
+							<th>Korepetytor</th>
+							<th>Przedmiot</th>
+							<th>Poziom</th>
+							<th>Data 1. lekcji</th>
+							<th>Czas utworzenia</th>
+							<th>Kto umówił</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for uczen in uczniowie %}
+						<tr>
+							<td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
+							<td>{{ uczen.rodzic }}</td>
+							<td>{{ uczen.telefon_glowny }}</td>
+							<td>{{ uczen.email_glowny }}</td>
+							<td>{{ uczen.telefon_dodatkowy }}</td>
+							<td>{{ uczen.email_dodatkowy }}</td>
+							<td>{{ uczen.korepetytor }}</td>
+							<td>{{ uczen.przedmiot }}</td>
+							<td>{{ uczen.poziom }}</td>
+							<td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+							<td>{{ uczen.dodano|date:"d.m.Y H:i" }}</td>
+							<td>{{ uczen.kto_umowil }}</td>
+						</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+			{% else %}
+			<p>Brak uczniów w systemie. Dodaj pierwszego obok.</p>
 			{% endif %}
 		</section>
 	</div>
 </div>
+
+<script>
+	document.querySelectorAll('.szukaj-tabela').forEach(function (pole) {
+		pole.addEventListener('input', function () {
+			var fraza = pole.value.trim().toLowerCase();
+			var tabela = document.getElementById(pole.dataset.tabela);
+			if (!tabela) return;
+			tabela.querySelectorAll('tbody tr').forEach(function (wiersz) {
+				var tekst = wiersz.textContent.toLowerCase();
+				wiersz.style.display = tekst.indexOf(fraza) !== -1 ? '' : 'none';
+			});
+		});
+	});
+</script>
 
 <script>
 	const wybierzPrzedmiot = document.getElementById('id_przedmiot');
@@ -196,26 +249,28 @@ pracowniczy{% endblock %} {% block panel %}
 			formularz.submit();
 		});
 	}
-
-	const poleDaty = document.getElementById('id_pierwsza_lekcja');
-	if (poleDaty) {
-		const przyciagnijMinuty = () => {
-			const wartosc = poleDaty.value;
-			if (!wartosc) return;
-			const [data, godzina] = wartosc.split('T');
-			if (!godzina) return;
-			const [h, m] = godzina.split(':').map(Number);
-			const noweMinuty = m < 15 ? 0 : m < 45 ? 30 : 60;
-			const noweH = (h + (noweMinuty === 60 ? 1 : 0)) % 24;
-			poleDaty.value =
-				data +
-				'T' +
-				String(noweH).padStart(2, '0') +
-				':' +
-				(noweMinuty === 60 ? '00' : String(noweMinuty).padStart(2, '0'));
-		};
-		poleDaty.addEventListener('change', przyciagnijMinuty);
-		poleDaty.addEventListener('blur', przyciagnijMinuty);
-	}
+</script>
+<script>
+    const godzina = document.getElementById('id_godzina_pierwszej_lekcji');
+    if (godzina) {
+        const opak = document.createElement('div');
+        opak.className = 'suwak-godzin';
+        gora = document.createElement('button');
+        gora.type = 'button';
+        gora.className = 'suwak-godzin-strzalka';
+        gora.textContent = '▲';
+        dol = document.createElement('button');
+        dol.type = 'button';
+        dol.className = 'suwak-godzin-strzalka';
+        dol.textContent = '▼';
+        godzina.replaceWith(opak);
+        opak.append(gora, godzina, dol);
+        gora.addEventListener('click', () => {
+            if (godzina.selectedIndex > 0) godzina.selectedIndex -= 1;
+        });
+        dol.addEventListener('click', () => {
+            if (godzina.selectedIndex < godzina.options.length - 1) godzina.selectedIndex += 1;
+        });
+    }
 </script>
 {% endblock %}

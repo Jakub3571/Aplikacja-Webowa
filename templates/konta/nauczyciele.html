@@ -37,30 +37,45 @@
       {{ form.email }}
       {% if form.email.help_text %}<p class="podpowiedz">{{ form.email.help_text }}</p>{% endif %}
 
+      <label for="{{ form.stawka.id_for_label }}">Stawka <span class="gwiazdka">*</span></label>
+      {{ form.stawka }}
+      {% if form.stawka.help_text %}<p class="podpowiedz">{{ form.stawka.help_text }}</p>{% endif %}
+
       <button type="submit">Dodaj nauczyciela</button>
     </form>
   </section>
 
   <section class="karta">
     <h2>Lista nauczycieli ({{ nauczyciele|length }})</h2>
+    <div class="pole-szukania">
+      <input type="text" class="szukaj-tabela" data-tabela="tabela-nauczyciele" placeholder="Szukaj nauczyciela...">
+    </div>
     {% if nauczyciele %}
       <div class="tabela-wrapper">
-        <table class="tabela">
+        <table class="tabela" id="tabela-nauczyciele">
           <thead>
             <tr>
+              <th>Umowa</th>
               <th>Nauczyciel</th>
               <th>Przedmiot</th>
               <th>Email</th>
+              <th>Stawka</th>
               <th>Kalendarz</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {% for nauczyciel in nauczyciele %}
+               {% for nauczyciel in nauczyciele %}
               <tr>
+                <td>
+                  <a class="przycisk-umowa {% if nauczyciel.ma_umowe %}umowa-tak{% else %}umowa-nie{% endif %}" href="{% url 'przelacz_umowe' nauczyciel.id %}" title="{% if nauczyciel.ma_umowe %}Umowa podpisana — kliknij, aby wycofać{% else %}Brak umowy — kliknij, aby oznaczyć jako podpisaną{% endif %}">
+                    {% if nauczyciel.ma_umowe %}✔{% else %}✘{% endif %}
+                  </a>
+                </td>
                 <td>{{ nauczyciel.imie }} {{ nauczyciel.nazwisko }}</td>
                 <td>{{ nauczyciel.przedmiot }}</td>
                 <td>{{ nauczyciel.email }}</td>
+                <td>{{ nauczyciel.stawka }} zł</td>
                 <td><a class="ikona-kalendarza" href="{% url 'kalendarz_nauczyciela' nauczyciel.id %}" title="Zobacz kalendarz">📅</a></td>
                 <td><a class="usuwanie" href="{% url 'usun_nauczyciela' nauczyciel.id %}">usuń</a></td>
               </tr>
@@ -73,4 +88,18 @@
     {% endif %}
   </section>
 </div>
+
+<script>
+  document.querySelectorAll('.szukaj-tabela').forEach(function (pole) {
+    pole.addEventListener('input', function () {
+      var fraza = pole.value.trim().toLowerCase();
+      var tabela = document.getElementById(pole.dataset.tabela);
+      if (!tabela) return;
+      tabela.querySelectorAll('tbody tr').forEach(function (wiersz) {
+        var tekst = wiersz.textContent.toLowerCase();
+        wiersz.style.display = tekst.indexOf(fraza) !== -1 ? '' : 'none';
+      });
+    });
+  });
+</script>
 {% endblock %}

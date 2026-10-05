@@ -66,6 +66,8 @@ class Nauczyciel(models.Model):
     nazwisko = models.CharField('nazwisko', max_length=100)
     przedmiot = models.CharField('przedmiot', max_length=100, choices=PRZEDMIOTY, default='')
     email = models.EmailField('email')
+    stawka = models.DecimalField('stawka', max_digits=6, decimal_places=2, default=0)
+    ma_umowe = models.BooleanField('ma umowę', default=False)
     dodano = models.DateTimeField('data dodania', auto_now_add=True)
 
     class Meta:
@@ -117,3 +119,22 @@ class RaportPlatnosci(models.Model):
 
     def __str__(self):
         return f'Raport z {self.wyslano:%d.%m.%Y %H:%M} — {self.email_odbiorcy}'
+
+class Lekcja(models.Model):
+    """Pojedyncza lekcja ucznia zapisana w kalendarzu lekcji."""
+    uczen = models.ForeignKey(
+        Uczen,
+        on_delete=models.CASCADE,
+        related_name='lekcje',
+        verbose_name='uczeń',
+    )
+    data = models.DateTimeField('data i godzina lekcji')
+    dodano = models.DateTimeField('data dodania', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'lekcja'
+        verbose_name_plural = 'lekcje'
+        ordering = ['data']
+
+    def __str__(self):
+        return f'{self.uczen}: {self.data:%d.%m.%Y %H:%M}'

@@ -1,0 +1,45 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Lekcje — Panel pracowniczy{% endblock %}
+
+{% block panel %}
+<div class="platnosci-uklad">
+  <section class="karta">
+    <h2>Lekcje</h2>
+    {% if uczniowie %}
+    <div class="tabela-wrapper">
+      <table class="tabela">
+        <thead>
+          <tr>
+            <th>Uczeń</th>
+            <th>Korepetytor</th>
+            <th>Przedmiot</th>
+            <th>1. lekcja</th>
+            <th>Lekcje</th>
+            <th>Dodano</th>
+            <th>Kalendarz</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for uczen in uczniowie %}
+          <tr>
+            <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
+            <td>{{ uczen.korepetytor }}</td>
+            <td>{{ uczen.przedmiot }}</td>
+            <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+            <td>{{ uczen.liczba_lekcji }}</td>
+            <td>{{ uczen.dodano|date:"d.m.Y H:i" }}</td>
+            <td>
+              <a class="ikona-kalendarza" href="{% url 'kalendarz_lekcji' uczen.id %}" title="Kalendarz lekcji">📅</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="podtytul">Brak uczniów w systemie — dodaj ich w zakładce Uczniowie.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

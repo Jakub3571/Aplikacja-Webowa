@@ -1,0 +1,64 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Kalendarz lekcji — {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}{% endblock %}
+
+{% block panel %}
+<section class="karta kalendarz-zajawka">
+  <h2>📅 Kalendarz lekcji: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</h2>
+  <p class="podtytul">
+    Korepetytor: {{ uczen.korepetytor }} · przedmiot: {{ uczen.przedmiot }} · poziom: {{ uczen.poziom }} · lekcji razem: {{ liczba_lekcji }}
+  </p>
+  <a class="powrot" href="{% url 'lekcje' %}">← Wróć do listy uczniów</a>
+</section>
+
+<div class="kalendarz-uklad">
+  <section class="karta">
+    <div class="kalendarz-naglowek">
+      <a class="strzalka" href="?rok={{ poprzedni_rok }}&miesiac={{ poprzedni_miesiac }}">&larr;</a>
+      <h3>{{ nazwa_miesiaca|capfirst }} {{ rok }}</h3>
+      <a class="strzalka" href="?rok={{ nastepny_rok }}&miesiac={{ nastepny_miesiac }}">&rarr;</a>
+    </div>
+    <table class="kalendarz">
+      <thead>
+        <tr>
+          {% for dzien in dni_tygodnia %}<th>{{ dzien }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for tydzien in tygodnie %}
+        <tr>
+          {% for dzien in tydzien %}
+          <td class="{% if not dzien.w_tym_miesiacu %}inny-miesiac{% endif %}
+                     {% if dzien.ma_lekcje %}dzien-dostepny{% endif %}
+                     {% if dzien.wybrany %}dzien-wybrany{% endif %}">
+            {% if dzien.w_tym_miesiacu %}
+            <a href="?rok={{ rok }}&miesiac={{ miesiac }}&dzien={{ dzien.data.day }}">{{ dzien.data.day }}</a>
+            {% else %}
+            {{ dzien.data.day }}
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="kalendarz-legenda"><span class="kropka-dostepny"></span> dni z lekcjami · <span class="kropka-wybrany"></span> dzień wybrany</p>
+  </section>
+
+  {% if wybrany_dzien %}
+  <section class="karta">
+    <h3>Dzień: {{ wybrany_dzien|date:"l, d.m.Y" }}</h3>
+    <p class="podtytul">Klikaj kafelki godzin, żeby wpisać lekcję (klik ponowny ją usuwa).</p>
+    <div class="kafelki-godzin">
+      {% for kafelek in kafelki %}
+      <form method="post" class="kafelek-form">
+        {% csrf_token %}
+        <input type="hidden" name="przelacz_godzine" value="1">
+        <button type="submit" name="godzina" value="{{ kafelek.etykieta }}" class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %}">{{ kafelek.etykieta }}</button>
+      </form>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

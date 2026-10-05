@@ -3,7 +3,7 @@
 {% block tytul %}Kalendarz {{ nauczyciel.imie }} {{ nauczyciel.nazwisko }} — Panel pracowniczy{% endblock %}
 
 {% block panel %}
-<section class="karta">
+<section class="karta kalendarz-zajawka">
   <h2>📅 Kalendarz: {{ nauczyciel.imie }} {{ nauczyciel.nazwisko }}</h2>
   <p class="podtytul">{{ nauczyciel.email }}{% if nauczyciel.przedmiot %} · {{ nauczyciel.przedmiot }}{% endif %}</p>
   <a class="powrot" href="{% url 'nauczyciele' %}">← Wróć do listy nauczycieli</a>
@@ -44,47 +44,20 @@
     <p class="kalendarz-legenda"><span class="kropka-dostepny"></span> dni z wpisanymi godzinami · <span class="kropka-wybrany"></span> dzień wybrany</p>
   </section>
 
+  {% if wybrany_dzien %}
   <section class="karta">
-    {% if wybrany_dzien %}
-      <h3>Dzień: {{ wybrany_dzien|date:"l, d.m.Y" }}</h3>
-      <p class="podtytul">Klikaj kafelki godzin, żeby oznaczać (klik ponowny odznacza).</p>
-      <div class="kafelki-godzin">
-        {% for kafelek in kafelki %}
-          <form method="post" class="kafelek-form">
-            {% csrf_token %}
-            <input type="hidden" name="przelacz_godzine" value="1">
-            <input type="hidden" name="godzina" value="{{ kafelek.etykieta }}">
-            <button type="submit" class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %}">{{ kafelek.etykieta }}</button>
-          </form>
-        {% endfor %}
-      </div>
-    {% else %}
-      <h3>Godziny pracy</h3>
-      <p class="podtytul">Kliknij dowolny dzień w kalendarzu obok, aby oznaczać godziny, w których nauczyciel może przyjmować uczniów.</p>
-    {% endif %}
-  </section>
-</div>
-
-<section class="karta">
-  <h3>Godziny w miesiącu ({{ dostepnosci|length }})</h3>
-  {% if dostepnosci %}
-    <div class="tabela-wrapper">
-      <table class="tabela">
-        <thead>
-          <tr><th>Dzień</th><th>Godzina</th></tr>
-        </thead>
-        <tbody>
-          {% for termin in dostepnosci %}
-            <tr>
-              <td>{{ termin.data_od|date:"d.m.Y" }}</td>
-              <td>{{ termin.godzina_od|time:"H:i" }} – {{ termin.godzina_do|time:"H:i" }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <h3>Dzień: {{ wybrany_dzien|date:"l, d.m.Y" }}</h3>
+    <p class="podtytul">Klikaj kafelki godzin, żeby oznaczać (klik ponowny odznacza).</p>
+    <div class="kafelki-godzin">
+      {% for kafelek in kafelki %}
+         <form method="post" class="kafelek-form">
+          {% csrf_token %}
+          <input type="hidden" name="przelacz_godzine" value="1">
+          <button type="submit" name="godzina" value="{{ kafelek.etykieta }}" class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %}">{{ kafelek.etykieta }}</button>
+        </form>
+      {% endfor %}
     </div>
-  {% else %}
-    <p>Brak wpisanych godzin w tym miesiącu.</p>
+  </section>
   {% endif %}
-</section>
+</div>
 {% endblock %}

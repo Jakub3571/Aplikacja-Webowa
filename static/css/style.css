@@ -167,6 +167,8 @@ body {
 }
 
 .zakladki a {
+  flex: 1 1 0;
+  text-align: center;
   padding: 0.5rem 1rem;
   border: 1px solid var(--ramka);
   border-radius: 8px 8px 0 0;
@@ -208,6 +210,41 @@ body {
   font-size: 0.8rem;
   opacity: 0.65;
   margin-top: 0.25rem;
+}
+
+.pole-szukania {
+  position: relative;
+  margin-bottom: 0.75rem;
+}
+
+.pole-szukania::before {
+  content: "🔍";
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.pole-szukania input {
+  width: 100%;
+  padding: 0.55rem 0.75rem 0.55rem 2.4rem;
+  border: 1px solid var(--ramka);
+  border-radius: 999px;
+  background: var(--tlo);
+  color: var(--tekst);
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pole-szukania input::placeholder { opacity: 0.6; }
+
+.pole-szukania input:focus {
+  outline: none;
+  border-color: var(--akcent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .kalendarz-naglowek {
@@ -302,11 +339,46 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  align-self: stretch;
+}
+
+.uczniowie-bok .karta {
+  flex: 1;
 }
 
 @media (max-width: 900px) {
   .uczniowie-uklad { grid-template-columns: 1fr; }
 }
+
+.platnosci-uklad {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.platnosci-uklad .karta {
+  margin-top: 0;
+  max-width: none;
+  width: 100%;
+}
+
+.przycisk-umowa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.umowa-tak { background: #16a34a; color: #fff; }
+.umowa-nie { background: #dc2626; color: #fff; }
+
+.przycisk-umowa:hover { opacity: 0.75; }
 
 .przycisk-zaplac {
   padding: 0.3rem 0.75rem;
@@ -381,6 +453,8 @@ body {
 
 .kalendarz-uklad .karta { margin-top: 0; max-width: none; }
 
+.kalendarz-zajawka { max-width: none; }
+
 @media (max-width: 900px) {
   .kalendarz-uklad { grid-template-columns: 1fr; }
 }
@@ -388,4 +462,33 @@ body {
 .formularz input[type="datetime-local"] {
   border-radius: 999px;
   padding-left: 1.1rem;
+}
+
+.formularz input[type="number"]::-webkit-outer-spin-button,
+.formularz input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.formularz input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.suwak-godzin {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.suwak-godzin select {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+.suwak-godzin-strzalka {
+    padding: 0.45rem 0.7rem;
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
 }

@@ -5,19 +5,22 @@
 {% block tresc %}
 <div class="opakowanie">
   <header class="pasek">
-    <span>👷 Panel pracowniczy</span>
+    <span>👤 Panel pracowniczy</span>
     <nav>
       <a href="{% url 'zmiana_hasla' %}">Zmień hasło</a>
       <a href="{% url 'wyloguj' %}">Wyloguj się</a>
     </nav>
   </header>
 
+  {% if request.user.is_superuser %}
   <nav class="zakladki">
     <a href="{% url 'pulpit' %}" class="{% if request.resolver_match.url_name == 'pulpit' %}aktywna{% endif %}">Start</a>
     <a href="{% url 'uczniowie' %}" class="{% if request.resolver_match.url_name == 'uczniowie' %}aktywna{% endif %}">Uczniowie</a>
     <a href="{% url 'nauczyciele' %}" class="{% if request.resolver_match.url_name == 'nauczyciele' %}aktywna{% endif %}">Nauczyciele</a>
+    <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">Lekcje</a>
     <a href="{% url 'platnosci' %}" class="{% if request.resolver_match.url_name == 'platnosci' %}aktywna{% endif %}">Płatności</a>
   </nav>
+  {% endif %}
 
   <main class="panel-tresc">
     {% block panel %}{% endblock %}

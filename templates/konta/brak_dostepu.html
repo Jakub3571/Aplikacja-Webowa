@@ -1,0 +1,16 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Brak dostępu — Panel pracowniczy{% endblock %}
+
+{% block panel %}
+<div class="platnosci-uklad">
+  <section class="karta">
+    <h2>Brak dostępu</h2>
+    <p class="podtytul">
+      Nie masz uprawnień do tej części panelu. Jeśli powinieneś mieć do niej
+      dostęp, poproś szefa o jego włączenie.
+    </p>
+    <p><a href="{% url 'pulpit' %}">← Wróć na stronę główną</a></p>
+  </section>
+</div>
+{% endblock %}
