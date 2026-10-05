@@ -1,8 +1,9 @@
 {% extends 'konta/panel.html' %} {% block tytul %}Uczniowie — Panel
 pracowniczy{% endblock %} {% block panel %}
 <div class="uczniowie-uklad">
+	{% if request.user.is_superuser %}
 	<section class="karta">
-		<h2>Dodaj ucznia</h2>
+        	<h2>Lista uczniów ({{ uczniowie|length }})</h2>
 
 		{% if form.errors %}
 		<div class="komunikat error">
@@ -219,6 +220,7 @@ pracowniczy{% endblock %} {% block panel %}
 			<p>Brak uczniów w systemie. Dodaj pierwszego obok.</p>
 			{% endif %}
 		</section>
+		{% endif %}
 	</div>
 </div>
 
