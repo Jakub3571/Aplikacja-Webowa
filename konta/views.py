@@ -129,7 +129,7 @@ def wyslij_powiadomienie_o_uczniu(request, uczen):
 
 @login_required
 def uczniowie(request):
-    """Zakładka uczniowie: szef widzi listę i formularz, pracownik tylko formularz."""
+    """Zakładka uczniowie: lista, formularz dodawania i dostępność nauczycieli."""
     uczniowie_lista = Uczen.objects.all()
     wybrany_przedmiot = request.POST.get('przedmiot') if request.method == 'POST' else None
 
@@ -138,8 +138,7 @@ def uczniowie(request):
             initial={'przedmiot': wybrany_przedmiot},
             przedmiot=wybrany_przedmiot,
         )
-        szablon = 'konta/formularz_ucznia.html' if not request.user.is_superuser else 'konta/uczniowie.html'
-        return render(request, szablon, {
+        return render(request, 'konta/uczniowie.html', {
             'form': form,
             'uczniowie': uczniowie_lista,
             'nadchodzace_dostepnosci': dostepnosci_nauczycieli(),
@@ -149,15 +148,13 @@ def uczniowie(request):
 
     if request.method == 'POST' and form.is_valid():
         uczen = form.save(commit=False)
-        uczen.pierwsza_lekcja = timezone.make_aware(form.cleaned_data['pierwsza_lekcja'])
         uczen.kto_umowil = request.user.get_full_name() or request.user.username
         uczen.save()
         messages.success(request, 'Uczeń został dodany do systemu.')
         wyslij_powiadomienie_o_uczniu(request, uczen)
         return redirect('uczniowie')
 
-    szablon = 'konta/formularz_ucznia.html' if not request.user.is_superuser else 'konta/uczniowie.html'
-    return render(request, szablon, {
+    return render(request, 'konta/uczniowie.html', {
         'form': form,
         'uczniowie': uczniowie_lista,
         'nadchodzace_dostepnosci': dostepnosci_nauczycieli(),
