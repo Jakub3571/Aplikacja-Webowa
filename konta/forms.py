@@ -1,10 +1,20 @@
 """Formularze: logowanie, zmiana hasła, dodawanie ucznia i nauczyciela."""
+
 from datetime import datetime, time
 
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 
-from .models import PRZEDMIOTY, Nauczyciel, Uczen
+from .models import (
+    POZIOMY_NAUCZYCIELA,
+    PRZEDMIOTY,
+    Nauczyciel,
+    Pracownik,
+    PrzedmiotNauczyciela,
+    Uczen,
+)
 
 WYBIERZ_PRZEDMIOT = [('', '— wybierz przedmiot —')] + list(PRZEDMIOTY)
 
@@ -14,6 +24,14 @@ POZIOMY = [
     ('szkoła średnia - rozszerzenie', 'szkoła średnia - rozszerzenie'),
     ('studia', 'studia'),
 ]
+
+# Mapowanie poziomu ucznia na poziom nauczyciela: poziom "szkoła średnia - podstawa"
+# wymaga nauczyciela z poziomem "podstawa", a "rozszerzenie" oraz "studia" — "rozszerzenie".
+POZIOM_UCZEN_NA_NAUCZYCIELA = {
+    'szkoła średnia - podstawa': 'podstawa',
+    'szkoła średnia - rozszerzenie': 'rozszerzenie',
+    'studia': 'rozszerzenie',
+}
 
 GODZINY_LEKCJI = [
     (f'{h:02d}:{m:02d}', f'{h:02d}:{m:02d}') for h in range(24) for m in (0, 30)
@@ -95,18 +113,32 @@ class FormularzUcznia(forms.ModelForm):
             'email_dodatkowy': {'invalid': 'Wpisz poprawny adres e-mail.'},
         }
 
-    def __init__(self, *args, przedmiot=None, **kwargs):
+    def __init__(self, *args, przedmiot=None, poziom=None, **kwargs):
         super().__init__(*args, **kwargs)
-        nauczyciele = Nauczyciel.objects.all()
+        nauczyciele = Nauczyciel.objects.none()
         if przedmiot:
-            nauczyciele = nauczyciele.filter(przedmiot=przedmiot)
-        else:
-            nauczyciele = Nauczyciel.objects.none()
+            wpisane_przedmioty = PrzedmiotNauczyciela.objects.filter(przedmiot=przedmiot)
+            if poziom:
+                poziom_nauczyciela = POZIOM_UCZEN_NA_NAUCZYCIELA.get(poziom)
+                if poziom_nauczyciela:
+                    wpisane_przedmioty = wpisane_przedmioty.filter(poziom=poziom_nauczyciela)
+            nauczyciele = (
+                Nauczyciel.objects
+                .filter(przedmioty__in=wpisane_przedmioty, aktywny=True)
+                .distinct()
+                .order_by('nazwisko', 'imie')
+            )
         self.fields['korepetytor'] = forms.ChoiceField(
             label='korepetytor',
-            choices=[('', '— najpierw wybierz przedmiot —')]
-            + [(f'{n.imie} {n.nazwisko}', f'{n.imie} {n.nazwisko}') for n in nauczyciele],
-            help_text='Nauczyciel prowadzący lekcje — lista zależna od wybranego przedmiotu',
+            choices=[('', '— najpierw wybierz przedmiot i poziom —')]
+            + [
+                (
+                    f'{n.imie} {n.nazwisko}',
+                    f'{n.imie} {n.nazwisko} ({n.przedmioty_tekst()})',
+                )
+                for n in nauczyciele
+            ],
+            help_text='Nauczyciel prowadzący lekcje — lista zależna od wybranego przedmiotu i poziomu',
         )
         for nazwa, pole in self.fields.items():
             pole.required = True
@@ -122,14 +154,65 @@ class FormularzUcznia(forms.ModelForm):
             dane['pierwsza_lekcja'] = datetime.combine(data, czas)
         return dane
 
+class FormularzUzytkownika(forms.ModelForm):
+    """Formularz dodawania nowego użytkownika panelu."""
+
+    haslo1 = forms.CharField(
+        label='hasło',
+        widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
+        help_text='Minimum 8 znaków. Nie może być samymi cyframi.',
+    )
+    haslo2 = forms.CharField(
+        label='powtórz hasło',
+        widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
+        help_text='Powtórz to samo hasło, żeby wykluczyć literówkę.',
+    )
+    uprawnienia = forms.ChoiceField(
+        label='uprawnienia',
+        choices=[('pracownik', 'pracownik'), ('admin', 'admin (pełny dostęp)')],
+        help_text='Admin widzi wszystkie zakładki; pracownik tylko formularz ucznia.',
+    )
+
+    class Meta:
+        model = Pracownik
+        fields = ['username', 'first_name', 'last_name', 'email', 'stanowisko', 'telefon']
+        help_texts = {
+            'username': 'Nazwa do logowania, np. j.kowalski',
+            'email': 'Adres e-mail pracownika',
+        }
+
+    def clean(self):
+        dane = super().clean()
+        haslo1 = dane.get('haslo1')
+        haslo2 = dane.get('haslo2')
+        if haslo1 and haslo2 and haslo1 != haslo2:
+            raise forms.ValidationError('Hasła nie są identyczne.')
+        if haslo1:
+            try:
+                validate_password(haslo1)
+            except ValidationError as e:
+                raise forms.ValidationError(list(e.messages))
+        return dane
+
+    def zapisz(self):
+        """Tworzy użytkownika z hasłem i uprawnieniami."""
+        user = self.save(commit=False)
+        user.set_password(self.cleaned_data['haslo1'])
+        user.is_superuser = self.cleaned_data['uprawnienia'] == 'admin'
+        user.is_staff = self.cleaned_data['uprawnienia'] == 'admin'
+        user.save()
+        return user
+    
+class WierszPrzedmiotu(forms.Form):
+    """Jeden wiersz formularza: przedmiot + poziom nauczania."""
+
+    przedmiot = forms.ChoiceField(label='przedmiot', choices=WYBIERZ_PRZEDMIOT)
+    poziom = forms.ChoiceField(label='poziom', choices=POZIOMY_NAUCZYCIELA)
+
 
 class FormularzNauczyciela(forms.ModelForm):
-    """Formularz dodawania nauczyciela."""
+    """Formularz dodawania nauczyciela z wieloma przedmiotami i poziomami."""
 
-    przedmiot = forms.ChoiceField(
-        label='przedmiot',
-        choices=WYBIERZ_PRZEDMIOT,
-    )
     stawka = forms.DecimalField(
         label='stawka',
         min_value=0,
@@ -138,7 +221,7 @@ class FormularzNauczyciela(forms.ModelForm):
 
     class Meta:
         model = Nauczyciel
-        fields = ['imie', 'nazwisko', 'przedmiot', 'email', 'stawka']
+        fields = ['imie', 'nazwisko', 'email', 'stawka']
         help_texts = {
             'imie': 'Imię nauczyciela',
             'nazwisko': 'Nazwisko nauczyciela',
@@ -153,3 +236,52 @@ class FormularzNauczyciela(forms.ModelForm):
         for nazwa, pole in self.fields.items():
             pole.required = True
             pole.widget.attrs['required'] = True
+        dane = None
+        if self.is_bound:
+            if hasattr(self.data, 'getlist'):
+                przedmioty = self.data.getlist('przedmioty')
+                poziomy = self.data.getlist('poziomy')
+            else:
+                przedmioty = self.data.get('przedmioty') or []
+                poziomy = self.data.get('poziomy') or []
+                if isinstance(przedmioty, str):
+                    przedmioty = [przedmioty]
+                if isinstance(poziomy, str):
+                    poziomy = [poziomy]
+            dane = [
+                {'przedmiot': p, 'poziom': poziomy[i] if i < len(poziomy) else 'podstawa'}
+                for i, p in enumerate(przedmioty)
+                if p
+            ]
+        self.wiersze = [
+            WierszPrzedmiotu(dane or {'przedmiot': '', 'poziom': 'podstawa'})
+        ] if not dane else [WierszPrzedmiotu(d) for d in dane]
+
+    def clean(self):
+        super().clean()
+        bledy = []
+        for i, wiersz in enumerate(self.wiersze, start=1):
+            if not wiersz.is_valid() or wiersz.cleaned_data.get('przedmiot') == '':
+                bledy.append(f'Wiersz {i}: wybierz przedmiot i poziom.')
+        pary = set()
+        for wiersz in self.wiersze:
+            if wiersz.is_valid() and wiersz.cleaned_data.get('przedmiot'):
+                para = (wiersz.cleaned_data['przedmiot'], wiersz.cleaned_data['poziom'])
+                if para in pary:
+                    bledy.append('Ten sam przedmiot i poziom jest wpisany dwa razy.')
+                pary.add(para)
+        if bledy:
+            raise forms.ValidationError(bledy)
+        return self.cleaned_data
+
+    def zapisz(self):
+        """Zapisuje nauczyciela i wszystkie jego przedmioty z poziomami."""
+        nauczyciel = self.save()
+        for wiersz in self.wiersze:
+            if wiersz.is_valid() and wiersz.cleaned_data.get('przedmiot'):
+                PrzedmiotNauczyciela.objects.get_or_create(
+                    nauczyciel=nauczyciel,
+                    przedmiot=wiersz.cleaned_data['przedmiot'],
+                    poziom=wiersz.cleaned_data['poziom'],
+                )
+        return nauczyciel

@@ -5,7 +5,7 @@
 {% block panel %}
 <section class="karta kalendarz-zajawka">
   <h2>📅 Kalendarz: {{ nauczyciel.imie }} {{ nauczyciel.nazwisko }}</h2>
-  <p class="podtytul">{{ nauczyciel.email }}{% if nauczyciel.przedmiot %} · {{ nauczyciel.przedmiot }}{% endif %}</p>
+  <p class="podtytul">{{ nauczyciel.email }}{% if nauczyciel.przedmioty_tekst %} · {{ nauczyciel.przedmioty_tekst }}{% endif %}</p>
   <a class="powrot" href="{% url 'nauczyciele' %}">← Wróć do listy nauczycieli</a>
 </section>
 

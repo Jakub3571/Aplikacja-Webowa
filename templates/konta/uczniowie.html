@@ -147,7 +147,7 @@ pracowniczy{% endblock %} {% block panel %}
 							<td>
 								{{ termin.nauczyciel.imie }} {{ termin.nauczyciel.nazwisko }}
 							</td>
-							<td>{{ termin.nauczyciel.przedmiot }}</td>
+							<td>{{ termin.nauczyciel.przedmioty_tekst }}</td>
 							<td>
 								{% if termin.dni %}{% for d in termin.dni %}{{ d|date:"d.m.Y"
 								}}{% if not forloop.last %}, {% endif %}{% endfor %}{% else
@@ -239,18 +239,23 @@ pracowniczy{% endblock %} {% block panel %}
 </script>
 
 <script>
-	const wybierzPrzedmiot = document.getElementById('id_przedmiot');
-	const formularz = document.getElementById('formularz-ucznia');
-	if (wybierzPrzedmiot && formularz) {
-		wybierzPrzedmiot.addEventListener('change', () => {
-			const ukryty = document.createElement('input');
-			ukryty.type = 'hidden';
-			ukryty.name = 'wybierz_przedmiot';
-			ukryty.value = '1';
-			formularz.appendChild(ukryty);
-			formularz.submit();
-		});
-	}
+    const wybierzPrzedmiot = document.getElementById('id_przedmiot');
+    const wybierzPoziom = document.getElementById('id_poziom');
+    const formularz = document.getElementById('formularz-ucznia');
+    const odswiezKorepetytorow = () => {
+        const ukryty = document.createElement('input');
+        ukryty.type = 'hidden';
+        ukryty.name = 'wybierz_przedmiot';
+        ukryty.value = '1';
+        formularz.appendChild(ukryty);
+        formularz.submit();
+    };
+    if (wybierzPrzedmiot && formularz) {
+        wybierzPrzedmiot.addEventListener('change', odswiezKorepetytorow);
+    }
+    if (wybierzPoziom && formularz) {
+        wybierzPoziom.addEventListener('change', odswiezKorepetytorow);
+    }
 </script>
 <script>
 	const godzina = document.getElementById('id_godzina_pierwszej_lekcji');

@@ -40,7 +40,8 @@ urlpatterns = [
     path('pulpit/', views.pulpit, name='pulpit'),
     path('uczniowie/', views.uczniowie, name='uczniowie'),
     path('nauczyciele/', views.nauczyciele, name='nauczyciele'),
-    path('nauczyciele/<int:nauczyciel_id>/usun/', views.usun_nauczyciela, name='usun_nauczyciela'),
+    path('nauczyciele/<int:nauczyciel_id>/archiwum/', views.archiwizuj_nauczyciela, name='archiwizuj_nauczyciela'),
+    path('nauczyciele/<int:nauczyciel_id>/przywroc/', views.przywroc_nauczyciela, name='przywroc_nauczyciela'),
     path('nauczyciele/<int:nauczyciel_id>/umowa/', views.przelacz_umowe, name='przelacz_umowe'),
     path('nauczyciele/<int:nauczyciel_id>/kalendarz/', views.kalendarz_nauczyciela, name='kalendarz_nauczyciela'),
     path('terminy/<int:termin_id>/usun/', views.usun_termin, name='usun_termin'),
@@ -48,6 +49,8 @@ urlpatterns = [
     path('lekcje/<int:uczen_id>/kalendarz/', views.kalendarz_lekcji, name='kalendarz_lekcji'),
     path('platnosci/', views.platnosci, name='platnosci'),
     path('zmiana-hasla/', views.zmiana_hasla, name='zmiana_hasla'),
+    path('uzytkownicy/', views.uzytkownicy, name='uzytkownicy'),
+    path('uzytkownicy/<int:user_id>/przelacz-szefa/', views.przelacz_szefa, name='przelacz_szefa'),
 ]
 
 handler403 = 'konta.views.brak_dostepu'

@@ -1,7 +1,8 @@
 """Rejestracja modeli w panelu administracyjnym Django."""
+
 from django.contrib import admin
 
-from .models import Dostepnosc, Nauczyciel, Pracownik, Uczen
+from .models import Dostepnosc, Nauczyciel, Pracownik, PrzedmiotNauczyciela, Uczen
 
 
 @admin.register(Pracownik)
@@ -11,6 +12,13 @@ class PracownikAdmin(admin.ModelAdmin):
     list_display = ('username', 'first_name', 'last_name', 'email', 'stanowisko', 'is_active')
     search_fields = ('username', 'first_name', 'last_name', 'stanowisko')
     list_filter = ('is_active', 'stanowisko')
+
+
+class PrzedmiotNauczycielaInline(admin.TabularInline):
+    """Przedmioty nauczyciela widoczne bezpośrednio w jego karcie."""
+
+    model = PrzedmiotNauczyciela
+    extra = 1
 
 
 class DostepnoscInline(admin.TabularInline):
@@ -24,10 +32,10 @@ class DostepnoscInline(admin.TabularInline):
 class NauczycielAdmin(admin.ModelAdmin):
     """Ustawienia widoku nauczycieli w panelu admina."""
 
-    list_display = ('imie', 'nazwisko', 'przedmiot', 'email')
+    list_display = ('imie', 'nazwisko', 'email', 'aktywny')
     search_fields = ('imie', 'nazwisko', 'email')
-    list_filter = ('przedmiot',)
-    inlines = [DostepnoscInline]
+    list_filter = ('aktywny',)
+    inlines = [PrzedmiotNauczycielaInline, DostepnoscInline]
 
 
 @admin.register(Dostepnosc)

@@ -7,11 +7,14 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import PermissionDenied
 
+def czy_szef(u):
+    """Prawdziwy szef: superuser LUB konto o nazwie 'Admin'."""
+    return bool(u.is_authenticated and (u.is_superuser or u.username.strip().lower() == 'admin'))
 
 def tylko_szef(widok):
     """Puszcza dalej tylko superusera (szefa); reszta dostaje stronę „brak dostępu"."""
     def sprawdz(u):
-        if u.is_superuser:
+        if czy_szef(u):
             return True
         raise PermissionDenied
     return user_passes_test(sprawdz, login_url='logowanie')(widok)
@@ -24,9 +27,10 @@ from .forms import (
     FormularzLogowania,
     FormularzNauczyciela,
     FormularzUcznia,
+    FormularzUzytkownika,
     FormularzZmianyHasla,
 )
-from .models import Dostepnosc, Lekcja, Nauczyciel, RaportPlatnosci, Uczen
+from .models import Dostepnosc, Lekcja, Nauczyciel, Pracownik, RaportPlatnosci, Uczen
 
 MIESIACE = [
     'styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec',
@@ -60,7 +64,7 @@ def wyloguj(request):
 @login_required
 def pulpit(request):
     """Strona startowa: szef widzi pulpit, pracownik od razu formularz ucznia."""
-    if not request.user.is_superuser:
+    if not czy_szef(request.user):
         return redirect('uczniowie')
     return render(request, 'konta/pulpit.html')
 
@@ -91,7 +95,12 @@ def dostepnosci_nauczycieli():
             wpis['godzina_do'] = termin.godzina_do
 
     wynik = []
-    for nauczyciel in Nauczyciel.objects.all().order_by('nazwisko', 'imie'):
+    for nauczyciel in (
+        Nauczyciel.objects
+        .prefetch_related('przedmioty')
+        .filter(aktywny=True)
+        .order_by('nazwisko', 'imie')
+    ):
         wpis = zgrupowane.get(nauczyciel.id)
         wynik.append({
             'nauczyciel': nauczyciel,
@@ -132,11 +141,13 @@ def uczniowie(request):
     """Zakładka uczniowie: lista, formularz dodawania i dostępność nauczycieli."""
     uczniowie_lista = Uczen.objects.all()
     wybrany_przedmiot = request.POST.get('przedmiot') if request.method == 'POST' else None
+    wybrany_poziom = request.POST.get('poziom') if request.method == 'POST' else None
 
     if request.method == 'POST' and 'wybierz_przedmiot' in request.POST:
         form = FormularzUcznia(
-            initial={'przedmiot': wybrany_przedmiot},
+            initial={'przedmiot': wybrany_przedmiot, 'poziom': wybrany_poziom},
             przedmiot=wybrany_przedmiot,
+            poziom=wybrany_poziom,
         )
         return render(request, 'konta/uczniowie.html', {
             'form': form,
@@ -144,10 +155,11 @@ def uczniowie(request):
             'nadchodzace_dostepnosci': dostepnosci_nauczycieli(),
         })
 
-    form = FormularzUcznia(request.POST or None, przedmiot=wybrany_przedmiot)
+    form = FormularzUcznia(request.POST or None, przedmiot=wybrany_przedmiot, poziom=wybrany_poziom)
 
     if request.method == 'POST' and form.is_valid():
         uczen = form.save(commit=False)
+        uczen.pierwsza_lekcja = form.cleaned_data['pierwsza_lekcja']
         uczen.kto_umowil = request.user.get_full_name() or request.user.username
         uczen.save()
         messages.success(request, 'Uczeń został dodany do systemu.')
@@ -164,17 +176,19 @@ def uczniowie(request):
 @login_required
 def nauczyciele(request):
     """Zakładka nauczyciele: lista i formularz dodawania nauczyciela."""
-    nauczyciele_lista = Nauczyciel.objects.all()
+    nauczyciele_lista = Nauczyciel.objects.prefetch_related('przedmioty').filter(aktywny=True)
+    historia_nauczycieli = Nauczyciel.objects.prefetch_related('przedmioty').filter(aktywny=False)
     form = FormularzNauczyciela(request.POST or None)
 
     if request.method == 'POST' and form.is_valid():
-        form.save()
+        form.zapisz()
         messages.success(request, 'Nauczyciel został dodany do systemu.')
         return redirect('nauczyciele')
 
     return render(request, 'konta/nauczyciele.html', {
         'form': form,
         'nauczyciele': nauczyciele_lista,
+        'historia_nauczycieli': historia_nauczycieli,
     })
 
 @tylko_szef
@@ -192,12 +206,25 @@ def przelacz_umowe(request, nauczyciel_id):
 
 @tylko_szef
 @login_required
-def usun_nauczyciela(request, nauczyciel_id):
-    """Usuwa nauczyciela z listy i wraca do zakładki Nauczyciele."""
+def archiwizuj_nauczyciela(request, nauczyciel_id):
+    """Archiwizuje nauczyciela: znika z listy, ale zostaje w historii."""
     nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
+    nauczyciel.aktywny = False
+    nauczyciel.save()
     imie = f'{nauczyciel.imie} {nauczyciel.nazwisko}'
-    nauczyciel.delete()
-    messages.success(request, f'{imie} — usunięto z listy nauczycieli.')
+    messages.success(request, f'{imie} — zakończono współpracę. Nauczyciel trafił do historii.')
+    return redirect('nauczyciele')
+
+
+@tylko_szef
+@login_required
+def przywroc_nauczyciela(request, nauczyciel_id):
+    """Przywraca nauczyciela z historii na aktywną listę."""
+    nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
+    nauczyciel.aktywny = True
+    nauczyciel.save()
+    imie = f'{nauczyciel.imie} {nauczyciel.nazwisko}'
+    messages.success(request, f'{imie} — wznowiono współpracę. Nauczyciel wrócił na listę.')
     return redirect('nauczyciele')
 
 @tylko_szef
@@ -501,7 +528,7 @@ def platnosci(request):
         return redirect('platnosci')
 
     rozliczenia = []
-    for nauczyciel in Nauczyciel.objects.all().order_by('nazwisko', 'imie'):
+    for nauczyciel in Nauczyciel.objects.filter(aktywny=True).order_by('nazwisko', 'imie'):
         nazwa = f'{nauczyciel.imie} {nauczyciel.nazwisko}'
         jego_uczniowie = [u for u in uczniowie_lista if (u.korepetytor or '').strip() == nazwa]
         zaplacone_lekcje = [u for u in jego_uczniowie if u.zaplacone]
@@ -520,6 +547,38 @@ def platnosci(request):
         'rozliczenia': rozliczenia,
     })
 
+@tylko_szef
+@login_required
+def uzytkownicy(request):
+    """Zakładka użytkownicy: dodawanie kont i nadawanie uprawnień (tylko szef)."""
+    lista = Pracownik.objects.all().order_by('username')
+    form = FormularzUzytkownika(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        form.zapisz()
+        messages.success(request, 'Użytkownik został dodany.')
+        return redirect('uzytkownicy')
+    return render(request, 'konta/uzytkownicy.html', {
+        'form': form,
+        'uzytkownicy': lista,
+    })
+
+
+@tylko_szef
+@login_required
+def przelacz_szefa(request, user_id):
+    """Włącza/wyłącza uprawnienia szefa dla użytkownika."""
+    uzytkownik = get_object_or_404(Pracownik, pk=user_id)
+    if uzytkownik.id == request.user.id:
+        messages.error(request, 'Nie możesz odebrać uprawnień samemu sobie.')
+        return redirect('uzytkownicy')
+    uzytkownik.is_superuser = not uzytkownik.is_superuser
+    uzytkownik.is_staff = uzytkownik.is_superuser
+    uzytkownik.save()
+    if uzytkownik.is_superuser:
+        messages.success(request, f'{uzytkownik.username} — nadano uprawnienia admina.')
+    else:
+        messages.info(request, f'{uzytkownik.username} — odebrano uprawnienia admina.')
+    return redirect('uzytkownicy')
 
 @login_required
 def zmiana_hasla(request):

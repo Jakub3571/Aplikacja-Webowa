@@ -19,6 +19,7 @@
     <a href="{% url 'nauczyciele' %}" class="{% if request.resolver_match.url_name == 'nauczyciele' %}aktywna{% endif %}">Nauczyciele</a>
     <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">Lekcje</a>
     <a href="{% url 'platnosci' %}" class="{% if request.resolver_match.url_name == 'platnosci' %}aktywna{% endif %}">Płatności</a>
+    <a href="{% url 'uzytkownicy' %}" class="{% if request.resolver_match.url_name == 'uzytkownicy' %}aktywna{% endif %}">Użytkownicy</a>
     {% endif %}
   </nav>
 

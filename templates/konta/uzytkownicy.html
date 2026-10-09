@@ -1,0 +1,92 @@
+{% extends 'konta/panel.html' %}
+{% block tytul %}Użytkownicy — Panel pracowniczy{% endblock %}
+{% block panel %}
+<div class="uczniowie-uklad">
+  <section class="karta">
+    <h2>Dodaj użytkownika</h2>
+    {% if form.errors %}
+      <div class="komunikat error">
+        Popraw błędy w formularzu:
+        <ul>
+          {% for pole, bledy in form.errors.items %}
+            {% for blad in bledy %}<li>{{ blad }}</li>{% endfor %}
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+    <form method="post" class="formularz">
+      {% csrf_token %}
+      <label for="{{ form.username.id_for_label }}">Nazwa użytkownika <span class="gwiazdka">*</span></label>
+      {{ form.username }}
+      {% if form.username.help_text %}<p class="podpowiedz">{{ form.username.help_text }}</p>{% endif %}
+      <label for="{{ form.first_name.id_for_label }}">Imię</label>
+      {{ form.first_name }}
+      <label for="{{ form.last_name.id_for_label }}">Nazwisko</label>
+      {{ form.last_name }}
+      <label for="{{ form.email.id_for_label }}">Email <span class="gwiazdka">*</span></label>
+      {{ form.email }}
+      {% if form.email.help_text %}<p class="podpowiedz">{{ form.email.help_text }}</p>{% endif %}
+      <label for="{{ form.stanowisko.id_for_label }}">Stanowisko</label>
+      {{ form.stanowisko }}
+      <label for="{{ form.telefon.id_for_label }}">Telefon</label>
+      {{ form.telefon }}
+      <label for="{{ form.haslo1.id_for_label }}">Hasło <span class="gwiazdka">*</span></label>
+      {{ form.haslo1 }}
+      {% if form.haslo1.help_text %}<p class="podpowiedz">{{ form.haslo1.help_text }}</p>{% endif %}
+      <label for="{{ form.haslo2.id_for_label }}">Powtórz hasło <span class="gwiazdka">*</span></label>
+      {{ form.haslo2 }}
+      {% if form.haslo2.help_text %}<p class="podpowiedz">{{ form.haslo2.help_text }}</p>{% endif %}
+      <label for="{{ form.uprawnienia.id_for_label }}">Uprawnienia <span class="gwiazdka">*</span></label>
+      {{ form.uprawnienia }}
+      {% if form.uprawnienia.help_text %}<p class="podpowiedz">{{ form.uprawnienia.help_text }}</p>{% endif %}
+      <button type="submit">Dodaj użytkownika</button>
+    </form>
+  </section>
+
+  <div class="uczniowie-bok">
+  <section class="karta">
+    <h2>Lista użytkowników ({{ uzytkownicy|length }})</h2>
+    <div class="tabela-wrapper">
+      <table class="tabela" id="tabela-uzytkownicy">
+        <thead>
+          <tr>
+            <th>Użytkownik</th>
+            <th>Imię i nazwisko</th>
+            <th>Email</th>
+            <th>Stanowisko</th>
+            <th>Uprawnienia</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in uzytkownicy %}
+            <tr>
+              <td>{{ u.username }}</td>
+              <td>{{ u.first_name }} {{ u.last_name }}</td>
+              <td>{{ u.email }}</td>
+              <td>{{ u.stanowisko }}</td>
+              <td>
+                {% if u.is_superuser %}
+                  <span class="umowa-tak">✔ admin</span>
+                {% else %}
+                  <span class="umowa-nie">pracownik</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if u.id == request.user.id %}
+                  <span class="podpowiedz">to Ty</span>
+                {% else %}
+                  <a class="przycisk-umowa {% if u.is_superuser %}umowa-tak{% else %}umowa-nie{% endif %}" href="{% url 'przelacz_szefa' u.id %}" title="{% if u.is_superuser %}Kliknij, aby odebrać uprawnienia admina{% else %}Kliknij, aby nadać uprawnienia admina{% endif %}">
+                    {% if u.is_superuser %}odebrać admina{% else %}nadać admina{% endif %}
+                  </a>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  </div>
+</div>
+{% endblock %}

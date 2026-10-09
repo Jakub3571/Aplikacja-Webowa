@@ -1,4 +1,5 @@
 """Modele aplikacji konta."""
+
 from datetime import date
 
 from django.contrib.auth.models import AbstractUser
@@ -59,15 +60,21 @@ class Uczen(models.Model):
         return f'{self.imie_ucznia} {self.nazwisko_rodzica} — {self.przedmiot}'
 
 
+POZIOMY_NAUCZYCIELA = [
+    ('podstawa', 'podstawa'),
+    ('rozszerzenie', 'rozszerzenie'),
+]
+
+
 class Nauczyciel(models.Model):
     """Karta nauczyciela/korepetytora."""
 
     imie = models.CharField('imię', max_length=100)
     nazwisko = models.CharField('nazwisko', max_length=100)
-    przedmiot = models.CharField('przedmiot', max_length=100, choices=PRZEDMIOTY, default='')
     email = models.EmailField('email')
     stawka = models.DecimalField('stawka', max_digits=6, decimal_places=2, default=0)
     ma_umowe = models.BooleanField('ma umowę', default=False)
+    aktywny = models.BooleanField('aktywny (współpracuje)', default=True)
     dodano = models.DateTimeField('data dodania', auto_now_add=True)
 
     class Meta:
@@ -77,6 +84,38 @@ class Nauczyciel(models.Model):
 
     def __str__(self):
         return f'{self.imie} {self.nazwisko}'
+
+    def przedmioty_tekst(self):
+        """Wypisuje wszystkie przedmioty nauczyciela z poziomami, np. 'matematyka (podstawa)'."""
+        wpisy = [f'{p.przedmiot} ({p.poziom})' for p in self.przedmioty.all()]
+        return ', '.join(wpisy) if wpisy else '—'
+
+
+class PrzedmiotNauczyciela(models.Model):
+    """Przedmiot, którego uczy nauczyciel, wraz z poziomem nauczania."""
+
+    nauczyciel = models.ForeignKey(
+        Nauczyciel,
+        on_delete=models.CASCADE,
+        related_name='przedmioty',
+        verbose_name='nauczyciel',
+    )
+    przedmiot = models.CharField('przedmiot', max_length=100, choices=PRZEDMIOTY)
+    poziom = models.CharField('poziom', max_length=50, choices=POZIOMY_NAUCZYCIELA)
+
+    class Meta:
+        verbose_name = 'przedmiot nauczyciela'
+        verbose_name_plural = 'przedmioty nauczycieli'
+        ordering = ['przedmiot', 'poziom']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['nauczyciel', 'przedmiot', 'poziom'],
+                name='unikalny_przedmiot_poziom_nauczyciela',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.nauczyciel}: {self.przedmiot} ({self.poziom})'
 
 
 class Dostepnosc(models.Model):
@@ -105,7 +144,7 @@ class Dostepnosc(models.Model):
 
 
 class RaportPlatnosci(models.Model):
-    """Archiwum raportu płatności wysłanego e-mailem."""
+    """Archiwum raportu płatności wysyłanego e-mailem."""
 
     zawartosc = models.TextField('zawartość raportu')
     email_odbiorcy = models.EmailField('email odbiorcy')
@@ -120,8 +159,10 @@ class RaportPlatnosci(models.Model):
     def __str__(self):
         return f'Raport z {self.wyslano:%d.%m.%Y %H:%M} — {self.email_odbiorcy}'
 
+
 class Lekcja(models.Model):
     """Pojedyncza lekcja ucznia zapisana w kalendarzu lekcji."""
+
     uczen = models.ForeignKey(
         Uczen,
         on_delete=models.CASCADE,
