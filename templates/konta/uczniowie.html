@@ -3,7 +3,7 @@ pracowniczy{% endblock %} {% block panel %}
 <div class="uczniowie-uklad">
 	{% if request.user.is_superuser %}
 	<section class="karta">
-        	<h2>Lista uczniów ({{ uczniowie|length }})</h2>
+		<h2>Lista uczniów ({{ uczniowie|length }})</h2>
 
 		{% if form.errors %}
 		<div class="komunikat error">
@@ -253,26 +253,27 @@ pracowniczy{% endblock %} {% block panel %}
 	}
 </script>
 <script>
-    const godzina = document.getElementById('id_godzina_pierwszej_lekcji');
-    if (godzina) {
-        const opak = document.createElement('div');
-        opak.className = 'suwak-godzin';
-        gora = document.createElement('button');
-        gora.type = 'button';
-        gora.className = 'suwak-godzin-strzalka';
-        gora.textContent = '▲';
-        dol = document.createElement('button');
-        dol.type = 'button';
-        dol.className = 'suwak-godzin-strzalka';
-        dol.textContent = '▼';
-        godzina.replaceWith(opak);
-        opak.append(gora, godzina, dol);
-        gora.addEventListener('click', () => {
-            if (godzina.selectedIndex > 0) godzina.selectedIndex -= 1;
-        });
-        dol.addEventListener('click', () => {
-            if (godzina.selectedIndex < godzina.options.length - 1) godzina.selectedIndex += 1;
-        });
-    }
+	const godzina = document.getElementById('id_godzina_pierwszej_lekcji');
+	if (godzina) {
+		const opak = document.createElement('div');
+		opak.className = 'suwak-godzin';
+		gora = document.createElement('button');
+		gora.type = 'button';
+		gora.className = 'suwak-godzin-strzalka';
+		gora.textContent = '▲';
+		dol = document.createElement('button');
+		dol.type = 'button';
+		dol.className = 'suwak-godzin-strzalka';
+		dol.textContent = '▼';
+		godzina.replaceWith(opak);
+		opak.append(gora, godzina, dol);
+		gora.addEventListener('click', () => {
+			if (godzina.selectedIndex > 0) godzina.selectedIndex -= 1;
+		});
+		dol.addEventListener('click', () => {
+			if (godzina.selectedIndex < godzina.options.length - 1)
+				godzina.selectedIndex += 1;
+		});
+	}
 </script>
 {% endblock %}
