@@ -84,9 +84,14 @@ class ZakladkiTests(TestCase):
     def test_pracownik_blokowany_na_panel_szefa(self):
         pracownik = Pracownik.objects.create_user('pracownik', 'p@f.pl', 'Sup3rHaslo!')
         self.client.force_login(pracownik)
-        for adres in ['/nauczyciele/', '/platnosci/', '/lekcje/']:
-            r = self.client.get(adres)
-            self.assertEqual(r.status_code, 403, f'{adres} wpuszcza pracownika')
+        r = self.client.get('/lekcje/')
+        self.assertEqual(r.status_code, 403, 'lekcje wpuszcza pracownika')
+        r = self.client.get('/platnosci/')
+        self.assertEqual(r.status_code, 403, 'platnosci wpuszcza pracownika')
+        # lista nauczycieli: pracownik widzi ja w trybie podgladu (nowa zasada)
+        r = self.client.get('/nauczyciele/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Podgląd')
         r = self.client.get('/pulpit/')
         self.assertRedirects(r, '/uczniowie/')
 
@@ -464,3 +469,73 @@ class KontoNauczycielaTests(TestCase):
         self.assertContains(r, 'został dodany')
         user = Pracownik.objects.get(username='prac')
         self.assertIsNone(user.nauczyciel)
+
+
+class KreatorDyspozycyjnoscTests(TestCase):
+    """Kreator dyspozycyjności: pierwsze logowanie nauczyciela i generowanie slotów."""
+
+    def setUp(self):
+        self.admin = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        # konto nauczyciela tworzone przez zakladke Uzytkownicy
+        self.client.force_login(self.admin)
+        dane = {
+            'username': 'j.kowalski',
+            'first_name': 'Jan',
+            'last_name': 'Kowalski',
+            'email': 'jan@k.pl',
+            'haslo1': 'M0taneHaslo!',
+            'haslo2': 'M0taneHaslo!',
+            'uprawnienia': 'pracownik',
+            'konto_nauczyciela': 'on',
+        }
+        self.client.post('/uzytkownicy/', dane, follow=True)
+        self.nauczyciel = Pracownik.objects.get(username='j.kowalski').nauczyciel
+
+    def test_nauczyciel_bez_dyspozycyjnosci_trafia_do_kreatora(self):
+        self.client.logout()
+        self.client.login(username='j.kowalski', password='M0taneHaslo!')
+        r = self.client.get('/pulpit/', follow=True)
+        self.assertContains(r, 'Twoja dyspozycyjność')
+
+    def test_kreator_tylko_dla_nauczyciela(self):
+        pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
+        self.client.force_login(pracownik)
+        r = self.client.get('/moja-dyspozycyjnosc/')
+        self.assertEqual(r.status_code, 403)
+
+    def test_kreator_generuje_sloty_z_przerwa(self):
+        # czwartki (weekday=3), 16:00-20:00, przerwa 10 min -> 16:00, 17:10, 18:20, 19:30
+        self.client.logout()
+        self.client.login(username='j.kowalski', password='M0taneHaslo!')
+        dane = {
+            'dni': ['3'],
+            'godzina_od': '16:00',
+            'godzina_do': '20:00',
+            'przerwa': '10',
+            'od_kiedy': '2026-10-01',   # czwartek
+            'do_kiedy': '2026-10-01',
+        }
+        r = self.client.post('/moja-dyspozycyjnosc/', dane, follow=True)
+        self.assertContains(r, 'Dyspozycyjność zapisana')
+        godziny = sorted(d.godzina_od.strftime('%H:%M') for d in Dostepnosc.objects.filter(nauczyciel=self.nauczyciel))
+        self.assertEqual(godziny, ['16:00', '17:10', '18:20', '19:30'])
+        self.nauczyciel.refresh_from_db()
+        self.assertTrue(self.nauczyciel.dyspozycyjnosc_uzupełniona)
+        self.assertEqual(self.nauczyciel.przerwa, 10)
+
+    def test_pracownik_widzi_kalendarz_bez_edycji(self):
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel,
+            data_od='2026-10-01', data_do='2026-10-01',
+            godzina_od='16:00', godzina_do='16:30',
+        )
+        pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
+        self.client.force_login(pracownik)
+        adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/?rok=2026&miesiac=10&dzien=1'
+        r = self.client.get(adres)
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Tryb podglądu')
+        # proba edycji: POST odrzucony, nic sie nie zmienia
+        r = self.client.post(adres, {'przelacz_godzine': '1', 'godzina': '17:00'}, follow=True)
+        self.assertContains(r, 'tylko do odczytu')
+        self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel).count(), 1)

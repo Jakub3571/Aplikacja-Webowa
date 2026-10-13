@@ -1,6 +1,34 @@
 {% extends 'konta/panel.html' %}
 {% block tytul %}Nauczyciele — Panel pracowniczy{% endblock %}
 {% block panel %}
+{% if podglad %}
+<section class="karta">
+  <h2>Nauczyciele ({{ nauczyciele|length }})</h2>
+  <p class="podtytul">Podgląd godzin nauczycieli — pomocny przy umawianiu zajęć. Kalendarze są tylko do odczytu.</p>
+  <div class="tabela-wrapper">
+    <table class="tabela" id="tabela-nauczyciele">
+      <thead>
+        <tr>
+          <th>Nauczyciel</th>
+          <th>Przedmioty</th>
+          <th>Email</th>
+          <th>Kalendarz</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for nauczyciel in nauczyciele %}
+          <tr>
+            <td>{{ nauczyciel.imie }} {{ nauczyciel.nazwisko }}</td>
+            <td>{{ nauczyciel.przedmioty_tekst }}</td>
+            <td>{{ nauczyciel.email }}</td>
+            <td><a class="ikona-kalendarza" href="{% url 'kalendarz_nauczyciela' nauczyciel.id %}" title="Zobacz kalendarz (podgląd)">📅</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% else %}
 <div class="uczniowie-uklad">
   <section class="karta">
     <h2>Dodaj nauczyciela</h2>
@@ -127,7 +155,7 @@
   </section>
   </div>
 </div>
-
+{% endif %}
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     var kontener = document.getElementById('wiersze-przedmiotow');

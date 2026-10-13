@@ -83,6 +83,12 @@ class Nauczyciel(models.Model):
     stawka = models.DecimalField('stawka', max_digits=6, decimal_places=2, default=0)
     ma_umowe = models.BooleanField('ma umowę', default=False)
     aktywny = models.BooleanField('aktywny (współpracuje)', default=True)
+    przerwa = models.PositiveIntegerField(
+        'przerwa między zajęciami (minuty)',
+        default=0,
+        help_text='Ile minut przerwy nauczyciel potrzebuje między zajęciami.',
+    )
+    dyspozycyjnosc_uzupełniona = models.BooleanField('dyspozycyjność uzupełniona', default=False)
     dodano = models.DateTimeField('data dodania', auto_now_add=True)
 
     class Meta:

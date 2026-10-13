@@ -44,6 +44,7 @@ urlpatterns = [
     path('nauczyciele/<int:nauczyciel_id>/przywroc/', views.przywroc_nauczyciela, name='przywroc_nauczyciela'),
     path('nauczyciele/<int:nauczyciel_id>/umowa/', views.przelacz_umowe, name='przelacz_umowe'),
     path('nauczyciele/<int:nauczyciel_id>/kalendarz/', views.kalendarz_nauczyciela, name='kalendarz_nauczyciela'),
+    path('moja-dyspozycyjnosc/', views.kreator_dyspozycyjnosc, name='kreator_dyspozycyjnosc'),
     path('terminy/<int:termin_id>/usun/', views.usun_termin, name='usun_termin'),
     path('lekcje/', views.lekcje, name='lekcje'),
     path('lekcje/<int:uczen_id>/kalendarz/', views.kalendarz_lekcji, name='kalendarz_lekcji'),

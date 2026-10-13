@@ -14,7 +14,7 @@
 
   <nav class="zakladki">
     <a href="{% url 'uczniowie' %}" class="{% if request.resolver_match.url_name == 'uczniowie' %}aktywna{% endif %}">Uczniowie</a>
-    {% if request.user.is_superuser or user.nauczyciel_id %}
+    {% if request.user.is_superuser or user.nauczyciel_id or not user.nauczyciel_id %}
     <a href="{% url 'nauczyciele' %}" class="{% if request.resolver_match.url_name == 'nauczyciele' %}aktywna{% endif %}">Nauczyciele</a>
     {% endif %}
     {% if user.nauczyciel_id %}

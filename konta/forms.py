@@ -216,7 +216,55 @@ class FormularzUzytkownika(forms.ModelForm):
             user.nauczyciel = nauczyciel
             user.save()
         return user
-    
+
+class FormularzDyspozycyjnosc(forms.Form):
+    """Kreator dyspozycyjności nauczyciela: dzień, przedział godzin i przerwa."""
+
+    dni = forms.MultipleChoiceField(
+        label='dni tygodnia',
+        choices=[
+            (0, 'poniedziałek'), (1, 'wtorek'), (2, 'środa'), (3, 'czwartek'),
+            (4, 'piątek'), (5, 'sobota'), (6, 'niedziela'),
+        ],
+        widget=forms.CheckboxSelectMultiple,
+        help_text='Zaznacz dni, w które możesz prowadzić zajęcia.',
+    )
+    godzina_od = forms.ChoiceField(
+        label='zajęcia od',
+        choices=[(f'{h:02d}:00', f'{h:02d}:00') for h in range(6, 24)],
+        initial='16:00',
+    )
+    godzina_do = forms.ChoiceField(
+        label='zajęcia do',
+        choices=[(f'{h:02d}:00', f'{h:02d}:00') for h in range(7, 25)],
+        initial='20:00',
+    )
+    przerwa = forms.ChoiceField(
+        label='przerwa między zajęciami',
+        choices=[(5, '5 minut'), (10, '10 minut'), (15, '15 minut'),
+                 (20, '20 minut'), (30, '30 minut')],
+        initial=10,
+        help_text='Np. przy 10 min przerwy i godzinach 16–20: 16:00, 17:10, 18:20, 19:30.',
+    )
+    od_kiedy = forms.DateField(
+        label='obowiązuje od dnia',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        help_text='Dyspozycyjność zostanie wpisana w kalendarz od tego dnia.',
+    )
+    do_kiedy = forms.DateField(
+        label='obowiązuje do dnia',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        help_text='Do tego dnia (włącznie) można zapisywać zajęcia.',
+    )
+
+    def clean(self):
+        dane = super().clean()
+        od = dane.get('godzina_od')
+        do_ = dane.get('godzina_do')
+        if od and do_ and od >= do_:
+            raise forms.ValidationError('Godzina „od” musi być wcześniejsza niż „do”.')
+        return dane
+
 class WierszPrzedmiotu(forms.Form):
     """Jeden wiersz formularza: przedmiot + poziom nauczania."""
 

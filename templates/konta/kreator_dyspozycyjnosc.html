@@ -1,0 +1,46 @@
+{% extends 'konta/panel.html' %}
+{% block tytul %}Moja dyspozycyjność — Panel pracowniczy{% endblock %}
+{% block panel %}
+<section class="karta">
+  <h2>📅 Twoja dyspozycyjność</h2>
+  <p class="podtytul">
+    Witaj! Zanim zaczniesz, powiedz nam, kiedy możesz prowadzić zajęcia.
+    Na podstawie tych informacji system wpisze terminy do Twojego kalendarza —
+    będziesz mógł je potem dokładnie doprecyzować.
+  </p>
+  {% if form.errors %}
+    <div class="komunikat error">
+      Popraw błędy w formularzu:
+      <ul>
+        {% for pole, bledy in form.errors.items %}
+          {% for blad in bledy %}<li>{{ blad }}</li>{% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+  <form method="post" class="formularz">
+    {% csrf_token %}
+    <label>{{ form.dni.label }} <span class="gwiazdka">*</span></label>
+    {{ form.dni }}
+    {% if form.dni.help_text %}<p class="podpowiedz">{{ form.dni.help_text }}</p>{% endif %}
+
+    <label>{{ form.godzina_od.label }} <span class="gwiazdka">*</span></label>
+    {{ form.godzina_od }}
+    <label>{{ form.godzina_do.label }} <span class="gwiazdka">*</span></label>
+    {{ form.godzina_do }}
+
+    <label>{{ form.przerwa.label }} <span class="gwiazdka">*</span></label>
+    {{ form.przerwa }}
+    {% if form.przerwa.help_text %}<p class="podpowiedz">{{ form.przerwa.help_text }}</p>{% endif %}
+
+    <label>{{ form.od_kiedy.label }} <span class="gwiazdka">*</span></label>
+    {{ form.od_kiedy }}
+    {% if form.od_kiedy.help_text %}<p class="podpowiedz">{{ form.od_kiedy.help_text }}</p>{% endif %}
+    <label>{{ form.do_kiedy.label }} <span class="gwiazdka">*</span></label>
+    {{ form.do_kiedy }}
+    {% if form.do_kiedy.help_text %}<p class="podpowiedz">{{ form.do_kiedy.help_text }}</p>{% endif %}
+
+    <button type="submit">Zapisz moją dyspozycyjność</button>
+  </form>
+</section>
+{% endblock %}

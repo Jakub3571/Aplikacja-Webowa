@@ -6,8 +6,13 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import PermissionDenied
-
+def moze_edytowac_kalendarz(user, nauczyciel_id):
+    """Kalendarz edytuje: admin/szef albo nauczyciel-właściciel konta."""
+    if czy_szef(user):
+        return True
+    return getattr(user, 'nauczyciel_id', None) == nauczyciel_id
 def czy_szef(u):
+    
     """Prawdziwy szef: superuser LUB konto o nazwie 'Admin'."""
     return bool(u.is_authenticated and (u.is_superuser or u.username.strip().lower() == 'admin'))
 
@@ -24,6 +29,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .forms import (
+    FormularzDyspozycyjnosc,
     FormularzLogowania,
     FormularzNauczyciela,
     FormularzUcznia,
@@ -66,6 +72,9 @@ def pulpit(request):
     """Strona startowa: szef widzi pulpit, pracownik od razu formularz ucznia."""
     if not czy_szef(request.user):
         if getattr(request.user, 'nauczyciel_id', None):
+            nauczyciel = request.user.nauczyciel
+            if not nauczyciel.dyspozycyjnosc_uzupełniona:
+                return redirect('kreator_dyspozycyjnosc')
             return redirect('kalendarz_nauczyciela', nauczyciel_id=request.user.nauczyciel_id)
         return redirect('uczniowie')
     return render(request, 'konta/pulpit.html')
@@ -177,12 +186,18 @@ def uczniowie(request):
 
 @login_required
 def nauczyciele(request):
-    """Zakładka nauczyciele: admin widzi listę, konto nauczyciela — tylko swój kalendarz."""
+    """Zakładka nauczyciele: admin widzi listę, konto nauczyciela — tylko swój kalendarz,
+    zwykły pracownik — listę nauczycieli z kalendarzem tylko do podglądu."""
     if not czy_szef(request.user):
         nauczyciel_id = getattr(request.user, 'nauczyciel_id', None)
         if nauczyciel_id:
             return redirect('kalendarz_nauczyciela', nauczyciel_id=nauczyciel_id)
-        raise PermissionDenied
+        # zwykły pracownik: lista nauczycieli do podglądu (bez formularza i historii)
+        nauczyciele_lista = Nauczyciel.objects.prefetch_related('przedmioty').filter(aktywny=True)
+        return render(request, 'konta/nauczyciele.html', {
+            'nauczyciele': nauczyciele_lista,
+            'podglad': True,
+        })
     nauczyciele_lista = Nauczyciel.objects.prefetch_related('przedmioty').filter(aktywny=True)
     historia_nauczycieli = Nauczyciel.objects.prefetch_related('przedmioty').filter(aktywny=False)
     form = FormularzNauczyciela(request.POST or None)
@@ -197,7 +212,6 @@ def nauczyciele(request):
         'nauczyciele': nauczyciele_lista,
         'historia_nauczycieli': historia_nauczycieli,
     })
-
 @tylko_szef
 @login_required
 def przelacz_umowe(request, nauczyciel_id):
@@ -238,9 +252,13 @@ def przywroc_nauczyciela(request, nauczyciel_id):
 @login_required
 def kalendarz_nauczyciela(request, nauczyciel_id):
     """Kalendarz miesiąca z klikalnymi kafelkami godzin (co 30 minut)."""
-    if not czy_szef(request.user):
-        if getattr(request.user, 'nauczyciel_id', None) != nauczyciel_id:
+    nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
+    edycja = moze_edytowac_kalendarz(request.user, nauczyciel_id)
+    if not czy_szef(request.user) and not edycja:
+        # konto nauczyciela: widzi TYLKO swój kalendarz
+        if getattr(request.user, 'nauczyciel_id', None):
             raise PermissionDenied
+        # zwykły pracownik: kalendarz tylko do podglądu
     nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
     dzisiaj = date.today()
 
@@ -310,6 +328,9 @@ def kalendarz_nauczyciela(request, nauczyciel_id):
             kafelki.append({'etykieta': etykieta, 'zaznaczony': etykieta in zaznaczone})
 
     if request.method == 'POST' and 'przelacz_godzine' in request.POST and wybrany_dzien:
+        if not edycja:
+            messages.error(request, 'Ten kalendarz jest tylko do odczytu — nie masz uprawnień do edycji.')
+            return redirect('kalendarz_nauczyciela', nauczyciel_id=nauczyciel.id)
         etykieta = request.POST['godzina']
         start = datetime.strptime(etykieta, '%H:%M').time()
         koniec = (datetime.combine(date.today(), start) + timedelta(minutes=30)).time()
@@ -351,6 +372,7 @@ def kalendarz_nauczyciela(request, nauczyciel_id):
         'wybrany_dzien': wybrany_dzien,
         'godziny_na_dzien': godziny_na_dzien,
         'kafelki': kafelki,
+        'edycja': edycja,
     })
 
 
@@ -592,6 +614,50 @@ def przelacz_szefa(request, user_id):
     else:
         messages.info(request, f'{uzytkownik.username} — odebrano uprawnienia admina.')
     return redirect('uzytkownicy')
+
+@login_required
+def kreator_dyspozycyjnosc(request):
+    """Kreator dyspozycyjności nauczyciela — widok dla konta nauczyciela."""
+    nauczyciel_id = getattr(request.user, 'nauczyciel_id', None)
+    if not nauczyciel_id:
+        raise PermissionDenied
+    nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
+    form = FormularzDyspozycyjnosc(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        dane = form.cleaned_data
+        godzina_od = datetime.strptime(dane['godzina_od'], '%H:%M').time()
+        godzina_do = datetime.strptime(dane['godzina_do'], '%H:%M').time()
+        przerwa = int(dane['przerwa'])
+        wybrane_dni = {int(d) for d in dane['dni']}
+        krok = timedelta(minutes=60 + przerwa)
+        start = datetime.combine(date(2000, 1, 1), godzina_od)
+        koniec = datetime.combine(date(2000, 1, 1), godzina_do)
+        utworzone = 0
+        dzien = dane['od_kiedy']
+        while dzien <= dane['do_kiedy']:
+            if dzien.weekday() in wybrane_dni:
+                slot = start
+                while slot < koniec:
+                    Dostepnosc.objects.get_or_create(
+                        nauczyciel=nauczyciel,
+                        data_od=dzien,
+                        data_do=dzien,
+                        godzina_od=slot.time(),
+                        godzina_do=(slot + timedelta(minutes=30)).time(),
+                    )
+                    utworzone += 1
+                    slot += krok
+            dzien += timedelta(days=1)
+        nauczyciel.przerwa = przerwa
+        nauczyciel.dyspozycyjnosc_uzupełniona = True
+        nauczyciel.save()
+        messages.success(
+            request,
+            f'Dyspozycyjność zapisana — w kalendarzu pojawiło się {utworzone} terminów. '
+            'Możesz teraz wejść w swój kalendarz i doprecyzować godziny.',
+        )
+        return redirect('kalendarz_nauczyciela', nauczyciel_id=nauczyciel.id)
+    return render(request, 'konta/kreator_dyspozycyjnosc.html', {'form': form})
 
 @login_required
 def zmiana_hasla(request):
