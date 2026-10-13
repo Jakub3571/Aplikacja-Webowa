@@ -76,7 +76,7 @@ class ZakladkiTests(TestCase):
             self.assertEqual(r.status_code, 200, f'{adres} nie dziala')
 
     def test_zakladki_blokowane_bez_zalogowania(self):
-        oczekiwane = {'/pulpit/': 302, '/uczniowie/': 302, '/nauczyciele/': 403, '/platnosci/': 403}
+        oczekiwane = {'/pulpit/': 302, '/uczniowie/': 302, '/nauczyciele/': 302, '/platnosci/': 403}
         for adres, kod in oczekiwane.items():
             r = self.client.get(adres)
             self.assertEqual(r.status_code, kod, f'{adres} wpuszcza bez logowania')
@@ -398,3 +398,69 @@ class UzytkownicyTests(TestCase):
         self.client.force_login(admin)
         r = self.client.get('/nauczyciele/')
         self.assertEqual(r.status_code, 200)
+
+class KontoNauczycielaTests(TestCase):
+    """Konto dla nauczyciela: dodawanie i dostęp tylko do własnego kalendarza."""
+
+    def setUp(self):
+        self.admin = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+
+    def dodaj_konto_nauczyciela(self):
+        self.client.force_login(self.admin)
+        dane = {
+            'username': 'j.kowalski',
+            'first_name': 'Jan',
+            'last_name': 'Kowalski',
+            'email': 'jan@k.pl',
+            'haslo1': 'M0taneHaslo!',
+            'haslo2': 'M0taneHaslo!',
+            'uprawnienia': 'pracownik',
+            'konto_nauczyciela': 'on',
+        }
+        r = self.client.post('/uzytkownicy/', dane, follow=True)
+        self.assertContains(r, 'został dodany')
+        return Pracownik.objects.get(username='j.kowalski')
+
+    def test_konto_nauczyciela_tworzy_karte_nauczyciela(self):
+        user = self.dodaj_konto_nauczyciela()
+        self.assertIsNotNone(user.nauczyciel)
+        self.assertEqual(user.nauczyciel.imie, 'Jan')
+        self.assertEqual(user.nauczyciel.nazwisko, 'Kowalski')
+
+    def test_nauczyciel_po_zalogowaniu_widzi_swoj_kalendarz(self):
+        user = self.dodaj_konto_nauczyciela()
+        self.client.logout()
+        self.client.login(username='j.kowalski', password='M0taneHaslo!')
+        r = self.client.get('/nauczyciele/', follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Kowalski')
+
+    def test_nauczyciel_nie_wejdzie_do_cudzego_kalendarza(self):
+        user = self.dodaj_konto_nauczyciela()
+        inny = Nauczyciel.objects.create(imie='Ola', nazwisko='Nowak', email='ola@n.pl')
+        self.client.logout()
+        self.client.login(username='j.kowalski', password='M0taneHaslo!')
+        r = self.client.get(f'/nauczyciele/{inny.id}/kalendarz/')
+        self.assertEqual(r.status_code, 403)
+
+    def test_nauczyciel_nie_widzi_panelu_admina(self):
+        user = self.dodaj_konto_nauczyciela()
+        self.client.logout()
+        self.client.login(username='j.kowalski', password='M0taneHaslo!')
+        for adres in ['/uzytkownicy/', '/platnosci/', '/lekcje/']:
+            r = self.client.get(adres)
+            self.assertEqual(r.status_code, 403, f'{adres} wpuszcza nauczyciela')
+
+    def test_zwykly_pracownik_bez_konta_nauczyciela(self):
+        self.client.force_login(self.admin)
+        dane = {
+            'username': 'prac',
+            'email': 'p@f.pl',
+            'haslo1': 'M0taneHaslo!',
+            'haslo2': 'M0taneHaslo!',
+            'uprawnienia': 'pracownik',
+        }
+        r = self.client.post('/uzytkownicy/', dane, follow=True)
+        self.assertContains(r, 'został dodany')
+        user = Pracownik.objects.get(username='prac')
+        self.assertIsNone(user.nauczyciel)

@@ -173,6 +173,12 @@ class FormularzUzytkownika(forms.ModelForm):
         help_text='Admin widzi wszystkie zakładki; pracownik tylko formularz ucznia.',
     )
 
+    konto_nauczyciela = forms.BooleanField(
+        label='konto dla nauczyciela',
+        required=False,
+        help_text='Zaznacz, jeśli to konto nauczyciela — po zalogowaniu widzi tylko swój kalendarz w zakładce Nauczyciele.',
+    )
+
     class Meta:
         model = Pracownik
         fields = ['username', 'first_name', 'last_name', 'email', 'stanowisko', 'telefon']
@@ -195,12 +201,20 @@ class FormularzUzytkownika(forms.ModelForm):
         return dane
 
     def zapisz(self):
-        """Tworzy użytkownika z hasłem i uprawnieniami."""
+        """Tworzy użytkownika z hasłem, uprawnieniami i opcjonalnym kontem nauczyciela."""
         user = self.save(commit=False)
         user.set_password(self.cleaned_data['haslo1'])
         user.is_superuser = self.cleaned_data['uprawnienia'] == 'admin'
         user.is_staff = self.cleaned_data['uprawnienia'] == 'admin'
         user.save()
+        if self.cleaned_data.get('konto_nauczyciela') and not user.is_superuser:
+            nauczyciel = Nauczyciel.objects.create(
+                imie=user.first_name or user.username,
+                nazwisko=user.last_name or user.username,
+                email=user.email,
+            )
+            user.nauczyciel = nauczyciel
+            user.save()
         return user
     
 class WierszPrzedmiotu(forms.Form):

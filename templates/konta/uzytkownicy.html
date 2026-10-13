@@ -40,6 +40,12 @@
       {{ form.uprawnienia }}
       {% if form.uprawnienia.help_text %}<p class="podpowiedz">{{ form.uprawnienia.help_text }}</p>{% endif %}
       <button type="submit">Dodaj użytkownika</button>
+            <div id="konta-nauczyciela-ukryte" style="display: none;">
+        <label for="{{ form.konto_nauczyciela.id_for_label }}">
+          {{ form.konto_nauczyciela }} konto dla nauczyciela <span class="gwiazdka">*</span>
+        </label>
+        {% if form.konto_nauczyciela.help_text %}<p class="podpowiedz">{{ form.konto_nauczyciela.help_text }}</p>{% endif %}
+      </div>
     </form>
   </section>
 
@@ -89,4 +95,15 @@
   </section>
   </div>
 </div>
+<script>
+  var uprawnienia = document.getElementById('id_uprawnienia');
+  var kartaNauczyciela = document.getElementById('konta-nauczyciela-ukryte');
+  if (uprawnienia && kartaNauczyciela) {
+    var odswiez = function () {
+      kartaNauczyciela.style.display = uprawnienia.value === 'pracownik' ? '' : 'none';
+    };
+    uprawnienia.addEventListener('change', odswiez);
+    odswiez();
+  }
+</script>
 {% endblock %}

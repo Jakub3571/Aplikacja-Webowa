@@ -65,6 +65,8 @@ def wyloguj(request):
 def pulpit(request):
     """Strona startowa: szef widzi pulpit, pracownik od razu formularz ucznia."""
     if not czy_szef(request.user):
+        if getattr(request.user, 'nauczyciel_id', None):
+            return redirect('kalendarz_nauczyciela', nauczyciel_id=request.user.nauczyciel_id)
         return redirect('uczniowie')
     return render(request, 'konta/pulpit.html')
 
@@ -172,10 +174,15 @@ def uczniowie(request):
         'nadchodzace_dostepnosci': dostepnosci_nauczycieli(),
     })
 
-@tylko_szef
+
 @login_required
 def nauczyciele(request):
-    """Zakładka nauczyciele: lista i formularz dodawania nauczyciela."""
+    """Zakładka nauczyciele: admin widzi listę, konto nauczyciela — tylko swój kalendarz."""
+    if not czy_szef(request.user):
+        nauczyciel_id = getattr(request.user, 'nauczyciel_id', None)
+        if nauczyciel_id:
+            return redirect('kalendarz_nauczyciela', nauczyciel_id=nauczyciel_id)
+        raise PermissionDenied
     nauczyciele_lista = Nauczyciel.objects.prefetch_related('przedmioty').filter(aktywny=True)
     historia_nauczycieli = Nauczyciel.objects.prefetch_related('przedmioty').filter(aktywny=False)
     form = FormularzNauczyciela(request.POST or None)
@@ -227,10 +234,13 @@ def przywroc_nauczyciela(request, nauczyciel_id):
     messages.success(request, f'{imie} — wznowiono współpracę. Nauczyciel wrócił na listę.')
     return redirect('nauczyciele')
 
-@tylko_szef
+
 @login_required
 def kalendarz_nauczyciela(request, nauczyciel_id):
     """Kalendarz miesiąca z klikalnymi kafelkami godzin (co 30 minut)."""
+    if not czy_szef(request.user):
+        if getattr(request.user, 'nauczyciel_id', None) != nauczyciel_id:
+            raise PermissionDenied
     nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
     dzisiaj = date.today()
 
@@ -343,11 +353,14 @@ def kalendarz_nauczyciela(request, nauczyciel_id):
         'kafelki': kafelki,
     })
 
-@tylko_szef
+
 @login_required
 def usun_termin(request, termin_id):
     """Usuwa wpisaną godzinę pracy i wraca do tego samego dnia kalendarza."""
     termin = get_object_or_404(Dostepnosc, pk=termin_id)
+    if not czy_szef(request.user):
+        if getattr(request.user, 'nauczyciel_id', None) != termin.nauczyciel_id:
+            raise PermissionDenied
     nauczyciel_id = termin.nauczyciel.id
     rok = request.GET.get('rok') or date.today().year
     miesiac = request.GET.get('miesiac') or date.today().month

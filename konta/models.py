@@ -22,6 +22,14 @@ class Pracownik(AbstractUser):
 
     stanowisko = models.CharField('stanowisko', max_length=100, blank=True)
     telefon = models.CharField('telefon', max_length=20, blank=True)
+    nauczyciel = models.ForeignKey(
+        'Nauczyciel',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='konto',
+        verbose_name='nauczyciel',
+    )
 
     class Meta:
         verbose_name = 'pracownik'
