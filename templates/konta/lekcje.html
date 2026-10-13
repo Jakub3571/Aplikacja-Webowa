@@ -18,6 +18,7 @@
             <th>Lekcje</th>
             <th>Dodano</th>
             <th>Kalendarz</th>
+            <th>Cykliczna</th>
           </tr>
         </thead>
         <tbody>
@@ -31,6 +32,9 @@
             <td>{{ uczen.dodano|date:"d.m.Y H:i" }}</td>
             <td>
               <a class="ikona-kalendarza" href="{% url 'kalendarz_lekcji' uczen.id %}" title="Kalendarz lekcji">📅</a>
+            </td>
+                        <td>
+              <a class="ikona-kalendarza" href="{% url 'lekcja_cykliczna' uczen.id %}" title="Umów lekcję cykliczną">🔄</a>
             </td>
           </tr>
           {% endfor %}

@@ -35,6 +35,7 @@ from .forms import (
     FormularzUcznia,
     FormularzUzytkownika,
     FormularzZmianyHasla,
+    FormularzLekcjiCyklicznej,
 )
 from .models import Dostepnosc, Lekcja, Nauczyciel, Pracownik, RaportPlatnosci, Uczen
 
@@ -149,8 +150,12 @@ def wyslij_powiadomienie_o_uczniu(request, uczen):
 
 @login_required
 def uczniowie(request):
-    """Zakładka uczniowie: lista, formularz dodawania i dostępność nauczycieli."""
-    uczniowie_lista = Uczen.objects.all()
+    """Zakładka uczniowie: lista, formularz dodawania i dostępność nauczycieli.
+    Zwykły pracownik widzi tylko uczniów, których sam umówił."""
+    if czy_szef(request.user):
+        uczniowie_lista = Uczen.objects.all()
+    else:
+        uczniowie_lista = Uczen.objects.filter(umowil=request.user)
     wybrany_przedmiot = request.POST.get('przedmiot') if request.method == 'POST' else None
     wybrany_poziom = request.POST.get('poziom') if request.method == 'POST' else None
 
@@ -172,6 +177,7 @@ def uczniowie(request):
         uczen = form.save(commit=False)
         uczen.pierwsza_lekcja = form.cleaned_data['pierwsza_lekcja']
         uczen.kto_umowil = request.user.get_full_name() or request.user.username
+        uczen.umowil = request.user
         uczen.save()
         messages.success(request, 'Uczeń został dodany do systemu.')
         wyslij_powiadomienie_o_uczniu(request, uczen)
@@ -394,13 +400,19 @@ def usun_termin(request, termin_id):
         + f'?rok={rok}&miesiac={miesiac}&dzien={dzien}'
     )
 
-@tylko_szef
 @login_required
 def lekcje(request):
-    """Zakładka lekcje: lista uczniów z liczbą lekcji i wejściem do kalendarza lekcji."""
-    uczniowie_lista = list(Uczen.objects.all())
+    """Zakładka lekcje: lista uczniów z liczbą lekcji i wejściem do kalendarza lekcji.
+    Admin widzi wszystkich uczniów, zwykły pracownik — tylko swoich.
+    Konto nauczyciela nie ma tu wstępu (widzi tylko swój kalendarz)."""
+    if getattr(request.user, 'nauczyciel_id', None):
+        raise PermissionDenied
+    if czy_szef(request.user):
+        uczniowie_lista = list(Uczen.objects.all())
+    else:
+        uczniowie_lista = list(Uczen.objects.filter(umowil=request.user))
     liczba_lekcji = {}
-    for lekcja in Lekcja.objects.all():
+    for lekcja in Lekcja.objects.filter(uczen__in=uczniowie_lista):
         liczba_lekcji[lekcja.uczen_id] = liczba_lekcji.get(lekcja.uczen_id, 0) + 1
     for u in uczniowie_lista:
         u.liczba_lekcji = liczba_lekcji.get(u.id, 0)
@@ -408,11 +420,13 @@ def lekcje(request):
         'uczniowie': uczniowie_lista,
     })
 
-@tylko_szef
+
 @login_required
 def kalendarz_lekcji(request, uczen_id):
     """Kalendarz lekcji ucznia: miesiąc, dni i kafelki godzin do wpisywania lekcji."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
+    if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
+        raise PermissionDenied
     dzisiaj = date.today()
 
     rok = request.GET.get('rok')
@@ -658,8 +672,161 @@ def kreator_dyspozycyjnosc(request):
         )
         return redirect('kalendarz_nauczyciela', nauczyciel_id=nauczyciel.id)
     return render(request, 'konta/kreator_dyspozycyjnosc.html', {'form': form})
+def wyslij_zaproszenie_meet(uczen):
+    """Wysyła e-mail do rodzica z linkiem do lekcji cyklicznej na Google Meet."""
+    if not uczen.link_meet or not uczen.email_glowny:
+        return
+    tresc = (
+        'Dzień dobry,\n\n'
+        f'umawiamy cykliczne zajęcia dla {uczen.imie_ucznia} '
+        f'(przedmiot: {uczen.przedmiot}, korepetytor: {uczen.korepetytor}).\n\n'
+        'Zapraszamy na spotkania przez Google Meet — ponieważ zajęcia są cykliczne,\n'
+        'ten link jest STAŁY i będzie obowiązywał przy każdej lekcji do końca roku szkolnego:\n\n'
+        f'{uczen.link_meet}\n\n'
+        'Prosimy zapisać go — to samo zaproszenie będzie używane zawsze.\n\n'
+        'Pozdrawiamy,\n'
+        f'{uczen.kto_umowil}\n'
+    )
+    try:
+        send_mail(
+            f'Zaproszenie na zajęcia — {uczen.imie_ucznia} (stały link Google Meet)',
+            tresc,
+            None,
+            [uczen.email_glowny],
+        )
+    except Exception:
+        pass
+
 
 @login_required
+def umow_lekcje_cykliczna(request, uczen_id):
+    """Umawia lekcje cykliczne: wpisuje lekcje do kalendarza, blokuje godzinę
+    w kalendarzu korepetytora i wysyła e-mail z linkiem Meet do rodzica."""
+    uczen = get_object_or_404(Uczen, pk=uczen_id)
+    if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
+        raise PermissionDenied
+    form = FormularzLekcjiCyklicznej(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        dane = form.cleaned_data
+        dzien_tygodnia = int(dane['dzien_tygodnia'])
+        godzina = datetime.strptime(dane['godzina'], '%H:%M').time()
+        utworzone = 0
+        dzien = dane['od_kiedy']
+        while dzien <= dane['do_kiedy']:
+            if dzien.weekday() == dzien_tygodnia:
+                data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
+                if not Lekcja.objects.filter(uczen=uczen, data=data_lekcji).exists():
+                    Lekcja.objects.create(uczen=uczen, data=data_lekcji)
+                utworzone += 1
+            dzien += timedelta(days=1)
+        # blokada godziny u korepetytora (jeśli ma kartę nauczyciela)
+        nauczyciel = Nauczyciel.objects.filter(
+            imie__iexact=uczen.korepetytor.split(' ')[0] if ' ' in uczen.korepetytor else uczen.korepetytor,
+            nazwisko__iexact=uczen.korepetytor.split(' ')[-1] if ' ' in uczen.korepetytor else '',
+        ).first()
+        if nauczyciel:
+            dzien = dane['od_kiedy']
+            while dzien <= dane['do_kiedy']:
+                if dzien.weekday() == dzien_tygodnia:
+                    Dostepnosc.objects.create(
+                        nauczyciel=nauczyciel,
+                        data_od=dzien,
+                        data_do=dzien,
+                        godzina_od=godzina,
+                        godzina_do=(datetime.combine(date(2000, 1, 1), godzina) + timedelta(minutes=30)).time(),
+                    )
+                dzien += timedelta(days=1)
+        uczen.link_meet = dane['link_meet']
+        uczen.save()
+        wyslij_zaproszenie_meet(uczen)
+        messages.success(
+            request,
+            f'Lekcja cykliczna umówiona — wpisanych {utworzone} terminów. '
+            f'Zaproszenie z linkiem Meet wysłano na {uczen.email_glowny}.',
+        )
+        return redirect('kalendarz_lekcji', uczen_id=uczen.id)
+    return render(request, 'konta/lekcja_cykliczna.html', {
+        'form': form,
+        'uczen': uczen,
+    })
+
+def wyslij_zaproszenie_meet(uczen):
+    """Wysyła e-mail do rodzica z linkiem do lekcji cyklicznej na Google Meet."""
+    if not uczen.link_meet or not uczen.email_glowny:
+        return
+    tresc = (
+        'Dzień dobry,\n\n'
+        f'umawiamy cykliczne zajęcia dla {uczen.imie_ucznia} '
+        f'(przedmiot: {uczen.przedmiot}, korepetytor: {uczen.korepetytor}).\n\n'
+        'Zapraszamy na spotkania przez Google Meet — ponieważ zajęcia są cykliczne,\n'
+        'ten link jest STAŁY i będzie obowiązywał przy każdej lekcji do końca roku szkolnego:\n\n'
+        f'{uczen.link_meet}\n\n'
+        'Prosimy zapisać go — to samo zaproszenie będzie używane zawsze.\n\n'
+        'Pozdrawiamy,\n'
+        f'{uczen.kto_umowil}\n'
+    )
+    try:
+        send_mail(
+            f'Zaproszenie na zajęcia — {uczen.imie_ucznia} (stały link Google Meet)',
+            tresc,
+            None,
+            [uczen.email_glowny],
+        )
+    except Exception:
+        pass
+
+
+@login_required
+def umow_lekcje_cykliczna(request, uczen_id):
+    """Umawia lekcje cykliczne: wpisuje lekcje do kalendarza, blokuje godzinę
+    w kalendarzu korepetytora i wysyła e-mail z linkiem Meet do rodzica."""
+    uczen = get_object_or_404(Uczen, pk=uczen_id)
+    if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
+        raise PermissionDenied
+    form = FormularzLekcjiCyklicznej(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        dane = form.cleaned_data
+        dzien_tygodnia = int(dane['dzien_tygodnia'])
+        godzina = datetime.strptime(dane['godzina'], '%H:%M').time()
+        utworzone = 0
+        dzien = dane['od_kiedy']
+        while dzien <= dane['do_kiedy']:
+            if dzien.weekday() == dzien_tygodnia:
+                data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
+                if not Lekcja.objects.filter(uczen=uczen, data=data_lekcji).exists():
+                    Lekcja.objects.create(uczen=uczen, data=data_lekcji)
+                utworzone += 1
+            dzien += timedelta(days=1)
+        # blokada godziny u korepetytora (jeśli ma kartę nauczyciela)
+        nauczyciel = Nauczyciel.objects.filter(
+            imie__iexact=uczen.korepetytor.split(' ')[0] if ' ' in uczen.korepetytor else uczen.korepetytor,
+            nazwisko__iexact=uczen.korepetytor.split(' ')[-1] if ' ' in uczen.korepetytor else '',
+        ).first()
+        if nauczyciel:
+            dzien = dane['od_kiedy']
+            while dzien <= dane['do_kiedy']:
+                if dzien.weekday() == dzien_tygodnia:
+                    Dostepnosc.objects.create(
+                        nauczyciel=nauczyciel,
+                        data_od=dzien,
+                        data_do=dzien,
+                        godzina_od=godzina,
+                        godzina_do=(datetime.combine(date(2000, 1, 1), godzina) + timedelta(minutes=30)).time(),
+                    )
+                dzien += timedelta(days=1)
+        uczen.link_meet = dane['link_meet']
+        uczen.save()
+        wyslij_zaproszenie_meet(uczen)
+        messages.success(
+            request,
+            f'Lekcja cykliczna umówiona — wpisanych {utworzone} terminów. '
+            f'Zaproszenie z linkiem Meet wysłano na {uczen.email_glowny}.',
+        )
+        return redirect('kalendarz_lekcji', uczen_id=uczen.id)
+    return render(request, 'konta/lekcja_cykliczna.html', {
+        'form': form,
+        'uczen': uczen,
+    })
 def zmiana_hasla(request):
     """Pozwala zalogowanemu pracownikowi zmienić własne hasło."""
     form = FormularzZmianyHasla(request.user, data=request.POST or None)

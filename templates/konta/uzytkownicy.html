@@ -39,13 +39,21 @@
       <label for="{{ form.uprawnienia.id_for_label }}">Uprawnienia <span class="gwiazdka">*</span></label>
       {{ form.uprawnienia }}
       {% if form.uprawnienia.help_text %}<p class="podpowiedz">{{ form.uprawnienia.help_text }}</p>{% endif %}
-      <button type="submit">Dodaj użytkownika</button>
-            <div id="konta-nauczyciela-ukryte" style="display: none;">
+      <div id="konta-nauczyciela-ukryte" style="display: none;">
         <label for="{{ form.konto_nauczyciela.id_for_label }}">
           {{ form.konto_nauczyciela }} konto dla nauczyciela <span class="gwiazdka">*</span>
         </label>
         {% if form.konto_nauczyciela.help_text %}<p class="podpowiedz">{{ form.konto_nauczyciela.help_text }}</p>{% endif %}
+        <div id="przedmioty-nauczyciela-ukryte" style="display: none; margin-top: 0.5rem;">
+          <label>{{ form.przedmioty_nauczyciela.label }}</label>
+          {{ form.przedmioty_nauczyciela }}
+          {% if form.przedmioty_nauczyciela.help_text %}<p class="podpowiedz">{{ form.przedmioty_nauczyciela.help_text }}</p>{% endif %}
+          <label>{{ form.poziomy_nauczyciela.label }}</label>
+          {{ form.poziomy_nauczyciela }}
+          {% if form.poziomy_nauczyciela.help_text %}<p class="podpowiedz">{{ form.poziomy_nauczyciela.help_text }}</p>{% endif %}
+        </div>
       </div>
+      <button type="submit">Dodaj użytkownika</button>
     </form>
   </section>
 
@@ -95,15 +103,28 @@
   </section>
   </div>
 </div>
+
 <script>
   var uprawnienia = document.getElementById('id_uprawnienia');
   var kartaNauczyciela = document.getElementById('konta-nauczyciela-ukryte');
+  var ptaszekNauczyciela = document.getElementById('id_konto_nauczyciela');
+  var przedmiotyNauczyciela = document.getElementById('przedmioty-nauczyciela-ukryte');
+  var odswiezPrzedmioty = function () {
+    if (przedmiotyNauczyciela && ptaszekNauczyciela) {
+      przedmiotyNauczyciela.style.display = ptaszekNauczyciela.checked ? '' : 'none';
+    }
+  };
   if (uprawnienia && kartaNauczyciela) {
     var odswiez = function () {
       kartaNauczyciela.style.display = uprawnienia.value === 'pracownik' ? '' : 'none';
+      odswiezPrzedmioty();
     };
     uprawnienia.addEventListener('change', odswiez);
     odswiez();
+  }
+  if (ptaszekNauczyciela) {
+    ptaszekNauczyciela.addEventListener('change', odswiezPrzedmioty);
+    odswiezPrzedmioty();
   }
 </script>
 {% endblock %}

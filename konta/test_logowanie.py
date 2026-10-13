@@ -7,11 +7,13 @@ from django.test import TestCase
 
 from konta.models import (
     Dostepnosc,
+    Lekcja,
     Nauczyciel,
     Pracownik,
     PrzedmiotNauczyciela,
     RaportPlatnosci,
     Uczen,
+   
 )
 
 
@@ -84,17 +86,19 @@ class ZakladkiTests(TestCase):
     def test_pracownik_blokowany_na_panel_szefa(self):
         pracownik = Pracownik.objects.create_user('pracownik', 'p@f.pl', 'Sup3rHaslo!')
         self.client.force_login(pracownik)
-        r = self.client.get('/lekcje/')
-        self.assertEqual(r.status_code, 403, 'lekcje wpuszcza pracownika')
         r = self.client.get('/platnosci/')
         self.assertEqual(r.status_code, 403, 'platnosci wpuszcza pracownika')
+        r = self.client.get('/uzytkownicy/')
+        self.assertEqual(r.status_code, 403, 'uzytkownicy wpuszcza pracownika')
         # lista nauczycieli: pracownik widzi ja w trybie podgladu (nowa zasada)
         r = self.client.get('/nauczyciele/')
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Podgląd')
+        # lekcje: pracownik widzi swoich uczniow (nowa zasada)
+        r = self.client.get('/lekcje/')
+        self.assertEqual(r.status_code, 200)
         r = self.client.get('/pulpit/')
         self.assertRedirects(r, '/uczniowie/')
-
 
 class DodawanieUczniaTests(TestCase):
     def setUp(self):
@@ -452,9 +456,12 @@ class KontoNauczycielaTests(TestCase):
         user = self.dodaj_konto_nauczyciela()
         self.client.logout()
         self.client.login(username='j.kowalski', password='M0taneHaslo!')
-        for adres in ['/uzytkownicy/', '/platnosci/', '/lekcje/']:
+        for adres in ['/uzytkownicy/', '/platnosci/']:
             r = self.client.get(adres)
             self.assertEqual(r.status_code, 403, f'{adres} wpuszcza nauczyciela')
+        # nauczyciel nie ma zakladki Lekcje (to kalendarze uczniow pracownika)
+        r = self.client.get('/lekcje/')
+        self.assertEqual(r.status_code, 403, 'lekcje wpuszcza nauczyciela')
 
     def test_zwykly_pracownik_bez_konta_nauczyciela(self):
         self.client.force_login(self.admin)
@@ -539,3 +546,81 @@ class KreatorDyspozycyjnoscTests(TestCase):
         r = self.client.post(adres, {'przelacz_godzine': '1', 'godzina': '17:00'}, follow=True)
         self.assertContains(r, 'tylko do odczytu')
         self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel).count(), 1)
+
+class LekcjeCykliczneTests(TestCase):
+    """Lekcje cykliczne + widoczność uczniów per pracownik."""
+
+    def setUp(self):
+        self.admin = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
+        self.uczen = Uczen.objects.create(
+            pierwsza_lekcja='2026-10-06T17:00',
+            przedmiot='matematyka', poziom='szkoła średnia - podstawa',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='ewa@f.pl',
+            telefon_dodatkowy='600300400', email_dodatkowy='r@f.pl',
+            korepetytor='Jan Kowalski', notatka_od_rodzica='ok',
+            kto_umowil='Jan Kowalski', umowil=self.pracownik,
+        )
+        self.nauczyciel = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='jan@n.pl')
+
+    def test_pracownik_widzi_tylko_swoich_uczniow(self):
+        Uczen.objects.create(
+            pierwsza_lekcja='2026-10-07T17:00',
+            przedmiot='fizyka', poziom='szkoła średnia - podstawa',
+            imie_ucznia='Ola', nazwisko_rodzica='Wiśniewska', rodzic='Ala Wiśniewska',
+            telefon_glowny='600100200', email_glowny='ola@f.pl',
+            telefon_dodatkowy='600300400', email_dodatkowy='r@f.pl',
+            korepetytor='Jan Kowalski', notatka_od_rodzica='ok',
+            kto_umowil='Admin', umowil=self.admin,
+        )
+        self.client.force_login(self.pracownik)
+        r = self.client.get('/uczniowie/')
+        self.assertContains(r, 'Kasia')
+        self.assertNotContains(r, 'Ola')
+
+    def test_admin_widzi_wszystkich(self):
+        self.client.force_login(self.admin)
+        r = self.client.get('/uczniowie/')
+        self.assertContains(r, 'Kasia')
+
+    def test_pracownik_umawia_lekcje_cykliczna(self):
+        self.client.force_login(self.pracownik)
+        dane = {
+            'dzien_tygodnia': '1',
+            'godzina': '17:00',
+            'od_kiedy': '2026-10-01',
+            'do_kiedy': '2026-10-29',
+            'link_meet': 'https://meet.google.com/abc-defg-hij',
+        }
+        r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', dane, follow=True)
+        self.assertContains(r, 'Lekcja cykliczna umówiona')
+        daty = sorted(l.data.date().day for l in Lekcja.objects.filter(uczen=self.uczen))
+        self.assertEqual(daty, [6, 13, 20, 27])
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('https://meet.google.com/abc-defg-hij', mail.outbox[0].body)
+        self.assertIn('STAŁY', mail.outbox[0].body)
+        blokady = Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='17:00')
+        self.assertEqual(blokady.count(), 4)
+
+    def test_pracownik_nie_umowi_cyklicznej_cudzemu_uczniowi(self):
+        obcy = Uczen.objects.create(
+            pierwsza_lekcja='2026-10-07T17:00',
+            przedmiot='fizyka', poziom='szkoła średnia - podstawa',
+            imie_ucznia='Ola', nazwisko_rodzica='Wiśniewska', rodzic='Ala Wiśniewska',
+            telefon_glowny='600100200', email_glowny='ola@f.pl',
+            telefon_dodatkowy='600300400', email_dodatkowy='r@f.pl',
+            korepetytor='Jan Kowalski', notatka_od_rodzica='ok',
+            kto_umowil='Admin', umowil=self.admin,
+        )
+        self.client.force_login(self.pracownik)
+        r = self.client.get(f'/uczniowie/{obcy.id}/lekcja-cykliczna/')
+        self.assertEqual(r.status_code, 403)
+
+    def test_pracownik_widzi_zakladke_lekcje(self):
+        self.client.force_login(self.pracownik)
+        r = self.client.get('/lekcje/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Kasia')
+        r = self.client.get(f'/lekcje/{self.uczen.id}/kalendarz/')
+        self.assertEqual(r.status_code, 200)

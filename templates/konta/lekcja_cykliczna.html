@@ -1,0 +1,41 @@
+{% extends 'konta/panel.html' %}
+{% block tytul %}Lekcja cykliczna — Panel pracowniczy{% endblock %}
+{% block panel %}
+<section class="karta">
+  <h2>🔄 Umów lekcję cykliczną: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</h2>
+  <p class="podtytul">
+    Uczeń: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }} · przedmiot: {{ uczen.przedmiot }}
+    · korepetytor: {{ uczen.korepetytor }}
+  </p>
+  <p class="podpowiedz">
+    Lekcja cykliczna wpisze zajęcia w kalendarz w wybrane dni do końca podanego okresu,
+    zablokuje godzinę u korepetytora i wyśle do rodzica e-mail z linkiem Google Meet.
+  </p>
+  {% if form.errors %}
+    <div class="komunikat error">
+      Popraw błędy w formularzu:
+      <ul>
+        {% for pole, bledy in form.errors.items %}
+          {% for blad in bledy %}<li>{{ blad }}</li>{% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+  <form method="post" class="formularz">
+    {% csrf_token %}
+    <label>{{ form.dzien_tygodnia.label }} <span class="gwiazdka">*</span></label>
+    {{ form.dzien_tygodnia }}
+    <label>{{ form.godzina.label }} <span class="gwiazdka">*</span></label>
+    {{ form.godzina }}
+    <label>{{ form.od_kiedy.label }} <span class="gwiazdka">*</span></label>
+    {{ form.od_kiedy }}
+    <label>{{ form.do_kiedy.label }} <span class="gwiazdka">*</span></label>
+    {{ form.do_kiedy }}
+    {% if form.do_kiedy.help_text %}<p class="podpowiedz">{{ form.do_kiedy.help_text }}</p>{% endif %}
+    <label>{{ form.link_meet.label }} <span class="gwiazdka">*</span></label>
+    {{ form.link_meet }}
+    {% if form.link_meet.help_text %}<p class="podpowiedz">{{ form.link_meet.help_text }}</p>{% endif %}
+    <button type="submit">Umów lekcję cykliczną</button>
+  </form>
+</section>
+{% endblock %}

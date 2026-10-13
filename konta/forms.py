@@ -178,7 +178,23 @@ class FormularzUzytkownika(forms.ModelForm):
         required=False,
         help_text='Zaznacz, jeśli to konto nauczyciela — po zalogowaniu widzi tylko swój kalendarz w zakładce Nauczyciele.',
     )
-
+    przedmioty_nauczyciela = forms.MultipleChoiceField(
+        label='przedmioty, których uczy',
+        choices=[],
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text='Zaznacz przedmioty — po każdym wybierz poziom.',
+    )
+    poziomy_nauczyciela = forms.MultipleChoiceField(
+        label='poziomy',
+        choices=POZIOMY_NAUCZYCIELA,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text='Zaznaczone poziomy dotyczą wszystkich wybranych przedmiotów.',
+    )
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['przedmioty_nauczyciela'].choices = list(PRZEDMIOTY)
     class Meta:
         model = Pracownik
         fields = ['username', 'first_name', 'last_name', 'email', 'stanowisko', 'telefon']
@@ -215,8 +231,40 @@ class FormularzUzytkownika(forms.ModelForm):
             )
             user.nauczyciel = nauczyciel
             user.save()
+        for przedmiot in self.cleaned_data.get('przedmioty_nauczyciela', []):
+            for poziom in self.cleaned_data.get('poziomy_nauczyciela', ['podstawa']):
+                PrzedmiotNauczyciela.objects.get_or_create(
+                    nauczyciel=nauczyciel,
+                    przedmiot=przedmiot,
+                    poziom=poziom,
+                )
         return user
+class FormularzLekcjiCyklicznej(forms.Form):
+    """Umawianie lekcji cyklicznej ucznia: dzień tygodnia, godzina i okres."""
 
+    dzien_tygodnia = forms.ChoiceField(
+        label='dzień tygodnia',
+        choices=[
+            (0, 'poniedziałek'), (1, 'wtorek'), (2, 'środa'), (3, 'czwartek'),
+            (4, 'piątek'), (5, 'sobota'), (6, 'niedziela'),
+        ],
+    )
+    godzina = forms.ChoiceField(
+        label='godzina lekcji',
+        choices=[(f'{h:02d}:{m:02d}', f'{h:02d}:{m:02d}') for h in range(6, 24) for m in (0, 30)],
+    )
+    od_kiedy = forms.DateField(
+        label='od dnia',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+    )
+    do_kiedy = forms.DateField(
+        label='do dnia (np. koniec roku szkolnego)',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+    )
+    link_meet = forms.CharField(
+        label='link Google Meet',
+        help_text='Stały link do spotkań Google Meet (meet.google.com/...). Wpisz raz — będzie ten sam przy każdej lekcji.',
+    )
 class FormularzDyspozycyjnosc(forms.Form):
     """Kreator dyspozycyjności nauczyciela: dzień, przedział godzin i przerwa."""
 
@@ -264,6 +312,60 @@ class FormularzDyspozycyjnosc(forms.Form):
         if od and do_ and od >= do_:
             raise forms.ValidationError('Godzina „od” musi być wcześniejsza niż „do”.')
         return dane
+
+class FormularzLekcjiCyklicznej(forms.Form):
+    """Umawianie lekcji cyklicznej ucznia: dzień tygodnia, godzina i okres."""
+
+    dzien_tygodnia = forms.ChoiceField(
+        label='dzień tygodnia',
+        choices=[
+            (0, 'poniedziałek'), (1, 'wtorek'), (2, 'środa'), (3, 'czwartek'),
+            (4, 'piątek'), (5, 'sobota'), (6, 'niedziela'),
+        ],
+    )
+    godzina = forms.ChoiceField(
+        label='godzina lekcji',
+        choices=[(f'{h:02d}:{m:02d}', f'{h:02d}:{m:02d}') for h in range(6, 24) for m in (0, 30)],
+    )
+    od_kiedy = forms.DateField(
+        label='od dnia',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+    )
+    do_kiedy = forms.DateField(
+        label='do dnia (np. koniec roku szkolnego)',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+    )
+    link_meet = forms.CharField(
+        label='link Google Meet',
+        help_text='Stały link do spotkań Google Meet (meet.google.com/...). Wpisz raz — będzie ten sam przy każdej lekcji.',
+    )
+class FormularzLekcjiCyklicznej(forms.Form):
+    """Umawianie lekcji cyklicznej ucznia: dzień tygodnia, godzina i okres."""
+
+    dzien_tygodnia = forms.ChoiceField(
+        label='dzień tygodnia',
+        choices=[
+            (0, 'poniedziałek'), (1, 'wtorek'), (2, 'środa'), (3, 'czwartek'),
+            (4, 'piątek'), (5, 'sobota'), (6, 'niedziela'),
+        ],
+    )
+    godzina = forms.ChoiceField(
+        label='godzina lekcji',
+        choices=[(f'{h:02d}:{m:02d}', f'{h:02d}:{m:02d}') for h in range(6, 24) for m in (0, 30)],
+    )
+    od_kiedy = forms.DateField(
+        label='od dnia',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+    )
+    do_kiedy = forms.DateField(
+        label='do dnia (np. koniec roku szkolnego)',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+    )
+    link_meet = forms.CharField(
+        label='link Google Meet',
+        help_text='Stały link do spotkań Google Meet (meet.google.com/...). Wpisz raz — będzie ten sam przy każdej lekcji.',
+    )
+
 
 class WierszPrzedmiotu(forms.Form):
     """Jeden wiersz formularza: przedmiot + poziom nauczania."""

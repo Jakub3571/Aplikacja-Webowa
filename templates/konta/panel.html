@@ -22,7 +22,9 @@
     {% endif %}
     {% if request.user.is_superuser %}
     <a href="{% url 'pulpit' %}" class="{% if request.resolver_match.url_name == 'pulpit' %}aktywna{% endif %}">Start</a>
+        {% if not user.nauczyciel_id %}
     <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">Lekcje</a>
+    {% endif %}
     <a href="{% url 'platnosci' %}" class="{% if request.resolver_match.url_name == 'platnosci' %}aktywna{% endif %}">Płatności</a>
     <a href="{% url 'uzytkownicy' %}" class="{% if request.resolver_match.url_name == 'uzytkownicy' %}aktywna{% endif %}">Użytkownicy</a>
     {% endif %}

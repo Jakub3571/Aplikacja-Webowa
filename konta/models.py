@@ -56,6 +56,15 @@ class Uczen(models.Model):
     korepetytor = models.CharField('korepetytor', max_length=150)
     notatka_od_rodzica = models.TextField('notatka od rodzica', blank=True)
     kto_umowil = models.CharField('kto umówił', max_length=150)
+    umowil = models.ForeignKey(
+        'Pracownik',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='umowieni_uczniowie',
+        verbose_name='pracownik, który umówił',
+    )
+    link_meet = models.CharField('stały link Google Meet', max_length=200, blank=True)
     zaplacone = models.BooleanField('zapłacone', default=False)
     dodano = models.DateTimeField('data dodania', auto_now_add=True)
 
