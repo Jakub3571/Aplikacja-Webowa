@@ -155,8 +155,18 @@ class FormularzUcznia(forms.ModelForm):
         return dane
 
 class FormularzUzytkownika(forms.ModelForm):
-    """Formularz dodawania nowego użytkownika panelu."""
+    """Formularz dodawania nowego użytkownika panelu — rola wybierana na górze."""
 
+    rola = forms.ChoiceField(
+        label='rola',
+        choices=[
+            ('pracownik', 'pracownik biura'),
+            ('nauczyciel', 'nauczyciel'),
+            ('admin', 'admin (pełny dostęp)'),
+        ],
+        initial='pracownik',
+        help_text='Wybierz, kim jest ta osoba — formularz dostosuje się automatycznie.',
+    )
     haslo1 = forms.CharField(
         label='hasło',
         widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
@@ -167,40 +177,36 @@ class FormularzUzytkownika(forms.ModelForm):
         widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
         help_text='Powtórz to samo hasło, żeby wykluczyć literówkę.',
     )
-    uprawnienia = forms.ChoiceField(
-        label='uprawnienia',
-        choices=[('pracownik', 'pracownik'), ('admin', 'admin (pełny dostęp)')],
-        help_text='Admin widzi wszystkie zakładki; pracownik tylko formularz ucznia.',
-    )
-
-    konto_nauczyciela = forms.BooleanField(
-        label='konto dla nauczyciela',
-        required=False,
-        help_text='Zaznacz, jeśli to konto nauczyciela — po zalogowaniu widzi tylko swój kalendarz w zakładce Nauczyciele.',
-    )
     przedmioty_nauczyciela = forms.MultipleChoiceField(
         label='przedmioty, których uczy',
         choices=[],
         required=False,
         widget=forms.CheckboxSelectMultiple,
-        help_text='Zaznacz przedmioty — po każdym wybierz poziom.',
+        help_text='Zaznacz przedmioty nauczyciela.',
     )
     poziomy_nauczyciela = forms.MultipleChoiceField(
         label='poziomy',
         choices=POZIOMY_NAUCZYCIELA,
         required=False,
         widget=forms.CheckboxSelectMultiple,
-        help_text='Zaznaczone poziomy dotyczą wszystkich wybranych przedmiotów.',
+        help_text='Zaznaczone poziomy dotyczą wybranych przedmiotów.',
     )
+    stawki_nauczyciela = forms.CharField(
+        label='stawki za przedmioty',
+        required=False,
+        help_text='Wpisz stawki po przecinku w kolejności przedmiotów, np. 40, 50.',
+    )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['przedmioty_nauczyciela'].choices = list(PRZEDMIOTY)
+
     class Meta:
         model = Pracownik
-        fields = ['username', 'first_name', 'last_name', 'email', 'stanowisko', 'telefon']
+        fields = ['username', 'first_name', 'last_name', 'email', 'telefon']
         help_texts = {
             'username': 'Nazwa do logowania, np. j.kowalski',
-            'email': 'Adres e-mail pracownika',
+            'email': 'Adres e-mail',
         }
 
     def clean(self):
@@ -214,16 +220,20 @@ class FormularzUzytkownika(forms.ModelForm):
                 validate_password(haslo1)
             except ValidationError as e:
                 raise forms.ValidationError(list(e.messages))
+        # nauczyciel musi miec min. jeden przedmiot
+        if dane.get('rola') == 'nauczyciel' and not dane.get('przedmioty_nauczyciela'):
+            raise forms.ValidationError('Nauczyciel musi mieć zaznaczony min. jeden przedmiot.')
         return dane
 
     def zapisz(self):
-        """Tworzy użytkownika z hasłem, uprawnieniami i opcjonalnym kontem nauczyciela."""
+        """Tworzy użytkownika z hasłem, rolą, a dla nauczyciela — przedmiotami ze stawkami."""
         user = self.save(commit=False)
+        rola = self.cleaned_data['rola']
         user.set_password(self.cleaned_data['haslo1'])
-        user.is_superuser = self.cleaned_data['uprawnienia'] == 'admin'
-        user.is_staff = self.cleaned_data['uprawnienia'] == 'admin'
+        user.is_superuser = rola == 'admin'
+        user.is_staff = rola == 'admin'
         user.save()
-        if self.cleaned_data.get('konto_nauczyciela') and not user.is_superuser:
+        if rola == 'nauczyciel':
             nauczyciel = Nauczyciel.objects.create(
                 imie=user.first_name or user.username,
                 nazwisko=user.last_name or user.username,
@@ -231,13 +241,20 @@ class FormularzUzytkownika(forms.ModelForm):
             )
             user.nauczyciel = nauczyciel
             user.save()
-        for przedmiot in self.cleaned_data.get('przedmioty_nauczyciela', []):
-            for poziom in self.cleaned_data.get('poziomy_nauczyciela', ['podstawa']):
-                PrzedmiotNauczyciela.objects.get_or_create(
-                    nauczyciel=nauczyciel,
-                    przedmiot=przedmiot,
-                    poziom=poziom,
-                )
+            # stawki: po przecinku, w kolejnosci przedmiotow; brak = 0
+            stawki_raw = self.cleaned_data.get('stawki_nauczyciela') or ''
+            stawki = [x.strip() for x in stawki_raw.split(',') if x.strip()]
+            przedmioty = self.cleaned_data.get('przedmioty_nauczyciela', [])
+            poziomy = self.cleaned_data.get('poziomy_nauczyciela') or ['podstawa']
+            for idx, przedmiot in enumerate(przedmioty):
+                stawka = stawki[idx] if idx < len(stawki) else '0'
+                for poziom in poziomy:
+                    PrzedmiotNauczyciela.objects.get_or_create(
+                        nauczyciel=nauczyciel,
+                        przedmiot=przedmiot,
+                        poziom=poziom,
+                        defaults={'stawka': stawka},
+                    )
         return user
 class FormularzLekcjiCyklicznej(forms.Form):
     """Umawianie lekcji cyklicznej ucznia: dzień tygodnia, godzina i okres."""

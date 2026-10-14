@@ -346,11 +346,10 @@ class UzytkownicyTests(TestCase):
             'first_name': 'Janina',
             'last_name': 'Nowak',
             'email': 'j.nowak@f.pl',
-            'stanowisko': 'Księgowa',
             'telefon': '600700900',
             'haslo1': 'M0taneHaslo!',
             'haslo2': 'M0taneHaslo!',
-            'uprawnienia': 'pracownik',
+            'rola': 'pracownik',
         }
         r = self.client.post('/uzytkownicy/', dane, follow=True)
         self.assertContains(r, 'został dodany')
@@ -365,7 +364,7 @@ class UzytkownicyTests(TestCase):
             'email': 'szef2@f.pl',
             'haslo1': 'M0taneHaslo!',
             'haslo2': 'M0taneHaslo!',
-            'uprawnienia': 'admin',
+            'rola': 'admin',
         }
         r = self.client.post('/uzytkownicy/', dane, follow=True)
         self.assertContains(r, 'został dodany')
@@ -379,7 +378,7 @@ class UzytkownicyTests(TestCase):
             'email': 'x@f.pl',
             'haslo1': 'M0taneHaslo!',
             'haslo2': 'InneHaslo!',
-            'uprawnienia': 'pracownik',
+            'rola': 'pracownik',
         }
         r = self.client.post('/uzytkownicy/', dane)
         self.assertContains(r, 'identyczne')
@@ -423,8 +422,10 @@ class KontoNauczycielaTests(TestCase):
             'email': 'jan@k.pl',
             'haslo1': 'M0taneHaslo!',
             'haslo2': 'M0taneHaslo!',
-            'uprawnienia': 'pracownik',
-            'konto_nauczyciela': 'on',
+            'rola': 'nauczyciel',
+            'przedmioty_nauczyciela': ['matematyka'],
+            'poziomy_nauczyciela': ['podstawa'],
+            'stawki_nauczyciela': '50',
         }
         r = self.client.post('/uzytkownicy/', dane, follow=True)
         self.assertContains(r, 'został dodany')
@@ -470,7 +471,7 @@ class KontoNauczycielaTests(TestCase):
             'email': 'p@f.pl',
             'haslo1': 'M0taneHaslo!',
             'haslo2': 'M0taneHaslo!',
-            'uprawnienia': 'pracownik',
+            'rola': 'pracownik',
         }
         r = self.client.post('/uzytkownicy/', dane, follow=True)
         self.assertContains(r, 'został dodany')
@@ -492,8 +493,10 @@ class KreatorDyspozycyjnoscTests(TestCase):
             'email': 'jan@k.pl',
             'haslo1': 'M0taneHaslo!',
             'haslo2': 'M0taneHaslo!',
-            'uprawnienia': 'pracownik',
-            'konto_nauczyciela': 'on',
+            'rola': 'nauczyciel',
+            'przedmioty_nauczyciela': ['matematyka'],
+            'poziomy_nauczyciela': ['podstawa'],
+            'stawki_nauczyciela': '50',
         }
         self.client.post('/uzytkownicy/', dane, follow=True)
         self.nauczyciel = Pracownik.objects.get(username='j.kowalski').nauczyciel
@@ -624,3 +627,82 @@ class LekcjeCykliczneTests(TestCase):
         self.assertContains(r, 'Kasia')
         r = self.client.get(f'/lekcje/{self.uczen.id}/kalendarz/')
         self.assertEqual(r.status_code, 200)
+
+class NauczycielTylkoKalendarzTests(TestCase):
+    """Konto nauczyciela widzi wyłącznie swój kalendarz — bez zakładki Uczniowie."""
+
+    def setUp(self):
+        self.admin = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.client.force_login(self.admin)
+        dane = {
+            'username': 'j.kowalski',
+            'first_name': 'Jan',
+            'last_name': 'Kowalski',
+            'email': 'jan@k.pl',
+            'haslo1': 'M0taneHaslo!',
+            'haslo2': 'M0taneHaslo!',
+            'rola': 'nauczyciel',
+            'przedmioty_nauczyciela': ['matematyka'],
+            'poziomy_nauczyciela': ['podstawa'],
+            'stawki_nauczyciela': '50',
+        }
+        self.client.post('/uzytkownicy/', dane, follow=True)
+        self.nauczyciel_user = Pracownik.objects.get(username='j.kowalski')
+
+    def test_nauczyciel_nie_ma_wstepu_do_uczniow(self):
+        self.client.force_login(self.nauczyciel_user)
+        r = self.client.get('/uczniowie/')
+        self.assertEqual(r.status_code, 403, 'uczniowie wpuszcza nauczyciela')
+
+    def test_nauczyciel_widzi_w_menu_tylko_swoj_kalendarz(self):
+        self.client.force_login(self.nauczyciel_user)
+        r = self.client.get('/pulpit/', follow=True)
+        html = r.content.decode()
+        self.assertIn('Mój kalendarz', html)
+        self.assertNotIn(f'>Uczniowie</a>', html)
+
+    def test_pracownik_widzi_uczniow_normalnie(self):
+        pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
+        self.client.force_login(pracownik)
+        r = self.client.get('/uczniowie/')
+        self.assertEqual(r.status_code, 200)
+
+class StawkiPrzedmiotowTests(TestCase):
+    """Stawki per przedmiot przy tworzeniu konta nauczyciela."""
+
+    def setUp(self):
+        self.admin = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+
+    def test_nauczyciel_ze_stawkami_per_przedmiot(self):
+        self.client.force_login(self.admin)
+        dane = {
+            'username': 'a.nowak',
+            'first_name': 'Anna',
+            'last_name': 'Nowak',
+            'email': 'anna@n.pl',
+            'haslo1': 'M0taneHaslo!',
+            'haslo2': 'M0taneHaslo!',
+            'rola': 'nauczyciel',
+            'przedmioty_nauczyciela': ['angielski', 'matematyka'],
+            'poziomy_nauczyciela': ['podstawa', 'rozszerzenie'],
+            'stawki_nauczyciela': '40, 50',
+        }
+        r = self.client.post('/uzytkownicy/', dane, follow=True)
+        self.assertContains(r, 'został dodany')
+        user = Pracownik.objects.get(username='a.nowak')
+        przedmioty = {p.przedmiot: p for p in user.nauczyciel.przedmioty.filter(poziom='podstawa')}
+        self.assertEqual(str(przedmioty['angielski'].stawka), '40.00')
+        self.assertEqual(str(przedmioty['matematyka'].stawka), '50.00')
+
+    def test_nauczyciel_bez_przedmiotu_odrzucony(self):
+        self.client.force_login(self.admin)
+        dane = {
+            'username': 'b.blad',
+            'email': 'b@f.pl',
+            'haslo1': 'M0taneHaslo!',
+            'haslo2': 'M0taneHaslo!',
+            'rola': 'nauczyciel',
+        }
+        r = self.client.post('/uzytkownicy/', dane)
+        self.assertContains(r, 'min. jeden przedmiot')
+        self.assertFalse(Pracownik.objects.filter(username='b.blad').exists())

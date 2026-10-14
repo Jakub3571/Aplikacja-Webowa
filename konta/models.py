@@ -125,6 +125,13 @@ class PrzedmiotNauczyciela(models.Model):
     )
     przedmiot = models.CharField('przedmiot', max_length=100, choices=PRZEDMIOTY)
     poziom = models.CharField('poziom', max_length=50, choices=POZIOMY_NAUCZYCIELA)
+    stawka = models.DecimalField(
+        'stawka za godzinę (zł)',
+        max_digits=6,
+        decimal_places=2,
+        default=0,
+        help_text='Individualna stawka za ten przedmiot i poziom.',
+    )
 
     class Meta:
         verbose_name = 'przedmiot nauczyciela'
@@ -139,7 +146,6 @@ class PrzedmiotNauczyciela(models.Model):
 
     def __str__(self):
         return f'{self.nauczyciel}: {self.przedmiot} ({self.poziom})'
-
 
 class Dostepnosc(models.Model):
     """Termin, w którym nauczyciel może przyjąć ucznia."""

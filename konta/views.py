@@ -151,8 +151,11 @@ def wyslij_powiadomienie_o_uczniu(request, uczen):
 @login_required
 def uczniowie(request):
     """Zakładka uczniowie: lista, formularz dodawania i dostępność nauczycieli.
-    Zwykły pracownik widzi tylko uczniów, których sam umówił."""
-    if czy_szef(request.user):
+    Zwykły pracownik widzi tylko uczniów, których sam umówił.
+    Konto nauczyciela nie ma tu wstępu (widzi tylko swój kalendarz)."""
+    if getattr(request.user, 'nauczyciel_id', None):
+        raise PermissionDenied
+    if czy_szef(request.user):         
         uczniowie_lista = Uczen.objects.all()
     else:
         uczniowie_lista = Uczen.objects.filter(umowil=request.user)
