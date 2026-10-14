@@ -194,6 +194,7 @@ pracowniczy{% endblock %} {% block panel %}
 							<th>Data 1. lekcji</th>
 							<th>Czas utworzenia</th>
 							<th>Kto umówił</th>
+							<th>Stałe lekcje</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -211,6 +212,9 @@ pracowniczy{% endblock %} {% block panel %}
 							<td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
 							<td>{{ uczen.dodano|date:"d.m.Y H:i" }}</td>
 							<td>{{ uczen.kto_umowil }}</td>
+							                        <td>
+                            <a class="ikona-kalendarza" href="{% url 'lekcja_cykliczna' uczen.id %}" title="Umów stałe lekcje (cykliczne)">🔄</a>
+                        </td>
 						</tr>
 						{% endfor %}
 					</tbody>

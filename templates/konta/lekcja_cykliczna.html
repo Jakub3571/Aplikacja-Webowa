@@ -1,41 +1,78 @@
 {% extends 'konta/panel.html' %}
-{% block tytul %}Lekcja cykliczna — Panel pracowniczy{% endblock %}
+{% block tytul %}Stałe lekcje — Panel pracowniczy{% endblock %}
 {% block panel %}
 <section class="karta">
-  <h2>🔄 Umów lekcję cykliczną: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</h2>
+  <h2>🔄 Stałe lekcje: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</h2>
   <p class="podtytul">
     Uczeń: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }} · przedmiot: {{ uczen.przedmiot }}
-    · korepetytor: {{ uczen.korepetytor }}
+    · korepetytor: {{ uczen.korepetytor }} · umówił(a): {{ uczen.kto_umowil }}
   </p>
   <p class="podpowiedz">
-    Lekcja cykliczna wpisze zajęcia w kalendarz w wybrane dni do końca podanego okresu,
-    zablokuje godzinę u korepetytora i wyśle do rodzica e-mail z linkiem Google Meet.
+    Wybierz jeden lub więcej terminów tygodniowych — lekcje wpiszą się automatycznie do kalendarza,
+    a korepetytor będzie miał zablokowane te godziny.
   </p>
-  {% if form.errors %}
-    <div class="komunikat error">
-      Popraw błędy w formularzu:
-      <ul>
-        {% for pole, bledy in form.errors.items %}
-          {% for blad in bledy %}<li>{{ blad }}</li>{% endfor %}
-        {% endfor %}
-      </ul>
-    </div>
-  {% endif %}
   <form method="post" class="formularz">
     {% csrf_token %}
-    <label>{{ form.dzien_tygodnia.label }} <span class="gwiazdka">*</span></label>
-    {{ form.dzien_tygodnia }}
-    <label>{{ form.godzina.label }} <span class="gwiazdka">*</span></label>
-    {{ form.godzina }}
-    <label>{{ form.od_kiedy.label }} <span class="gwiazdka">*</span></label>
-    {{ form.od_kiedy }}
-    <label>{{ form.do_kiedy.label }} <span class="gwiazdka">*</span></label>
-    {{ form.do_kiedy }}
-    {% if form.do_kiedy.help_text %}<p class="podpowiedz">{{ form.do_kiedy.help_text }}</p>{% endif %}
-    <label>{{ form.link_meet.label }} <span class="gwiazdka">*</span></label>
-    {{ form.link_meet }}
-    {% if form.link_meet.help_text %}<p class="podpowiedz">{{ form.link_meet.help_text }}</p>{% endif %}
-    <button type="submit">Umów lekcję cykliczną</button>
+
+    <label>Terminy tygodniowe <span class="gwiazdka">*</span></label>
+    <div id="sloty-tygodniowe">
+      <div class="wiersz-przedmiotu">
+        <select name="slot_dzien" required>
+          <option value="">— dzień —</option>
+          <option value="0">poniedziałek</option>
+          <option value="1">wtorek</option>
+          <option value="2">środa</option>
+          <option value="3">czwartek</option>
+          <option value="4">piątek</option>
+          <option value="5">sobota</option>
+          <option value="6">niedziela</option>
+        </select>
+        <select name="slot_godzina" required>
+          <option value="">— godzina —</option>
+          {% for g in godziny %}
+          <option value="{{ g }}">{{ g }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" class="przycisk-usun-slot" title="Usuń ten termin">✘</button>
+      </div>
+    </div>
+    <button type="button" id="dodaj-slot">+ Dodaj kolejny termin</button>
+    <p class="podpowiedz">Przykład: wtorek 17:20 i czwartek 19:15 = 2 lekcje tygodniowo.</p>
+
+    <label>Obowiązuje do <span class="gwiazdka">*</span></label>
+    <select name="okres" required>
+      <option value="miesiac">do końca tego miesiąca</option>
+      <option value="rok" selected>do końca roku szkolnego (30 czerwca)</option>
+    </select>
+
+    <label for="id_link_meet">Link Google Meet (opcjonalnie)</label>
+    <input type="text" name="link_meet" id="id_link_meet" placeholder="https://meet.google.com/...">
+    <p class="podpowiedz">Jeśli podasz link, rodzic dostanie e-mail z zaproszeniem (link stały na każdą lekcję).</p>
+
+    <button type="submit">Umów stałe lekcje</button>
   </form>
 </section>
+
+<script>
+  var kontenerSlotow = document.getElementById('sloty-tygodniowe');
+  var przyciskDodaj = document.getElementById('dodaj-slot');
+  if (kontenerSlotow && przyciskDodaj) {
+    przyciskDodaj.addEventListener('click', function () {
+      var wzor = kontenerSlotow.querySelector('.wiersz-przedmiotu');
+      var klon = wzor.cloneNode(true);
+      klon.querySelectorAll('select').forEach(function (sel) { sel.selectedIndex = 0; });
+      klon.querySelector('.przycisk-usun-slot').addEventListener('click', function () {
+        klon.remove();
+      });
+      kontenerSlotow.appendChild(klon);
+    });
+    kontenerSlotow.querySelectorAll('.przycisk-usun-slot').forEach(function (prz) {
+      prz.addEventListener('click', function () {
+        if (kontenerSlotow.querySelectorAll('.wiersz-przedmiotu').length > 1) {
+          prz.closest('.wiersz-przedmiotu').remove();
+        }
+      });
+    });
+  }
+</script>
 {% endblock %}

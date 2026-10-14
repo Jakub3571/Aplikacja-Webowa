@@ -612,6 +612,7 @@ def uzytkownicy(request):
     return render(request, 'konta/uzytkownicy.html', {
         'form': form,
         'uzytkownicy': lista,
+        'nauczyciele': [u for u in lista if u.nauczyciel],
     })
 
 
@@ -700,136 +701,84 @@ def wyslij_zaproszenie_meet(uczen):
     except Exception:
         pass
 
-
 @login_required
 def umow_lekcje_cykliczna(request, uczen_id):
-    """Umawia lekcje cykliczne: wpisuje lekcje do kalendarza, blokuje godzinę
-    w kalendarzu korepetytora i wysyła e-mail z linkiem Meet do rodzica."""
+    """Umawia stałe lekcje ucznia: wiele slotów w tygodniu, presets okresu,
+    blokada terminów u korepetytora i e-mail z linkiem Meet do rodzica."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
     if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
         raise PermissionDenied
-    form = FormularzLekcjiCyklicznej(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        dane = form.cleaned_data
-        dzien_tygodnia = int(dane['dzien_tygodnia'])
-        godzina = datetime.strptime(dane['godzina'], '%H:%M').time()
+
+    def okres_dat(okres, od_dnia):
+        """Zwraca (od, do) wg wybranego presetu."""
+        if okres == 'miesiac':
+            if od_dnia.month == 12:
+                do = date(od_dnia.year, 12, 31)
+            else:
+                nast = date(od_dnia.year, od_dnia.month + 1, 1)
+                do = nast - timedelta(days=1)
+            return od_dnia, do
+        if od_dnia.month >= 9:
+            rok = od_dnia.year + 1
+        else:
+            rok = od_dnia.year
+        return od_dnia, date(rok, 6, 30)
+
+    if request.method == 'POST':
+        okres = request.POST.get('okres', 'miesiac')
+        link_meet = request.POST.get('link_meet', '').strip()
+        od_dnia, do_dnia = okres_dat(okres, date.today())
+        sloty_raw = request.POST.getlist('slot_dzien')
+        godziny_raw = request.POST.getlist('slot_godzina')
+        sloty = []
+        for idx, dzien_txt in enumerate(sloty_raw):
+            if not dzien_txt:
+                continue
+            godzina_txt = godziny_raw[idx] if idx < len(godziny_raw) else ''
+            if not godzina_txt:
+                continue
+            sloty.append((int(dzien_txt), godzina_txt))
+        if not sloty:
+            messages.error(request, 'Dodaj min. jeden termin (dzień tygodnia i godzina).')
+            return redirect('lekcja_cykliczna', uczen_id=uczen.id)
+        nauczyciel = None
+        if ' ' in uczen.korepetytor:
+            imie, nazwisko = uczen.korepetytor.split(' ', 1)
+            nauczyciel = Nauczyciel.objects.filter(imie__iexact=imie, nazwisko__iexact=nazwisko).first()
         utworzone = 0
-        dzien = dane['od_kiedy']
-        while dzien <= dane['do_kiedy']:
-            if dzien.weekday() == dzien_tygodnia:
-                data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
-                if not Lekcja.objects.filter(uczen=uczen, data=data_lekcji).exists():
-                    Lekcja.objects.create(uczen=uczen, data=data_lekcji)
-                utworzone += 1
-            dzien += timedelta(days=1)
-        # blokada godziny u korepetytora (jeśli ma kartę nauczyciela)
-        nauczyciel = Nauczyciel.objects.filter(
-            imie__iexact=uczen.korepetytor.split(' ')[0] if ' ' in uczen.korepetytor else uczen.korepetytor,
-            nazwisko__iexact=uczen.korepetytor.split(' ')[-1] if ' ' in uczen.korepetytor else '',
-        ).first()
-        if nauczyciel:
-            dzien = dane['od_kiedy']
-            while dzien <= dane['do_kiedy']:
+        for dzien_tygodnia, godzina_txt in sloty:
+            godzina = datetime.strptime(godzina_txt, '%H:%M').time()
+            dzien = od_dnia
+            while dzien <= do_dnia:
                 if dzien.weekday() == dzien_tygodnia:
-                    Dostepnosc.objects.create(
-                        nauczyciel=nauczyciel,
-                        data_od=dzien,
-                        data_do=dzien,
-                        godzina_od=godzina,
-                        godzina_do=(datetime.combine(date(2000, 1, 1), godzina) + timedelta(minutes=30)).time(),
-                    )
+                    data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
+                    Lekcja.objects.get_or_create(uczen=uczen, data=data_lekcji)
+                    if nauczyciel:
+                        Dostepnosc.objects.get_or_create(
+                            nauczyciel=nauczyciel,
+                            data_od=dzien,
+                            data_do=dzien,
+                            godzina_od=godzina,
+                            godzina_do=(datetime.combine(date(2000, 1, 1), godzina) + timedelta(minutes=60)).time(),
+                        )
+                    utworzone += 1
                 dzien += timedelta(days=1)
-        uczen.link_meet = dane['link_meet']
-        uczen.save()
-        wyslij_zaproszenie_meet(uczen)
+        if link_meet:
+            uczen.link_meet = link_meet
+            uczen.save()
+            wyslij_zaproszenie_meet(uczen)
         messages.success(
             request,
-            f'Lekcja cykliczna umówiona — wpisanych {utworzone} terminów. '
-            f'Zaproszenie z linkiem Meet wysłano na {uczen.email_glowny}.',
+            f'Stałe lekcje umówione — wpisano {utworzone} terminów do {do_dnia:%d.%m.%Y}. '
+            'Korepetytor ma zablokowane godziny w kalendarzu.',
         )
         return redirect('kalendarz_lekcji', uczen_id=uczen.id)
     return render(request, 'konta/lekcja_cykliczna.html', {
-        'form': form,
         'uczen': uczen,
+        'godziny': [f'{h:02d}:{m:02d}' for h in range(6, 24) for m in (0, 30)],
     })
-
-def wyslij_zaproszenie_meet(uczen):
-    """Wysyła e-mail do rodzica z linkiem do lekcji cyklicznej na Google Meet."""
-    if not uczen.link_meet or not uczen.email_glowny:
-        return
-    tresc = (
-        'Dzień dobry,\n\n'
-        f'umawiamy cykliczne zajęcia dla {uczen.imie_ucznia} '
-        f'(przedmiot: {uczen.przedmiot}, korepetytor: {uczen.korepetytor}).\n\n'
-        'Zapraszamy na spotkania przez Google Meet — ponieważ zajęcia są cykliczne,\n'
-        'ten link jest STAŁY i będzie obowiązywał przy każdej lekcji do końca roku szkolnego:\n\n'
-        f'{uczen.link_meet}\n\n'
-        'Prosimy zapisać go — to samo zaproszenie będzie używane zawsze.\n\n'
-        'Pozdrawiamy,\n'
-        f'{uczen.kto_umowil}\n'
-    )
-    try:
-        send_mail(
-            f'Zaproszenie na zajęcia — {uczen.imie_ucznia} (stały link Google Meet)',
-            tresc,
-            None,
-            [uczen.email_glowny],
-        )
-    except Exception:
-        pass
-
 
 @login_required
-def umow_lekcje_cykliczna(request, uczen_id):
-    """Umawia lekcje cykliczne: wpisuje lekcje do kalendarza, blokuje godzinę
-    w kalendarzu korepetytora i wysyła e-mail z linkiem Meet do rodzica."""
-    uczen = get_object_or_404(Uczen, pk=uczen_id)
-    if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
-        raise PermissionDenied
-    form = FormularzLekcjiCyklicznej(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        dane = form.cleaned_data
-        dzien_tygodnia = int(dane['dzien_tygodnia'])
-        godzina = datetime.strptime(dane['godzina'], '%H:%M').time()
-        utworzone = 0
-        dzien = dane['od_kiedy']
-        while dzien <= dane['do_kiedy']:
-            if dzien.weekday() == dzien_tygodnia:
-                data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
-                if not Lekcja.objects.filter(uczen=uczen, data=data_lekcji).exists():
-                    Lekcja.objects.create(uczen=uczen, data=data_lekcji)
-                utworzone += 1
-            dzien += timedelta(days=1)
-        # blokada godziny u korepetytora (jeśli ma kartę nauczyciela)
-        nauczyciel = Nauczyciel.objects.filter(
-            imie__iexact=uczen.korepetytor.split(' ')[0] if ' ' in uczen.korepetytor else uczen.korepetytor,
-            nazwisko__iexact=uczen.korepetytor.split(' ')[-1] if ' ' in uczen.korepetytor else '',
-        ).first()
-        if nauczyciel:
-            dzien = dane['od_kiedy']
-            while dzien <= dane['do_kiedy']:
-                if dzien.weekday() == dzien_tygodnia:
-                    Dostepnosc.objects.create(
-                        nauczyciel=nauczyciel,
-                        data_od=dzien,
-                        data_do=dzien,
-                        godzina_od=godzina,
-                        godzina_do=(datetime.combine(date(2000, 1, 1), godzina) + timedelta(minutes=30)).time(),
-                    )
-                dzien += timedelta(days=1)
-        uczen.link_meet = dane['link_meet']
-        uczen.save()
-        wyslij_zaproszenie_meet(uczen)
-        messages.success(
-            request,
-            f'Lekcja cykliczna umówiona — wpisanych {utworzone} terminów. '
-            f'Zaproszenie z linkiem Meet wysłano na {uczen.email_glowny}.',
-        )
-        return redirect('kalendarz_lekcji', uczen_id=uczen.id)
-    return render(request, 'konta/lekcja_cykliczna.html', {
-        'form': form,
-        'uczen': uczen,
-    })
 def zmiana_hasla(request):
     """Pozwala zalogowanemu pracownikowi zmienić własne hasło."""
     form = FormularzZmianyHasla(request.user, data=request.POST or None)
@@ -838,6 +787,7 @@ def zmiana_hasla(request):
         messages.success(request, 'Hasło zostało zmienione.')
         return redirect('pulpit')
     return render(request, 'konta/zmiana_hasla.html', {'form': form})
+
 
 def brak_dostepu(request, exception=None):
     """Strona wyświetlana, gdy pracownik nie ma uprawnień (błąd 403)."""

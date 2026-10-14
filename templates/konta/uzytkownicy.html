@@ -69,6 +69,7 @@
   <div class="uczniowie-bok">
   <section class="karta">
     <h2>Lista użytkowników ({{ uzytkownicy|length }})</h2>
+    <p class="podpowiedz">Konta pracowników i adminów. Nauczyciele są na liście poniżej.</p>
     <div class="tabela-wrapper">
       <table class="tabela" id="tabela-uzytkownicy">
         <thead>
@@ -77,12 +78,12 @@
             <th>Imię i nazwisko</th>
             <th>Email</th>
             <th>Rola</th>
-            <th>Przedmioty (stawki)</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {% for u in uzytkownicy %}
+            {% if not u.nauczyciel %}
             <tr>
               <td>{{ u.username }}</td>
               <td>{{ u.first_name }} {{ u.last_name }}</td>
@@ -90,19 +91,8 @@
               <td>
                 {% if u.is_superuser %}
                   <span class="umowa-tak">✔ admin</span>
-                {% elif u.nauczyciel %}
-                  <span class="umowa-tak">nauczyciel</span>
                 {% else %}
                   <span class="umowa-nie">pracownik</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if u.nauczyciel %}
-                  {% for p in u.nauczyciel.przedmioty.all %}
-                    {{ p.przedmiot }} {{ p.poziom }} — {{ p.stawka }} zł{% if not forloop.last %}, {% endif %}
-                  {% endfor %}
-                {% else %}
-                  —
                 {% endif %}
               </td>
               <td>
@@ -115,10 +105,46 @@
                 {% endif %}
               </td>
             </tr>
+            {% endif %}
           {% endfor %}
         </tbody>
       </table>
     </div>
+  </section>
+
+  <section class="karta">
+    <h2>Nauczyciele ({{ nauczyciele|length }})</h2>
+    <p class="podpowiedz">Konta nauczycieli z ich przedmiotami i stawkami.</p>
+    {% if nauczyciele %}
+    <div class="tabela-wrapper">
+      <table class="tabela" id="tabela-nauczyciele-konta">
+        <thead>
+          <tr>
+            <th>Nauczyciel</th>
+            <th>Email</th>
+            <th>Przedmioty i stawki</th>
+            <th>Kalendarz</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in nauczyciele %}
+            <tr>
+              <td>{{ u.first_name }} {{ u.last_name }}</td>
+              <td>{{ u.email }}</td>
+              <td>
+                {% for p in u.nauczyciel.przedmioty.all %}
+                  {{ p.przedmiot }} {{ p.poziom }} — {{ p.stawka }} zł{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+              </td>
+              <td><a class="ikona-kalendarza" href="{% url 'kalendarz_nauczyciela' u.nauczyciel_id %}" title="Zobacz kalendarz nauczyciela">📅</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p>Brak kont nauczycieli.</p>
+    {% endif %}
   </section>
   </div>
 </div>

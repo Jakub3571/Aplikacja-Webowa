@@ -590,21 +590,28 @@ class LekcjeCykliczneTests(TestCase):
     def test_pracownik_umawia_lekcje_cykliczna(self):
         self.client.force_login(self.pracownik)
         dane = {
-            'dzien_tygodnia': '1',
-            'godzina': '17:00',
-            'od_kiedy': '2026-10-01',
-            'do_kiedy': '2026-10-29',
+            'slot_dzien': ['1'],
+            'slot_godzina': ['17:00'],
+            'okres': 'miesiac',
             'link_meet': 'https://meet.google.com/abc-defg-hij',
         }
         r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', dane, follow=True)
-        self.assertContains(r, 'Lekcja cykliczna umówiona')
-        daty = sorted(l.data.date().day for l in Lekcja.objects.filter(uczen=self.uczen))
-        self.assertEqual(daty, [6, 13, 20, 27])
+        self.assertContains(r, 'Stałe lekcje umówione')
+        # lekcje: wszystkie w tym miesiacu, wszystkie we wtorki
+        lekcje = Lekcja.objects.filter(uczen=self.uczen)
+        self.assertTrue(lekcje.exists())
+        dzis = date.today()
+        for lekcja in lekcje:
+            dz = lekcja.data.date()
+            self.assertEqual(dz.month, dzis.month)
+            self.assertEqual(dz.weekday(), 1)  # 1 = wtorek
+        # mail do rodzica z linkiem Meet
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn('https://meet.google.com/abc-defg-hij', mail.outbox[0].body)
         self.assertIn('STAŁY', mail.outbox[0].body)
+        # blokady u korepetytora: tyle samo co lekcji
         blokady = Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='17:00')
-        self.assertEqual(blokady.count(), 4)
+        self.assertEqual(blokady.count(), lekcje.count())
 
     def test_pracownik_nie_umowi_cyklicznej_cudzemu_uczniowi(self):
         obcy = Uczen.objects.create(
@@ -706,3 +713,73 @@ class StawkiPrzedmiotowTests(TestCase):
         r = self.client.post('/uzytkownicy/', dane)
         self.assertContains(r, 'min. jeden przedmiot')
         self.assertFalse(Pracownik.objects.filter(username='b.blad').exists())
+
+class StaleLekcjeMultiSlotTests(TestCase):
+    """Stałe lekcje: wiele terminów tygodniowo i preset do końca roku szkolnego."""
+
+    def setUp(self):
+        self.admin = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
+        self.nauczyciel = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='j@n.pl')
+        self.uczen = Uczen.objects.create(
+            pierwsza_lekcja='2026-10-06T17:00',
+            przedmiot='matematyka', poziom='szkoła średnia - podstawa',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='ewa@f.pl',
+            telefon_dodatkowy='600300400', email_dodatkowy='r@f.pl',
+            korepetytor='Jan Kowalski', notatka_od_rodzica='ok',
+            kto_umowil='Prac Testowy', umowil=self.pracownik,
+        )
+
+    def test_dwa_terminy_tygodniowo(self):
+        self.client.force_login(self.pracownik)
+        dane = {
+            'slot_dzien': ['1', '3'],      # wtorek + czwartek
+            'slot_godzina': ['17:20', '19:15'],
+            'okres': 'miesiac',
+        }
+        r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', dane, follow=True)
+        self.assertContains(r, 'Stałe lekcje umówione')
+        # lekcje: wtorki 17:20 i czwartki 19:15, w tym miesiacu
+        lekcje = Lekcja.objects.filter(uczen=self.uczen)
+        self.assertTrue(lekcje.exists())
+        dzis = date.today()
+        for lekcja in lekcje:
+            dz = lekcja.data.date()
+            self.assertEqual(dz.month, dzis.month)
+            self.assertIn(dz.weekday(), [1, 3])  # wtorek (1) albo czwartek (3)
+        # godziny: obie obecne
+        from django.utils import timezone as _tz
+        godziny = set(
+            _tz.localtime(l.data).strftime('%H:%M') for l in lekcje
+        )
+        self.assertIn('17:20', godziny)
+        self.assertIn('19:15', godziny)
+        # blokady u korepetytora na obie godziny
+        self.assertTrue(
+            Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='17:20').exists()
+        )
+        self.assertTrue(
+            Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='19:15').exists()
+        )
+
+    def test_preset_rok_szkolny(self):
+        self.client.force_login(self.pracownik)
+        dane = {
+            'slot_dzien': ['1'],
+            'slot_godzina': ['17:20'],
+            'okres': 'rok',
+        }
+        r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', dane, follow=True)
+        self.assertContains(r, 'Stałe lekcje umówione')
+        from django.utils import timezone as _tz
+        ostatnia = Lekcja.objects.filter(uczen=self.uczen).order_by('-data').first()
+        lok = _tz.localtime(ostatnia.data).date()
+        self.assertEqual(lok.month, 6)
+        self.assertLessEqual(lok.day, 30)
+        from datetime import date as _date, timedelta as _td
+        self.assertEqual(lok.weekday(), 1)
+        koniec = _date(lok.year, 6, 30)
+        while koniec.weekday() != 1:
+            koniec -= _td(days=1)
+        self.assertEqual(lok, koniec)
