@@ -423,9 +423,9 @@ class KontoNauczycielaTests(TestCase):
             'haslo1': 'M0taneHaslo!',
             'haslo2': 'M0taneHaslo!',
             'rola': 'nauczyciel',
-            'przedmioty_nauczyciela': ['matematyka'],
-            'poziomy_nauczyciela': ['podstawa'],
-            'stawki_nauczyciela': '50',
+            'w_przedmiot': ['matematyka'],
+            'w_poziom': ['podstawa'],
+            'w_stawka': ['50'],
         }
         r = self.client.post('/uzytkownicy/', dane, follow=True)
         self.assertContains(r, 'został dodany')
@@ -494,9 +494,9 @@ class KreatorDyspozycyjnoscTests(TestCase):
             'haslo1': 'M0taneHaslo!',
             'haslo2': 'M0taneHaslo!',
             'rola': 'nauczyciel',
-            'przedmioty_nauczyciela': ['matematyka'],
-            'poziomy_nauczyciela': ['podstawa'],
-            'stawki_nauczyciela': '50',
+            'w_przedmiot': ['matematyka'],
+            'w_poziom': ['podstawa'],
+            'w_stawka': ['50'],
         }
         self.client.post('/uzytkownicy/', dane, follow=True)
         self.nauczyciel = Pracownik.objects.get(username='j.kowalski').nauczyciel
@@ -642,9 +642,9 @@ class NauczycielTylkoKalendarzTests(TestCase):
             'haslo1': 'M0taneHaslo!',
             'haslo2': 'M0taneHaslo!',
             'rola': 'nauczyciel',
-            'przedmioty_nauczyciela': ['matematyka'],
-            'poziomy_nauczyciela': ['podstawa'],
-            'stawki_nauczyciela': '50',
+            'w_przedmiot': ['matematyka'],
+            'w_poziom': ['podstawa'],
+            'w_stawka': ['50'],
         }
         self.client.post('/uzytkownicy/', dane, follow=True)
         self.nauczyciel_user = Pracownik.objects.get(username='j.kowalski')
@@ -683,16 +683,16 @@ class StawkiPrzedmiotowTests(TestCase):
             'haslo1': 'M0taneHaslo!',
             'haslo2': 'M0taneHaslo!',
             'rola': 'nauczyciel',
-            'przedmioty_nauczyciela': ['angielski', 'matematyka'],
-            'poziomy_nauczyciela': ['podstawa', 'rozszerzenie'],
-            'stawki_nauczyciela': '40, 50',
+            'w_przedmiot': ['angielski', 'matematyka'],
+            'w_poziom': ['podstawa', 'rozszerzenie'],
+            'w_stawka': ['40', '50'],
         }
         r = self.client.post('/uzytkownicy/', dane, follow=True)
         self.assertContains(r, 'został dodany')
         user = Pracownik.objects.get(username='a.nowak')
-        przedmioty = {p.przedmiot: p for p in user.nauczyciel.przedmioty.filter(poziom='podstawa')}
-        self.assertEqual(str(przedmioty['angielski'].stawka), '40.00')
-        self.assertEqual(str(przedmioty['matematyka'].stawka), '50.00')
+        wiersze = {(p.przedmiot, p.poziom): p for p in user.nauczyciel.przedmioty.all()}
+        self.assertEqual(str(wiersze[('angielski', 'podstawa')].stawka), '40.00')
+        self.assertEqual(str(wiersze[('matematyka', 'rozszerzenie')].stawka), '50.00')
 
     def test_nauczyciel_bez_przedmiotu_odrzucony(self):
         self.client.force_login(self.admin)

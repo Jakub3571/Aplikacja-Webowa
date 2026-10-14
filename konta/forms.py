@@ -155,7 +155,8 @@ class FormularzUcznia(forms.ModelForm):
         return dane
 
 class FormularzUzytkownika(forms.ModelForm):
-    """Formularz dodawania nowego użytkownika panelu — rola wybierana na górze."""
+    """Formularz dodawania nowego użytkownika panelu — rola wybierana na górze.
+    Dla nauczyciela: wiersze przedmiot + poziom + stawka."""
 
     rola = forms.ChoiceField(
         label='rola',
@@ -177,29 +178,28 @@ class FormularzUzytkownika(forms.ModelForm):
         widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
         help_text='Powtórz to samo hasło, żeby wykluczyć literówkę.',
     )
-    przedmioty_nauczyciela = forms.MultipleChoiceField(
-        label='przedmioty, których uczy',
-        choices=[],
-        required=False,
-        widget=forms.CheckboxSelectMultiple,
-        help_text='Zaznacz przedmioty nauczyciela.',
-    )
-    poziomy_nauczyciela = forms.MultipleChoiceField(
-        label='poziomy',
-        choices=POZIOMY_NAUCZYCIELA,
-        required=False,
-        widget=forms.CheckboxSelectMultiple,
-        help_text='Zaznaczone poziomy dotyczą wybranych przedmiotów.',
-    )
-    stawki_nauczyciela = forms.CharField(
-        label='stawki za przedmioty',
-        required=False,
-        help_text='Wpisz stawki po przecinku w kolejności przedmiotów, np. 40, 50.',
-    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['przedmioty_nauczyciela'].choices = list(PRZEDMIOTY)
+        # dla nauczyciela: budujemy wiersze przedmiot+poziom+stawka
+        self.wiersze_przedmiotow = []
+        if self.is_bound and hasattr(self.data, 'getlist'):
+            przedmioty = self.data.getlist('w_przedmiot')
+            poziomy = self.data.getlist('w_poziom')
+            stawki = self.data.getlist('w_stawka')
+            for idx, przedmiot in enumerate(przedmioty):
+                if not przedmiot:
+                    continue
+                poziom = poziomy[idx] if idx < len(poziomy) else 'podstawa'
+                stawka = stawki[idx] if idx < len(stawki) else '0'
+                self.wiersze_przedmiotow.append({
+                    'przedmiot': przedmiot,
+                    'poziom': poziom,
+                    'stawka': stawka,
+                })
+        if not self.wiersze_przedmiotow:
+            self.wiersze_przedmiotow = [{'przedmiot': '', 'poziom': 'podstawa', 'stawka': ''}]
+        self.fields_przedmioty = list(PRZEDMIOTY)
 
     class Meta:
         model = Pracownik
@@ -220,9 +220,27 @@ class FormularzUzytkownika(forms.ModelForm):
                 validate_password(haslo1)
             except ValidationError as e:
                 raise forms.ValidationError(list(e.messages))
-        # nauczyciel musi miec min. jeden przedmiot
-        if dane.get('rola') == 'nauczyciel' and not dane.get('przedmioty_nauczyciela'):
-            raise forms.ValidationError('Nauczyciel musi mieć zaznaczony min. jeden przedmiot.')
+        # nauczyciel: walidacja wierszy przedmiotow
+        if dane.get('rola') == 'nauczyciel':
+            pelne = [w for w in self.wiersze_przedmiotow if w['przedmiot']]
+            if not pelne:
+                raise forms.ValidationError('Nauczyciel musi mieć min. jeden przedmiot.')
+            pary = set()
+            for w in pelne:
+                para = (w['przedmiot'], w['poziom'])
+                if para in pary:
+                    raise forms.ValidationError(
+                        f'Przedmiot {w["przedmiot"]} na poziomie {w["poziom"]} jest wpisany dwa razy.'
+                    )
+                pary.add(para)
+                try:
+                    stawka = float(w['stawka'].replace(',', '.') or '0')
+                    if stawka < 0:
+                        raise ValueError
+                except ValueError:
+                    raise forms.ValidationError(
+                        f'Stawka dla {w["przedmiot"]} ({w["poziom"]}) musi być liczbą.'
+                    )
         return dane
 
     def zapisz(self):
@@ -241,20 +259,16 @@ class FormularzUzytkownika(forms.ModelForm):
             )
             user.nauczyciel = nauczyciel
             user.save()
-            # stawki: po przecinku, w kolejnosci przedmiotow; brak = 0
-            stawki_raw = self.cleaned_data.get('stawki_nauczyciela') or ''
-            stawki = [x.strip() for x in stawki_raw.split(',') if x.strip()]
-            przedmioty = self.cleaned_data.get('przedmioty_nauczyciela', [])
-            poziomy = self.cleaned_data.get('poziomy_nauczyciela') or ['podstawa']
-            for idx, przedmiot in enumerate(przedmioty):
-                stawka = stawki[idx] if idx < len(stawki) else '0'
-                for poziom in poziomy:
-                    PrzedmiotNauczyciela.objects.get_or_create(
-                        nauczyciel=nauczyciel,
-                        przedmiot=przedmiot,
-                        poziom=poziom,
-                        defaults={'stawka': stawka},
-                    )
+            for w in self.wiersze_przedmiotow:
+                if not w['przedmiot']:
+                    continue
+                stawka = w['stawka'].replace(',', '.') or '0'
+                PrzedmiotNauczyciela.objects.update_or_create(
+                    nauczyciel=nauczyciel,
+                    przedmiot=w['przedmiot'],
+                    poziom=w['poziom'],
+                    defaults={'stawka': stawka},
+                )
         return user
 class FormularzLekcjiCyklicznej(forms.Form):
     """Umawianie lekcji cyklicznej ucznia: dzień tygodnia, godzina i okres."""

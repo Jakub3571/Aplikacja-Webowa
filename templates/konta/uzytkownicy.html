@@ -36,17 +36,24 @@
 
       <div id="sekcja-nauczyciel" style="display: none; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #ddd;">
         <h3>Przedmioty i stawki nauczyciela</h3>
-        <label>{{ form.przedmioty_nauczyciela.label }} <span class="gwiazdka">*</span></label>
-        {{ form.przedmioty_nauczyciela }}
-        {% if form.przedmioty_nauczyciela.help_text %}<p class="podpowiedz">{{ form.przedmioty_nauczyciela.help_text }}</p>{% endif %}
-        <label>{{ form.poziomy_nauczyciela.label }}</label>
-        {{ form.poziomy_nauczyciela }}
-        {% if form.poziomy_nauczyciela.help_text %}<p class="podpowiedz">{{ form.poziomy_nauczyciela.help_text }}</p>{% endif %}
-        <label for="{{ form.stawki_nauczyciela.id_for_label }}">Stawki (zł/godz.) <span class="gwiazdka">*</span></label>
-        {{ form.stawki_nauczyciela }}
-        {% if form.stawki_nauczyciela.help_text %}<p class="podpowiedz">{{ form.stawki_nauczyciela.help_text }}</p>{% endif %}
-        <p class="podpowiedz">Przykład: zaznaczysz angielski i matematykę, wpisz „40, 50” —
-        angielski 40 zł, matematyka 50 zł za godzinę.</p>
+        <p class="podpowiedz">Każdy przedmiot ma własny poziom i stawkę. Kliknij „+ Dodaj przedmiot”, aby dodać kolejny.</p>
+        <div id="wiersze-przedmiotow-konto">
+          <div class="wiersz-przedmiotu">
+            <select name="w_przedmiot" required>
+              <option value="">— wybierz przedmiot —</option>
+              {% for wartosc, etykieta in form.fields_przedmioty %}
+              <option value="{{ wartosc }}">{{ etykieta }}</option>
+              {% endfor %}
+            </select>
+            <select name="w_poziom" required>
+              <option value="podstawa" selected>podstawa</option>
+              <option value="rozszerzenie">rozszerzenie</option>
+            </select>
+            <input type="number" name="w_stawka" min="0" step="0.01" placeholder="stawka (zł)" required>
+            <button type="button" class="przycisk-usun-wiersz-konto" title="Usuń ten przedmiot">✘</button>
+          </div>
+        </div>
+        <button type="button" id="dodaj-przedmiot-konto">+ Dodaj przedmiot</button>
       </div>
 
       <label for="{{ form.haslo1.id_for_label }}">Hasło <span class="gwiazdka">*</span></label>
@@ -120,11 +127,33 @@
   var rola = document.getElementById('id_rola');
   var sekcjaNauczyciel = document.getElementById('sekcja-nauczyciel');
   if (rola && sekcjaNauczyciel) {
-    var odswiez = function () {
+    var odswiezRole = function () {
       sekcjaNauczyciel.style.display = rola.value === 'nauczyciel' ? '' : 'none';
     };
-    rola.addEventListener('change', odswiez);
-    odswiez();
+    rola.addEventListener('change', odswiezRole);
+    odswiezRole();
+  }
+
+  var kontenerWierszy = document.getElementById('wiersze-przedmiotow-konto');
+  var przyciskDodaj = document.getElementById('dodaj-przedmiot-konto');
+  if (kontenerWierszy && przyciskDodaj) {
+    przyciskDodaj.addEventListener('click', function () {
+      var wzor = kontenerWierszy.querySelector('.wiersz-przedmiotu');
+      var klon = wzor.cloneNode(true);
+      klon.querySelectorAll('select').forEach(function (sel) { sel.selectedIndex = 0; });
+      klon.querySelector('input[name="w_stawka"]').value = '';
+      klon.querySelector('.przycisk-usun-wiersz-konto').addEventListener('click', function () {
+        klon.remove();
+      });
+      kontenerWierszy.appendChild(klon);
+    });
+    kontenerWierszy.querySelectorAll('.przycisk-usun-wiersz-konto').forEach(function (prz) {
+      prz.addEventListener('click', function () {
+        if (kontenerWierszy.querySelectorAll('.wiersz-przedmiotu').length > 1) {
+          prz.closest('.wiersz-przedmiotu').remove();
+        }
+      });
+    });
   }
 </script>
 {% endblock %}
