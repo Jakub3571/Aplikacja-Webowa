@@ -161,8 +161,8 @@ class FormularzUzytkownika(forms.ModelForm):
     rola = forms.ChoiceField(
         label='rola',
         choices=[
-            ('pracownik', 'pracownik biura'),
-            ('nauczyciel', 'nauczyciel'),
+            ('pracownik', 'osoba umawiająca'),
+            ('nauczyciel', 'korepetytor'),
             ('admin', 'admin (pełny dostęp)'),
         ],
         initial='pracownik',
