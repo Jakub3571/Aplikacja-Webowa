@@ -200,13 +200,14 @@ class FormularzUzytkownika(forms.ModelForm):
         if not self.wiersze_przedmiotow:
             self.wiersze_przedmiotow = [{'przedmiot': '', 'poziom': 'podstawa', 'stawka': ''}]
         self.fields_przedmioty = list(PRZEDMIOTY)
+        self.fields['email'].required = False
 
     class Meta:
         model = Pracownik
         fields = ['username', 'first_name', 'last_name', 'email', 'telefon']
         help_texts = {
             'username': 'Nazwa do logowania, np. j.kowalski',
-            'email': 'Adres e-mail',
+            'email': 'Adres e-mail (dla nauczyciela można zostawić puste — utworzy się automatycznie)',
         }
 
     def clean(self):
@@ -220,6 +221,12 @@ class FormularzUzytkownika(forms.ModelForm):
                 validate_password(haslo1)
             except ValidationError as e:
                 raise forms.ValidationError(list(e.messages))
+
+                # nauczyciel: email nie jest potrzebny — utworzy się automatycznie
+        if dane.get('rola') == 'nauczyciel':
+            dane['email'] = dane.get('email') or f"{dane.get('username', '')}@konta.local"
+        elif not dane.get('email'):
+            self.add_error('email', 'Adres e-mail jest wymagany dla pracownika i admina.')
         # nauczyciel: walidacja wierszy przedmiotow
         if dane.get('rola') == 'nauczyciel':
             pelne = [w for w in self.wiersze_przedmiotow if w['przedmiot']]

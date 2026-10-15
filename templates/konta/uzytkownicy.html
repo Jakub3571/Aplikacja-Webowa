@@ -32,9 +32,11 @@
       <label for="{{ form.last_name.id_for_label }}">Nazwisko</label>
       {{ form.last_name }}
 
-      <label for="{{ form.email.id_for_label }}">Email <span class="gwiazdka">*</span></label>
-      {{ form.email }}
-      {% if form.email.help_text %}<p class="podpowiedz">{{ form.email.help_text }}</p>{% endif %}
+      <div id="pole-email">
+        <label for="{{ form.email.id_for_label }}">Email <span class="gwiazdka">*</span></label>
+        {{ form.email }}
+        {% if form.email.help_text %}<p class="podpowiedz">{{ form.email.help_text }}</p>{% endif %}
+      </div>
 
       <label for="{{ form.telefon.id_for_label }}">Telefon</label>
       {{ form.telefon }}
@@ -159,6 +161,7 @@
 <script>
   var rola = document.getElementById('id_rola');
   var sekcjaNauczyciel = document.getElementById('sekcja-nauczyciel');
+  var poleEmail = document.getElementById('pole-email');
 
   function ustawWymaganePrzedmiotow(wymagane) {
     sekcjaNauczyciel.querySelectorAll('select[name="w_przedmiot"], select[name="w_poziom"], input[name="w_stawka"]').forEach(function (pole) {
@@ -171,6 +174,10 @@
       var czyNauczyciel = rola.value === 'nauczyciel';
       sekcjaNauczyciel.style.display = czyNauczyciel ? '' : 'none';
       ustawWymaganePrzedmiotow(czyNauczyciel);
+      if (poleEmail) {
+        poleEmail.style.display = czyNauczyciel ? 'none' : '';
+        poleEmail.querySelector('input[name="email"]').required = !czyNauczyciel;
+      }
     };
     rola.addEventListener('change', odswiezRole);
     odswiezRole();
