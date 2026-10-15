@@ -668,3 +668,19 @@ body {
   border-radius: 999px;
   background: #fca5a5;
 }
+
+.przycisk-usun {
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  font-weight: 600;
+  margin-right: 0.75rem;
+}
+
+.przycisk-usun:hover {
+  background: #b91c1c;
+}

@@ -1,7 +1,5 @@
 {% extends 'konta/panel.html' %}
-
 {% block tytul %}Lekcje — Panel pracowniczy{% endblock %}
-
 {% block panel %}
 <div class="platnosci-uklad">
   <section class="karta">
@@ -19,6 +17,7 @@
             <th>Dodano</th>
             <th>Kalendarz</th>
             <th>Cykliczna</th>
+            <th>Akcje</th>
           </tr>
         </thead>
         <tbody>
@@ -33,8 +32,12 @@
             <td>
               <a class="ikona-kalendarza" href="{% url 'kalendarz_lekcji' uczen.id %}" title="Kalendarz lekcji">📅</a>
             </td>
-                        <td>
+            <td>
               <a class="ikona-kalendarza" href="{% url 'lekcja_cykliczna' uczen.id %}" title="Umów lekcję cykliczną">🔄</a>
+            </td>
+            <td>
+              <a class="ikona-kalendarza" href="{% url 'edytuj_ucznia' uczen.id %}" title="Edytuj dane ucznia">✏️</a>
+              <a class="ikona-kalendarza" href="{% url 'usun_ucznia' uczen.id %}" title="Usuń ucznia">🗑</a>
             </td>
           </tr>
           {% endfor %}

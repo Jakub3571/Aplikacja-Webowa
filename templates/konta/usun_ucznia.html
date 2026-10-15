@@ -1,0 +1,16 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Usuń ucznia — {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}{% endblock %}
+
+{% block panel %}
+<section class="karta">
+  <h2>🗑 Usunąć ucznia?</h2>
+  <p>Czy na pewno chcesz usunąć ucznia <strong>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</strong> (korepetytor: {{ uczen.korepetytor }})?</p>
+  <p class="podpowiedz">Razem z uczniem usunięte zostaną <strong>wszystkie jego lekcje</strong>, a zablokowane godziny wrócą do kalendarza korepetytora. Tej operacji nie można cofnąć.</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="przycisk-usun">Tak, usuń ucznia</button>
+    <a href="{% url 'lekcje' %}" class="powrot">← Anuluj</a>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Edytuj ucznia — {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}{% endblock %}
+
+{% block panel %}
+<section class="karta">
+  <h2>✏️ Edytuj ucznia: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</h2>
+  {% if form.errors %}
+  <div class="komunikat error">
+    Popraw błędy w formularzu:
+    <ul>
+      {% for pole, bledy in form.errors.items %}
+        {% for blad in bledy %}<li>{{ blad }}</li>{% endfor %}
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  <form method="post" class="formularz" id="formularz-ucznia">
+    {% csrf_token %}
+    <label for="{{ form.data_pierwszej_lekcji.id_for_label }}">Data 1. lekcji</label>
+    {{ form.data_pierwszej_lekcji }}
+
+    <label for="{{ form.godzina_pierwszej_lekcji.id_for_label }}">Godzina 1. lekcji</label>
+    {{ form.godzina_pierwszej_lekcji }}
+
+    <label for="{{ form.przedmiot.id_for_label }}">Przedmiot <span class="gwiazdka">*</span></label>
+    {{ form.przedmiot }}
+
+    <label for="{{ form.poziom.id_for_label }}">Poziom <span class="gwiazdka">*</span></label>
+    {{ form.poziom }}
+
+    <label for="{{ form.imie_ucznia.id_for_label }}">Uczeń — imię <span class="gwiazdka">*</span></label>
+    {{ form.imie_ucznia }}
+
+    <label for="{{ form.nazwisko_rodzica.id_for_label }}">Uczeń — nazwisko (rodzica) <span class="gwiazdka">*</span></label>
+    {{ form.nazwisko_rodzica }}
+
+    <label for="{{ form.rodzic.id_for_label }}">Rodzic — imię i nazwisko <span class="gwiazdka">*</span></label>
+    {{ form.rodzic }}
+
+    <label for="{{ form.telefon_glowny.id_for_label }}">Telefon główny <span class="gwiazdka">*</span></label>
+    {{ form.telefon_glowny }}
+
+    <label for="{{ form.email_glowny.id_for_label }}">Email główny <span class="gwiazdka">*</span></label>
+    {{ form.email_glowny }}
+
+    <label for="{{ form.telefon_dodatkowy.id_for_label }}">Telefon dodatkowy <span class="gwiazdka">*</span></label>
+    {{ form.telefon_dodatkowy }}
+
+    <label for="{{ form.email_dodatkowy.id_for_label }}">Email dodatkowy <span class="gwiazdka">*</span></label>
+    {{ form.email_dodatkowy }}
+
+    <label for="{{ form.korepetytor.id_for_label }}">Korepetytor <span class="gwiazdka">*</span></label>
+    {{ form.korepetytor }}
+
+    <label for="{{ form.notatka_od_rodzica.id_for_label }}">Notatka od rodzica</label>
+    {{ form.notatka_od_rodzica }}
+
+    <button type="submit">Zapisz zmiany</button>
+  </form>
+  <a class="powrot" href="{% url 'lekcje' %}">← Wróć do listy uczniów</a>
+</section>
+{% endblock %}

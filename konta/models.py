@@ -112,7 +112,19 @@ class Nauczyciel(models.Model):
         """Wypisuje wszystkie przedmioty nauczyciela z poziomami, np. 'matematyka (podstawa)'."""
         wpisy = [f'{p.przedmiot} ({p.poziom})' for p in self.przedmioty.all()]
         return ', '.join(wpisy) if wpisy else '—'
-
+        
+    def stawka_dla(self, przedmiot, poziom_ucznia):
+        """Stawka dla przedmiotu i poziomu ucznia (z kart przedmiotów);
+        jeśli nie znajdzie, fallback do ogólnej stawki nauczyciela."""
+        poziom_nauczyciela = {
+            'szkoła średnia - podstawa': 'podstawa',
+            'szkoła średnia - rozszerzenie': 'rozszerzenie',
+            'studia': 'rozszerzenie',
+        }.get(poziom_ucznia)
+        for p in self.przedmioty.all():
+            if p.przedmiot == przedmiot and p.poziom == poziom_nauczyciela:
+                return p.stawka
+        return self.stawka
 
 class PrzedmiotNauczyciela(models.Model):
     """Przedmiot, którego uczy nauczyciel, wraz z poziomem nauczania."""

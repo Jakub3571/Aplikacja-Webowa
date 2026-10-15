@@ -1,0 +1,30 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Edytuj konto — {{ uzytkownik.username }}{% endblock %}
+
+{% block panel %}
+<section class="karta">
+  <h2>✏️ Edytuj konto: {{ uzytkownik.username }}</h2>
+  <p class="podtytul">
+    Rola: {% if uzytkownik.nauczyciel %}korepetytor{% elif uzytkownik.is_superuser %}admin{% else %}osoba umawiająca{% endif %}
+    — hasła i roli nie zmienia się tutaj.
+  </p>
+  <form method="post" class="formularz">
+    {% csrf_token %}
+    <label for="id_first_name">Imię</label>
+    <input type="text" name="first_name" id="id_first_name" value="{{ uzytkownik.first_name }}">
+
+    <label for="id_last_name">Nazwisko</label>
+    <input type="text" name="last_name" id="id_last_name" value="{{ uzytkownik.last_name }}">
+
+    <label for="id_email">Email <span class="gwiazdka">*</span></label>
+    <input type="email" name="email" id="id_email" value="{{ uzytkownik.email }}" required>
+
+    <label for="id_telefon">Telefon</label>
+    <input type="text" name="telefon" id="id_telefon" value="{{ uzytkownik.telefon }}">
+
+    <button type="submit">Zapisz zmiany</button>
+  </form>
+  <a class="powrot" href="{% url 'uzytkownicy' %}">← Wróć do listy użytkowników</a>
+</section>
+{% endblock %}

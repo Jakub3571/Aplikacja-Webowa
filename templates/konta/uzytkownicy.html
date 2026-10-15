@@ -78,7 +78,7 @@
   <div class="uczniowie-bok">
   <section class="karta">
     <h2>Lista użytkowników ({{ uzytkownicy|length }})</h2>
-    <p class="podpowiedz">Konta pracowników i adminów. Nauczyciele są na liście poniżej.</p>
+    <p class="podpowiedz">Konta pracowników i adminów. Korepetytorzy są na liście poniżej.</p>
     <div class="tabela-wrapper">
       <table class="tabela" id="tabela-uzytkownicy">
         <thead>
@@ -87,7 +87,8 @@
             <th>Imię i nazwisko</th>
             <th>Email</th>
             <th>Rola</th>
-            <th></th>
+            <th>Status</th>
+            <th>Akcje</th>
           </tr>
         </thead>
         <tbody>
@@ -101,16 +102,25 @@
                 {% if u.is_superuser %}
                   <span class="umowa-tak">✔ admin</span>
                 {% else %}
-                  <span class="umowa-nie">pracownik</span>
+                  <span class="umowa-nie">osoba umawiająca</span>
                 {% endif %}
               </td>
               <td>
-                {% if u.id == request.user.id %}
-                  <span class="podpowiedz">to Ty</span>
+                {% if u.is_active %}
+                  <span class="umowa-tak">✔ aktywne</span>
                 {% else %}
-                  <a class="przycisk-umowa {% if u.is_superuser %}umowa-tak{% else %}umowa-nie{% endif %}" href="{% url 'przelacz_szefa' u.id %}" title="{% if u.is_superuser %}Kliknij, aby odebrać uprawnienia admina{% else %}Kliknij, aby nadać uprawnienia admina{% endif %}">
-                    {% if u.is_superuser %}odebrać admina{% else %}nadać admina{% endif %}
-                  </a>
+                  <span class="umowa-nie">wyłączone</span>
+                {% endif %}
+              </td>
+              <td>
+                <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>
+                {% if u.id != request.user.id %}
+                <a class="przycisk-umowa {% if u.is_superuser %}umowa-tak{% else %}umowa-nie{% endif %}" href="{% url 'przelacz_szefa' u.id %}" title="{% if u.is_superuser %}Kliknij, aby odebrać uprawnienia admina{% else %}Kliknij, aby nadać uprawnienia admina{% endif %}">
+                  {% if u.is_superuser %}odebrać admina{% else %}nadać admina{% endif %}
+                </a>
+                <a class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}" href="{% url 'przelacz_konto' u.id %}" title="{% if u.is_active %}Wyłącz konto (nie będzie się mogło logować){% else %}Włącz konto{% endif %}">
+                  {% if u.is_active %}wyłącz konto{% else %}włącz konto{% endif %}
+                </a>
                 {% endif %}
               </td>
             </tr>
@@ -122,17 +132,19 @@
   </section>
 
   <section class="karta">
-    <h2>Nauczyciele ({{ nauczyciele|length }})</h2>
-    <p class="podpowiedz">Konta nauczycieli z ich przedmiotami i stawkami.</p>
+    <h2>Korepetytorzy ({{ nauczyciele|length }})</h2>
+    <p class="podpowiedz">Konta korepetytorów z ich przedmiotami i stawkami.</p>
     {% if nauczyciele %}
     <div class="tabela-wrapper">
       <table class="tabela" id="tabela-nauczyciele-konta">
         <thead>
           <tr>
-            <th>Nauczyciel</th>
+            <th>Korepetytor</th>
             <th>Email</th>
             <th>Przedmioty i stawki</th>
+            <th>Status</th>
             <th>Kalendarz</th>
+            <th>Akcje</th>
           </tr>
         </thead>
         <tbody>
@@ -145,14 +157,29 @@
                   {{ p.przedmiot }} {{ p.poziom }} — {{ p.stawka }} zł{% if not forloop.last %}, {% endif %}
                 {% endfor %}
               </td>
-              <td><a class="ikona-kalendarza" href="{% url 'kalendarz_nauczyciela' u.nauczyciel_id %}" title="Zobacz kalendarz nauczyciela">📅</a></td>
+              <td>
+                {% if u.is_active %}
+                  <span class="umowa-tak">✔ aktywne</span>
+                {% else %}
+                  <span class="umowa-nie">wyłączone</span>
+                {% endif %}
+              </td>
+              <td><a class="ikona-kalendarza" href="{% url 'kalendarz_nauczyciela' u.nauczyciel_id %}" title="Zobacz kalendarz korepetytora">📅</a></td>
+              <td>
+                <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>
+                {% if u.id != request.user.id %}
+                <a class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}" href="{% url 'przelacz_konto' u.id %}" title="{% if u.is_active %}Wyłącz konto (nie będzie się mogło logować){% else %}Włącz konto{% endif %}">
+                  {% if u.is_active %}wyłącz{% else %}włącz{% endif %}
+                </a>
+                {% endif %}
+              </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
     {% else %}
-    <p>Brak kont nauczycieli.</p>
+    <p>Brak kont korepetytorów.</p>
     {% endif %}
   </section>
   </div>
