@@ -501,11 +501,13 @@ class KreatorDyspozycyjnoscTests(TestCase):
         self.client.post('/uzytkownicy/', dane, follow=True)
         self.nauczyciel = Pracownik.objects.get(username='j.kowalski').nauczyciel
 
-    def test_nauczyciel_bez_dyspozycyjnosci_trafia_do_kreatora(self):
+    def test_nauczyciel_od_razu_trafia_do_kalendarza(self):
         self.client.logout()
         self.client.login(username='j.kowalski', password='M0taneHaslo!')
         r = self.client.get('/pulpit/', follow=True)
-        self.assertContains(r, 'Twoja dyspozycyjność')
+        # wlasny kalendarz, bez przymusowego kreatora dyspozycyjnosci
+        self.assertContains(r, 'Kalendarz')
+        self.assertNotContains(r, 'Twoja dyspozycyjność')
 
     def test_kreator_tylko_dla_nauczyciela(self):
         pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')

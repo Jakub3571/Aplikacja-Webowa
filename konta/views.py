@@ -73,9 +73,7 @@ def pulpit(request):
     """Strona startowa: szef widzi pulpit, pracownik od razu formularz ucznia."""
     if not czy_szef(request.user):
         if getattr(request.user, 'nauczyciel_id', None):
-            nauczyciel = request.user.nauczyciel
-            if not nauczyciel.dyspozycyjnosc_uzupełniona:
-                return redirect('kreator_dyspozycyjnosc')
+            # nauczyciel: od razu swoj kalendarz (dni/godziny zaznacza sam w kalendarzu)
             return redirect('kalendarz_nauczyciela', nauczyciel_id=request.user.nauczyciel_id)
         return redirect('uczniowie')
     return render(request, 'konta/pulpit.html')
