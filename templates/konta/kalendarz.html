@@ -1,93 +1,249 @@
-{% extends 'konta/panel.html' %} {% block tytul %}Kalendarz {{ nauczyciel.imie
-}} {{ nauczyciel.nazwisko }} — Panel pracowniczy{% endblock %} {% block panel %}
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Kalendarz {{ nauczyciel.imie }} {{ nauczyciel.nazwisko }} — Panel pracowniczy{% endblock %}
+
+{% block panel %}
 <section class="karta kalendarz-zajawka">
-	<h2>📅 Kalendarz: {{ nauczyciel.imie }} {{ nauczyciel.nazwisko }}</h2>
+  <h2>📅 Kalendarz: {{ nauczyciel.imie }} {{ nauczyciel.nazwisko }}</h2>
 </section>
 
 <div class="kalendarz-uklad">
-	<section class="karta">
-		<div class="kalendarz-naglowek">
-			<a
-				class="strzalka"
-				href="?rok={{ poprzedni_rok }}&miesiac={{ poprzedni_miesiac }}"
-				>&larr;</a
-			>
-			<h3>{{ nazwa_miesiaca|capfirst }} {{ rok }}</h3>
-			<a
-				class="strzalka"
-				href="?rok={{ nastepny_rok }}&miesiac={{ nastepny_miesiac }}"
-				>&rarr;</a
-			>
-		</div>
+  <section class="karta">
+    <div class="kalendarz-naglowek">
+      <a class="strzalka" href="?rok={{ poprzedni_rok }}&miesiac={{ poprzedni_miesiac }}">&larr;</a>
+      <h3>{{ nazwa_miesiaca|capfirst }} {{ rok }}</h3>
+      <a class="strzalka" href="?rok={{ nastepny_rok }}&miesiac={{ nastepny_miesiac }}">&rarr;</a>
+    </div>
+    <table class="kalendarz">
+      <thead>
+        <tr>
+          {% for dzien in dni_tygodnia %}<th>{{ dzien }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for tydzien in tygodnie %}
+        <tr>
+          {% for dzien in tydzien %}
+          <td class="{% if not dzien.w_tym_miesiacu %}inny-miesiac{% endif %} {% if dzien.dostepny %}dzien-dostepny{% endif %} {% if dzien.wybrany %}dzien-wybrany{% endif %}">
+            {% if dzien.w_tym_miesiacu %}
+            <a href="?rok={{ rok }}&miesiac={{ miesiac }}&dzien={{ dzien.data.day }}">{{ dzien.data.day }}</a>
+            {% else %}
+            {{ dzien.data.day }}
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="kalendarz-legenda">
+      <span class="kropka-dostepny"></span> dni z wpisanymi godzinami ·
+      <span class="kropka-wybrany"></span> dzień wybrany
+    </p>
+  </section>
 
-		<table class="kalendarz">
-			<thead>
-				<tr>
-					{% for dzien in dni_tygodnia %}
-					<th>{{ dzien }}</th>
-					{% endfor %}
-				</tr>
-			</thead>
-			<tbody>
-				{% for tydzien in tygodnie %}
-				<tr>
-					{% for dzien in tydzien %}
-					<td
-						class="{% if not dzien.w_tym_miesiacu %}inny-miesiac{% endif %} {% if dzien.dostepny %}dzien-dostepny{% endif %} {% if dzien.wybrany %}dzien-wybrany{% endif %}"
-					>
-						{% if dzien.w_tym_miesiacu %}
-						<a
-							href="?rok={{ rok }}&miesiac={{ miesiac }}&dzien={{ dzien.data.day }}"
-							>{{ dzien.data.day }}</a
-						>
-						{% else %} {{ dzien.data.day }} {% endif %}
-					</td>
-					{% endfor %}
-				</tr>
-				{% endfor %}
-			</tbody>
-		</table>
-		<p class="kalendarz-legenda">
-			<span class="kropka-dostepny"></span> dni z wpisanymi godzinami ·
-			<span class="kropka-wybrany"></span> dzień wybrany
-		</p>
-	</section>
+  {% if wybrany_dzien %}
+  <section class="karta">
+    <h3>Dzień: {{ wybrany_dzien|date:"l, d.m.Y" }}</h3>
+    {% if edycja %}
+    <p class="podtytul">
+      Klikaj kafelki godzin, żeby oznaczyć (klik ponowny odznacza).
+    </p>
 
-	{% if wybrany_dzien %}
-	<section class="karta">
-		<h3>Dzień: {{ wybrany_dzien|date:"l, d.m.Y" }}</h3>
-		{% if edycja %}
-		<p class="podtytul">
-			Klikaj kafelki godzin, żeby oznaczać (klik ponowny odznacza).
-		</p>
-		<div class="kafelki-godzin">
-			{% for kafelek in kafelki %}
-			<form method="post" class="kafelek-form">
-				{% csrf_token %}
-				<input type="hidden" name="przelacz_godzine" value="1" />
-				<button
-					type="submit"
-					name="godzina"
-					value="{{ kafelek.etykieta }}"
-					class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %}"
-				>
-					{{ kafelek.etykieta }}
-				</button>
-			</form>
-			{% endfor %}
-		</div>
-		{% else %}
-		<p class="podtytul">⚠️ Tryb podglądu — kalendarz jest tylko do odczytu.</p>
-		<div class="kafelki-godzin">
-			{% for kafelek in kafelki %}
-			<span
-				class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %}"
-				>{{ kafelek.etykieta }}</span
-			>
-			{% endfor %}
-		</div>
-		{% endif %}
-	</section>
-	{% endif %}
+    <div class="przerwa-form">
+      <h3>Przerwa między zajęciami (ten dzień)</h3>
+      <p class="podtytul">
+        Przerwa dotyczy wybranego dnia — między blokami zajęć pojawi się szara luka.
+      </p>
+      <div class="przerwa-opcje" id="przerwa-opcje">
+        <label class="przerwa-opcja" data-min="0">
+          <input type="radio" name="przerwa" value="0" {% if przerwa_dnia == 0 %}checked{% endif %} />
+          bez przerwy
+        </label>
+        <label class="przerwa-opcja" data-min="5">
+          <input type="radio" name="przerwa" value="5" {% if przerwa_dnia == 5 %}checked{% endif %} />
+          5 min
+        </label>
+        <label class="przerwa-opcja" data-min="10">
+          <input type="radio" name="przerwa" value="10" {% if przerwa_dnia == 10 %}checked{% endif %} />
+          10 min
+        </label>
+        <label class="przerwa-opcja" data-min="15">
+          <input type="radio" name="przerwa" value="15" {% if przerwa_dnia == 15 %}checked{% endif %} />
+          15 min
+        </label>
+        <label class="przerwa-opcja" data-min="30">
+          <input type="radio" name="przerwa" value="30" {% if przerwa_dnia == 30 %}checked{% endif %} />
+          30 min
+        </label>
+      </div>
+    </div>
+
+    <div class="kafelki-godzin" id="kafelki-godzin"
+         data-url="{% url 'kalendarz_dane' nauczyciel.id %}"
+         data-dzien="{{ wybrany_dzien|date:'Y-m-d' }}">
+      {% for kafelek in kafelki %}
+      <button
+        type="button"
+        class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %} {% if kafelek.przerwa %}kafelek-przerwa{% endif %}"
+        data-godzina="{{ kafelek.etykieta }}"
+      >
+        {{ kafelek.etykieta }}
+      </button>
+      {% endfor %}
+    </div>
+
+    {% if plan_dnia %}
+    <h3>Plan dnia (zajęcia po 60 min)</h3>
+    <div class="plan-dnia" id="plan-dnia">
+      {% for wpis in plan_dnia %}
+      {% if wpis.typ == 'przerwa' %}
+      <div class="plan-slot plan-przerwa">
+        <span class="plan-godziny">{{ wpis.start }}–{{ wpis.koniec }}</span>
+        <span class="plan-opis">przerwa</span>
+      </div>
+      {% else %}
+      <div class="plan-slot plan-lekcja">
+        <span class="plan-godziny">{{ wpis.start }}–{{ wpis.koniec }}</span>
+        <span class="plan-opis">zajęcia {{ wpis.numer }}</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <p class="kalendarz-komunikat" id="kalendarz-komunikat"></p>
+
+    <script>
+      (function () {
+        var siatka = document.getElementById('kafelki-godzin');
+        var plan = document.getElementById('plan-dnia');
+        var komunikat = document.getElementById('kalendarz-komunikat');
+        var opcje = document.getElementById('przerwa-opcje');
+        var url = siatka.dataset.url;
+        var dzien = siatka.dataset.dzien;
+        var wTrakcie = false;
+
+        function oznaczWybranaOpcje(minuty) {
+          opcje.querySelectorAll('.przerwa-opcja').forEach(function (opcja) {
+            opcja.classList.toggle('wybrana', Number(opcja.dataset.min) === Number(minuty));
+          });
+        }
+
+        function odswiezKafelki(kafelki) {
+          siatka.querySelectorAll('.kafelek').forEach(function (przycisk) {
+            var kafelek = kafelki.find(function (k) { return k.etykieta === przycisk.dataset.godzina; });
+            if (!kafelek) return;
+            przycisk.classList.toggle('kafelek-zaznaczony', kafelek.zaznaczony);
+            przycisk.classList.toggle('kafelek-przerwa', kafelek.przerwa);
+          });
+        }
+
+        function odswiezPlan(wpisy) {
+          if (!plan) {
+            return;
+          }
+          plan.innerHTML = '';
+          wpisy.forEach(function (wpis) {
+            var slot = document.createElement('div');
+            slot.className = 'plan-slot ' + (wpis.typ === 'przerwa' ? 'plan-przerwa' : 'plan-lekcja');
+            var godziny = document.createElement('span');
+            godziny.className = 'plan-godziny';
+            godziny.textContent = wpis.start + '–' + wpis.koniec;
+            var opis = document.createElement('span');
+            opis.className = 'plan-opis';
+            opis.textContent = wpis.typ === 'przerwa' ? 'przerwa' : 'zajęcia ' + wpis.numer;
+            slot.appendChild(godziny);
+            slot.appendChild(opis);
+            plan.appendChild(slot);
+          });
+        }
+
+        function tokenCsrf() {
+          var ciastka = document.cookie.split(';');
+          for (var i = 0; i < ciastka.length; i++) {
+            var czesc = ciastka[i].trim();
+            if (czesc.indexOf('csrftoken=') === 0) {
+              return czesc.substring('csrftoken='.length);
+            }
+          }
+          return '';
+        }
+
+        function wyslij(dane) {
+          if (wTrakcie) return;
+          wTrakcie = true;
+          dane.append('dzien', dzien);
+          fetch(url, {
+            method: 'POST',
+            body: dane,
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              'X-CSRFToken': tokenCsrf(),
+            },
+          })
+            .then(function (odp) { return odp.json(); })
+            .then(function (wynik) {
+              if (wynik.blad) {
+                komunikat.textContent = wynik.blad;
+                return;
+              }
+              komunikat.textContent = wynik.komunikat || '';
+              odswiezKafelki(wynik.kafelki);
+              odswiezPlan(wynik.plan_dnia);
+              oznaczWybranaOpcje(wynik.przerwa);
+            })
+            .catch(function () { komunikat.textContent = 'Błąd połączenia — spróbuj ponownie.'; })
+            .finally(function () { wTrakcie = false; });
+        }
+
+        siatka.addEventListener('click', function (zdarzenie) {
+          var przycisk = zdarzenie.target.closest('.kafelek');
+          if (!przycisk) return;
+          var dane = new FormData();
+          dane.append('akcja', 'przelacz_godzine');
+          dane.append('godzina', przycisk.dataset.godzina);
+          wyslij(dane);
+        });
+
+        opcje.addEventListener('change', function (zdarzenie) {
+          var radio = zdarzenie.target.closest('input[name="przerwa"]');
+          if (!radio) return;
+          var dane = new FormData();
+          dane.append('akcja', 'zapisz_przerwe');
+          dane.append('przerwa', radio.value);
+          wyslij(dane);
+        });
+      })();
+    </script>
+
+    {% else %}
+    <p class="podtytul">⚠️ Tryb podglądu — kalendarz jest tylko do odczytu.</p>
+    <div class="kafelki-godzin">
+      {% for kafelek in kafelki %}
+      <span class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %} {% if kafelek.przerwa %}kafelek-przerwa{% endif %}">{{ kafelek.etykieta }}</span>
+      {% endfor %}
+    </div>
+    {% if plan_dnia %}
+    <h3>Plan dnia (zajęcia po 60 min)</h3>
+    <div class="plan-dnia">
+      {% for wpis in plan_dnia %}
+      {% if wpis.typ == 'przerwa' %}
+      <div class="plan-slot plan-przerwa">
+        <span class="plan-godziny">{{ wpis.start }}–{{ wpis.koniec }}</span>
+        <span class="plan-opis">przerwa</span>
+      </div>
+      {% else %}
+      <div class="plan-slot plan-lekcja">
+        <span class="plan-godziny">{{ wpis.start }}–{{ wpis.koniec }}</span>
+        <span class="plan-opis">zajęcia {{ wpis.numer }}</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
+  </section>
+  {% endif %}
 </div>
 {% endblock %}

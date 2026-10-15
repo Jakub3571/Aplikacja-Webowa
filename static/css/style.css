@@ -492,3 +492,179 @@ body {
     line-height: 1;
     cursor: pointer;
 }
+
+.przerwa-form {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--ramka);
+}
+
+.przerwa-form h3 {
+  margin-bottom: 0.35rem;
+}
+
+.przerwa-opcje {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.przerwa-opcja {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--ramka);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  background: var(--karta);
+  color: var(--tekst);
+}
+
+.przerwa-opcja input {
+  accent-color: var(--akcent);
+}
+
+.przerwa-opcja.wybrana {
+  border-color: var(--akcent);
+  background: color-mix(in srgb, var(--akcent) 12%, var(--karta));
+  font-weight: 600;
+}
+
+.plan-dnia {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.plan-slot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.plan-lekcja {
+  background: color-mix(in srgb, var(--akcent) 15%, var(--karta));
+  border-left: 4px solid var(--akcent);
+  font-weight: 600;
+}
+
+.plan-przerwa {
+  background: #9ca3af;
+  color: #ffffff;
+  border-left: 4px solid #6b7280;
+  font-style: italic;
+}
+
+.przerwa-form {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--ramka);
+}
+
+.przerwa-form h3 {
+  margin-bottom: 0.35rem;
+}
+
+.przerwa-opcje {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.przerwa-opcja {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--ramka);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  background: var(--karta);
+  color: var(--tekst);
+}
+
+.przerwa-opcja input {
+  accent-color: var(--akcent);
+}
+
+.przerwa-opcja.wybrana {
+  border-color: var(--akcent);
+  background: color-mix(in srgb, var(--akcent) 12%, var(--karta));
+  font-weight: 600;
+}
+
+.plan-dnia {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.plan-slot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.plan-lekcja {
+  background: color-mix(in srgb, var(--akcent) 15%, var(--karta));
+  border-left: 4px solid var(--akcent);
+  font-weight: 600;
+}
+
+.plan-przerwa {
+  background: #9ca3af;
+  color: #ffffff;
+  border-left: 4px solid #6b7280;
+  font-style: italic;
+}
+
+.kafelek-przerwa {
+  background: #9ca3af;
+  color: #ffffff;
+  border-style: dashed;
+  font-style: italic;
+}
+
+.kafelek-przerwa:hover {
+  background: #6b7280;
+}
+
+.kalendarz-komunikat {
+  margin-top: 0.75rem;
+  min-height: 1.2rem;
+  font-size: 0.9rem;
+  color: var(--akcent);
+  font-weight: 600;
+}
+
+.kafelek-zajety {
+  background: #fca5a5;
+  color: #7f1d1d;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.kafelek-zajety:hover {
+  background: #f87171;
+}
+
+.kropka-zajety {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: #fca5a5;
+}

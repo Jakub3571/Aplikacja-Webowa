@@ -171,6 +171,31 @@ class Dostepnosc(models.Model):
             return f'{self.nauczyciel}: {self.data_od:%d.%m.%Y} {self.godzina_od:%H:%M}–{self.godzina_do:%H:%M}'
         return f'{self.nauczyciel}: {self.data_od:%d.%m.%Y}–{self.data_do:%d.%m.%Y} {self.godzina_od:%H:%M}–{self.godzina_do:%H:%M}'
 
+class PrzerwaDnia(models.Model):
+    """Przerwa między zajęciami przypisana do konkretnego dnia nauczyciela."""
+
+    nauczyciel = models.ForeignKey(
+        Nauczyciel,
+        on_delete=models.CASCADE,
+        related_name='przerwy',
+        verbose_name='nauczyciel',
+    )
+    data = models.DateField('data', default=date(2026, 1, 1))
+    minuty = models.PositiveIntegerField('przerwa (minuty)', default=0)
+
+    class Meta:
+        verbose_name = 'przerwa dnia'
+        verbose_name_plural = 'przerwy dni'
+        ordering = ['data']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['nauczyciel', 'data'],
+                name='unikalna_przerwa_nauczyciel_dzien',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.nauczyciel}: {self.data:%d.%m.%Y} — przerwa {self.minuty} min'
 
 class RaportPlatnosci(models.Model):
     """Archiwum raportu płatności wysyłanego e-mailem."""

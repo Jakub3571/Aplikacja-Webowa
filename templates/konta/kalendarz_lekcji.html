@@ -54,10 +54,17 @@
       <form method="post" class="kafelek-form">
         {% csrf_token %}
         <input type="hidden" name="przelacz_godzine" value="1">
-        <button type="submit" name="godzina" value="{{ kafelek.etykieta }}" class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %}">{{ kafelek.etykieta }}</button>
+        <button type="submit" name="godzina" value="{{ kafelek.etykieta }}"
+                class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %} {% if kafelek.zajety %}kafelek-zajety{% endif %}"
+                {% if kafelek.zajety %}disabled title="Korepetytor ma już wtedy lekcję z innym uczniem"{% endif %}>
+          {{ kafelek.etykieta }}
+        </button>
       </form>
       {% endfor %}
     </div>
+    <p class="kalendarz-legenda">
+      <span class="kropka-zajety"></span> godzina zajęta u korepetytora (lekcja z innym uczniem)
+    </p>
   </section>
   {% endif %}
 </div>

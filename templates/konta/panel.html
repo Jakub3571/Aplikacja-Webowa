@@ -5,29 +5,27 @@
 {% block tresc %}
 <div class="opakowanie">
   <header class="pasek">
-    <span>👤 Panel pracowniczy</span>
+    <span>👤 {% if user.nauczyciel_id %}Mój kalendarz{% else %}Panel pracowniczy{% endif %}</span>
     <nav>
       <a href="{% url 'zmiana_hasla' %}">Zmień hasło</a>
       <a href="{% url 'wyloguj' %}">Wyloguj się</a>
     </nav>
   </header>
 
-<nav class="zakladki">
-    {% if user.nauczyciel_id %}
-    <a href="{% url 'kalendarz_nauczyciela' user.nauczyciel_id %}" class="{% if request.resolver_match.url_name == 'kalendarz_nauczyciela' %}aktywna{% endif %}">Mój kalendarz</a>
-    {% elif request.user.is_superuser %}
+  {% if not user.nauczyciel_id %}
+  <nav class="zakladki">
+    {% if request.user.is_superuser %}
     <a href="{% url 'uczniowie' %}" class="{% if request.resolver_match.url_name == 'uczniowie' %}aktywna{% endif %}">Uczniowie</a>
-    <a href="{% url 'nauczyciele' %}" class="{% if request.resolver_match.url_name == 'nauczyciele' %}aktywna{% endif %}">Nauczyciele</a>
     <a href="{% url 'pulpit' %}" class="{% if request.resolver_match.url_name == 'pulpit' %}aktywna{% endif %}">Start</a>
     <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">Lekcje</a>
     <a href="{% url 'platnosci' %}" class="{% if request.resolver_match.url_name == 'platnosci' %}aktywna{% endif %}">Płatności</a>
     <a href="{% url 'uzytkownicy' %}" class="{% if request.resolver_match.url_name == 'uzytkownicy' %}aktywna{% endif %}">Użytkownicy</a>
     {% else %}
     <a href="{% url 'uczniowie' %}" class="{% if request.resolver_match.url_name == 'uczniowie' %}aktywna{% endif %}">Uczniowie</a>
-    <a href="{% url 'nauczyciele' %}" class="{% if request.resolver_match.url_name == 'nauczyciele' %}aktywna{% endif %}">Nauczyciele</a>
     <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">Lekcje</a>
     {% endif %}
-</nav>
+  </nav>
+  {% endif %}
 
   <main class="panel-tresc">
     {% block panel %}{% endblock %}

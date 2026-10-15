@@ -1,5 +1,7 @@
 {% extends 'konta/panel.html' %}
+
 {% block tytul %}Użytkownicy — Panel pracowniczy{% endblock %}
+
 {% block panel %}
 <div class="uczniowie-uklad">
   <section class="karta">
@@ -16,7 +18,6 @@
     {% endif %}
     <form method="post" class="formularz">
       {% csrf_token %}
-
       <label for="{{ form.rola.id_for_label }}">Kto to będzie? <span class="gwiazdka">*</span></label>
       {{ form.rola }}
       {% if form.rola.help_text %}<p class="podpowiedz">{{ form.rola.help_text }}</p>{% endif %}
@@ -24,13 +25,17 @@
       <label for="{{ form.username.id_for_label }}">Nazwa użytkownika <span class="gwiazdka">*</span></label>
       {{ form.username }}
       {% if form.username.help_text %}<p class="podpowiedz">{{ form.username.help_text }}</p>{% endif %}
+
       <label for="{{ form.first_name.id_for_label }}">Imię</label>
       {{ form.first_name }}
+
       <label for="{{ form.last_name.id_for_label }}">Nazwisko</label>
       {{ form.last_name }}
+
       <label for="{{ form.email.id_for_label }}">Email <span class="gwiazdka">*</span></label>
       {{ form.email }}
       {% if form.email.help_text %}<p class="podpowiedz">{{ form.email.help_text }}</p>{% endif %}
+
       <label for="{{ form.telefon.id_for_label }}">Telefon</label>
       {{ form.telefon }}
 
@@ -39,17 +44,17 @@
         <p class="podpowiedz">Każdy przedmiot ma własny poziom i stawkę. Kliknij „+ Dodaj przedmiot”, aby dodać kolejny.</p>
         <div id="wiersze-przedmiotow-konto">
           <div class="wiersz-przedmiotu">
-            <select name="w_przedmiot" required>
+            <select name="w_przedmiot">
               <option value="">— wybierz przedmiot —</option>
               {% for wartosc, etykieta in form.fields_przedmioty %}
               <option value="{{ wartosc }}">{{ etykieta }}</option>
               {% endfor %}
             </select>
-            <select name="w_poziom" required>
+            <select name="w_poziom">
               <option value="podstawa" selected>podstawa</option>
               <option value="rozszerzenie">rozszerzenie</option>
             </select>
-            <input type="number" name="w_stawka" min="0" step="0.01" placeholder="stawka (zł)" required>
+            <input type="number" name="w_stawka" min="0" step="0.01" placeholder="stawka (zł)">
             <button type="button" class="przycisk-usun-wiersz-konto" title="Usuń ten przedmiot">✘</button>
           </div>
         </div>
@@ -59,9 +64,11 @@
       <label for="{{ form.haslo1.id_for_label }}">Hasło <span class="gwiazdka">*</span></label>
       {{ form.haslo1 }}
       {% if form.haslo1.help_text %}<p class="podpowiedz">{{ form.haslo1.help_text }}</p>{% endif %}
+
       <label for="{{ form.haslo2.id_for_label }}">Powtórz hasło <span class="gwiazdka">*</span></label>
       {{ form.haslo2 }}
       {% if form.haslo2.help_text %}<p class="podpowiedz">{{ form.haslo2.help_text }}</p>{% endif %}
+
       <button type="submit">Dodaj użytkownika</button>
     </form>
   </section>
@@ -152,9 +159,18 @@
 <script>
   var rola = document.getElementById('id_rola');
   var sekcjaNauczyciel = document.getElementById('sekcja-nauczyciel');
+
+  function ustawWymaganePrzedmiotow(wymagane) {
+    sekcjaNauczyciel.querySelectorAll('select[name="w_przedmiot"], select[name="w_poziom"], input[name="w_stawka"]').forEach(function (pole) {
+      pole.required = wymagane;
+    });
+  }
+
   if (rola && sekcjaNauczyciel) {
     var odswiezRole = function () {
-      sekcjaNauczyciel.style.display = rola.value === 'nauczyciel' ? '' : 'none';
+      var czyNauczyciel = rola.value === 'nauczyciel';
+      sekcjaNauczyciel.style.display = czyNauczyciel ? '' : 'none';
+      ustawWymaganePrzedmiotow(czyNauczyciel);
     };
     rola.addEventListener('change', odswiezRole);
     odswiezRole();

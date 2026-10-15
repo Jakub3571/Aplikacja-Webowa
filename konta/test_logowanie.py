@@ -73,12 +73,12 @@ class ZakladkiTests(TestCase):
 
     def test_zakladki_dostepne_po_zalogowaniu(self):
         self.client.force_login(self.user)
-        for adres in ['/pulpit/', '/uczniowie/', '/nauczyciele/', '/platnosci/']:
+        for adres in ['/pulpit/', '/uczniowie/', '/platnosci/']:
             r = self.client.get(adres)
             self.assertEqual(r.status_code, 200, f'{adres} nie dziala')
 
     def test_zakladki_blokowane_bez_zalogowania(self):
-        oczekiwane = {'/pulpit/': 302, '/uczniowie/': 302, '/nauczyciele/': 302, '/platnosci/': 403}
+        oczekiwane = {'/pulpit/': 302, '/uczniowie/': 302, '/platnosci/': 403}
         for adres, kod in oczekiwane.items():
             r = self.client.get(adres)
             self.assertEqual(r.status_code, kod, f'{adres} wpuszcza bez logowania')
@@ -90,10 +90,6 @@ class ZakladkiTests(TestCase):
         self.assertEqual(r.status_code, 403, 'platnosci wpuszcza pracownika')
         r = self.client.get('/uzytkownicy/')
         self.assertEqual(r.status_code, 403, 'uzytkownicy wpuszcza pracownika')
-        # lista nauczycieli: pracownik widzi ja w trybie podgladu (nowa zasada)
-        r = self.client.get('/nauczyciele/')
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Podgląd')
         # lekcje: pracownik widzi swoich uczniow (nowa zasada)
         r = self.client.get('/lekcje/')
         self.assertEqual(r.status_code, 200)
@@ -181,54 +177,6 @@ class NauczycieleTests(TestCase):
         PrzedmiotNauczyciela.objects.create(
             nauczyciel=self.nauczyciel, przedmiot='matematyka', poziom='podstawa',
         )
-
-    def test_dodawanie_nauczyciela(self):
-        self.client.force_login(self.user)
-        dane = {
-            'imie': 'Anna', 'nazwisko': 'Nowak', 'email': 'anna@n.pl', 'stawka': '80',
-            'przedmioty': ['matematyka', 'fizyka'], 'poziomy': ['podstawa', 'rozszerzenie'],
-        }
-        r = self.client.post('/nauczyciele/', dane, follow=True)
-        self.assertContains(r, 'został dodany')
-        self.assertEqual(Nauczyciel.objects.count(), 2)
-        nowy = Nauczyciel.objects.get(imie='Anna')
-        self.assertEqual(nowy.przedmioty.count(), 2)
-        self.assertTrue(
-            nowy.przedmioty.filter(przedmiot='fizyka', poziom='rozszerzenie').exists()
-        )
-
-    def test_archiwizacja_nauczyciela(self):
-        self.client.force_login(self.user)
-        r = self.client.get(f'/nauczyciele/{self.nauczyciel.id}/archiwum/', follow=True)
-        self.assertContains(r, 'zakończono współpracę')
-        self.assertEqual(Nauczyciel.objects.count(), 1)
-        self.nauczyciel.refresh_from_db()
-        self.assertFalse(self.nauczyciel.aktywny)
-        r = self.client.get('/nauczyciele/')
-        self.assertContains(r, 'Historia nauczycieli')
-
-    def test_przywracanie_nauczyciela(self):
-        self.client.force_login(self.user)
-        self.nauczyciel.aktywny = False
-        self.nauczyciel.save()
-        r = self.client.get(f'/nauczyciele/{self.nauczyciel.id}/przywroc/', follow=True)
-        self.assertContains(r, 'wznowiono współpracę')
-        self.nauczyciel.refresh_from_db()
-        self.assertTrue(self.nauczyciel.aktywny)
-
-    def test_zarchiwizowany_nie_wyswietla_sie_w_formularzu_ucznia(self):
-        self.client.force_login(self.user)
-        self.nauczyciel.aktywny = False
-        self.nauczyciel.save()
-        r = self.client.post(
-            '/uczniowie/',
-            {'przedmiot': 'matematyka', 'poziom': 'szkoła średnia - podstawa',
-             'wybierz_przedmiot': '1'},
-            follow=True,
-        )
-        opcje = r.context['form'].fields['korepetytor'].choices
-        wartosci = [w for w, _ in opcje]
-        self.assertNotIn('Jan Kowalski', wartosci)
 
     def test_kalendarz_przelnacza_kafelek(self):
         self.client.force_login(self.user)
@@ -404,7 +352,7 @@ class UzytkownicyTests(TestCase):
     def test_konto_admin_to_szef(self):
         admin = Pracownik.objects.create_user('Admin', 'a@f.pl', 'Sup3rHaslo!')
         self.client.force_login(admin)
-        r = self.client.get('/nauczyciele/')
+        r = self.client.get('/uzytkownicy/')
         self.assertEqual(r.status_code, 200)
 
 class KontoNauczycielaTests(TestCase):
@@ -441,7 +389,7 @@ class KontoNauczycielaTests(TestCase):
         user = self.dodaj_konto_nauczyciela()
         self.client.logout()
         self.client.login(username='j.kowalski', password='M0taneHaslo!')
-        r = self.client.get('/nauczyciele/', follow=True)
+        r = self.client.get('/pulpit/', follow=True)
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Kowalski')
 
@@ -580,13 +528,13 @@ class LekcjeCykliczneTests(TestCase):
             kto_umowil='Admin', umowil=self.admin,
         )
         self.client.force_login(self.pracownik)
-        r = self.client.get('/uczniowie/')
+        r = self.client.get('/lekcje/')
         self.assertContains(r, 'Kasia')
         self.assertNotContains(r, 'Ola')
 
     def test_admin_widzi_wszystkich(self):
         self.client.force_login(self.admin)
-        r = self.client.get('/uczniowie/')
+        r = self.client.get('/lekcje/')
         self.assertContains(r, 'Kasia')
 
     def test_pracownik_umawia_lekcje_cykliczna(self):
