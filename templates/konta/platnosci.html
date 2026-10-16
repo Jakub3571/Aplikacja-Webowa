@@ -3,9 +3,17 @@ pracowniczy{% endblock %} {% block panel %}
 <div class="platnosci-uklad">
 	<section class="karta">
 		<h2>Płatności</h2>
+		<div class="pole-szukania" style="margin-bottom: 1rem">
+			<input
+				type="text"
+				class="szukaj-tabela"
+				data-tabela="tabela-platnosci-niezaplacone"
+				placeholder="Szukaj ucznia lub nauczyciela..."
+			/>
+		</div>
 		{% if uczniowie %}
 		<div class="tabela-wrapper">
-			<table class="tabela">
+			<table class="tabela" id="tabela-platnosci-niezaplacone">
 				<thead>
 					<tr>
 						<th></th>
@@ -55,9 +63,17 @@ pracowniczy{% endblock %} {% block panel %}
 <div class="platnosci-uklad">
 	<section class="karta">
 		<h2>Rozliczenia</h2>
+		<div class="pole-szukania" style="margin-bottom: 1rem">
+			<input
+				type="text"
+				class="szukaj-tabela"
+				data-tabela="tabela-platnosci-rozliczenia"
+				placeholder="Szukaj nauczyciela..."
+			/>
+		</div>
 		{% if rozliczenia %}
 		<div class="tabela-wrapper">
-			<table class="tabela">
+			<table class="tabela" id="tabela-platnosci-rozliczenia">
 				<thead>
 					<tr>
 						<th>Nauczyciel</th>
@@ -98,9 +114,17 @@ pracowniczy{% endblock %} {% block panel %}
 <div class="platnosci-uklad">
 	<section class="karta">
 		<h2>Zapłacone</h2>
+		<div class="pole-szukania" style="margin-bottom: 1rem">
+			<input
+				type="text"
+				class="szukaj-tabela"
+				data-tabela="tabela-platnosci-zaplacone"
+				placeholder="Szukaj ucznia lub nauczyciela..."
+			/>
+		</div>
 		{% if zaplaconi %}
 		<div class="tabela-wrapper">
-			<table class="tabela">
+			<table class="tabela" id="tabela-platnosci-zaplacone">
 				<thead>
 					<tr>
 						<th></th>
@@ -158,21 +182,11 @@ pracowniczy{% endblock %} {% block panel %}
 		{% csrf_token %}
 		<input type="hidden" name="wyslij_raport" value="1" />
 		<label for="id_email_raportu">Email odbiorcy raportu</label>
-		<input
-			type="email"
-			name="email_raportu"
-			id="id_email_raportu"
-			value="{{ email_raportu }}"
-			required
-		/>
+		<input type="email" name="email_raportu" id="id_email_raportu" required />
 		<button type="submit">Wyślij raport</button>
 	</form>
 	{% else %}
-	<p class="podtytul">
-		Brak zapłaconych płatności — oznacz „Zapłacone" w tabeli powyżej, aby wysłać
-		raport.
-	</p>
+	<p class="podtytul">Brak zapłaconych płatności — nie ma czego wysyłać.</p>
 	{% endif %}
 </section>
-
 {% endblock %}

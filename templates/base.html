@@ -18,6 +18,43 @@
 
   {% block tresc %}{% endblock %}
 
+  {% block skrypty %}{% endblock %}
+
+  <script>
+    (function () {
+      function podepnijSzukanie(pole, tabela) {
+        if (!pole || !tabela) return;
+        pole.addEventListener('input', function () {
+          var fraza = pole.value.trim().toLowerCase();
+          tabela.querySelectorAll('tbody tr').forEach(function (wiersz) {
+            var tekst = wiersz.textContent.toLowerCase();
+            wiersz.style.display = tekst.indexOf(fraza) !== -1 ? '' : 'none';
+          });
+        });
+      }
+
+      document.querySelectorAll('.szukaj-tabela').forEach(function (pole) {
+        podepnijSzukanie(pole, document.getElementById(pole.dataset.tabela));
+      });
+
+      document.querySelectorAll('table.tabela').forEach(function (tabela) {
+        if (tabela.dataset.szukanie === 'wylaczone') return;
+        var istniejace = document.querySelector('.szukaj-tabela[data-tabela="' + (tabela.id || '') + '"]');
+        if (istniejace) return;
+        var wrapper = tabela.closest('.tabela-wrapper') || tabela;
+        var otoczka = document.createElement('div');
+        otoczka.className = 'pole-szukania';
+        otoczka.style.marginBottom = '1rem';
+        var pole = document.createElement('input');
+        pole.type = 'text';
+        pole.placeholder = 'Szukaj na liście...';
+        otoczka.appendChild(pole);
+        wrapper.parentNode.insertBefore(otoczka, wrapper);
+        podepnijSzukanie(pole, tabela);
+      });
+    })();
+  </script>
+
   <footer class="stopka">
     <p href="https://example.com">@Jakub Ciszewski</p>
   </footer>

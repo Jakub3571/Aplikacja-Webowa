@@ -11,7 +11,7 @@
         value="{{ fraza }}"
         placeholder="Szukaj ucznia, korepetytora lub przedmiotu..."
       />
-      <button type="submit" class="przycisk-usun" style="background: var(--akcent);">Szukaj</button>
+      
       {% if fraza %}<a href="{% url 'lekcje' %}" class="powrot">wyczyść</a>{% endif %}
     </form>
     {% if uczniowie %}
