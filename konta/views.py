@@ -27,7 +27,7 @@ from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 
 from .forms import (
     FormularzDyspozycyjnosc,
@@ -125,18 +125,31 @@ def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
             return True
     return False
 
+MAX_PROB_LOGOWANIA = 5
+
+
 def logowanie(request):
-    """Wyświetla formularz logowania i loguje pracownika po poprawnych danych."""
+    """Wyświetla formularz logowania i loguje pracownika po poprawnych danych.
+    Po 5 nieudanych próbach z rzędu blokuje logowanie do wygaśnięcia sesji
+    (ochrona przed zgadywaniem haseł)."""
     if request.user.is_authenticated:
         return redirect('pulpit')
+    if request.method == 'POST':
+        if request.session.get('proby_logowania', 0) >= MAX_PROB_LOGOWANIA:
+            messages.error(
+                request,
+                'Zbyt wiele nieudanych prób logowania — odczekaj ok. 10 minut i spróbuj ponownie.',
+            )
+            return render(request, 'konta/logowanie.html', {'form': FormularzLogowania(request)})
+        request.session['proby_logowania'] = request.session.get('proby_logowania', 0) + 1
     form = FormularzLogowania(request, data=request.POST or None)
     if request.method == 'POST' and form.is_valid():
         user = form.get_user()
         login(request, user)
+        request.session['proby_logowania'] = 0
         messages.success(request, f'Witaj, {user.get_full_name() or user.username}!')
         return redirect('pulpit')
     return render(request, 'konta/logowanie.html', {'form': form})
-
 
 @login_required
 def wyloguj(request):
@@ -368,6 +381,110 @@ def przelacz_konto(request, user_id):
     return redirect('uzytkownicy')
 
 @login_required
+def archiwum_uczniow(request):
+    """Zakładka archiwum: uczniowie ze zakończoną współpracą, z możliwością przywrócenia."""
+    if getattr(request.user, 'nauczyciel_id', None):
+        raise PermissionDenied
+    if czy_szef(request.user):
+        uczniowie_lista = list(Uczen.objects.filter(zakonczona=True))
+    else:
+        uczniowie_lista = list(Uczen.objects.filter(umowil=request.user, zakonczona=True))
+    fraza = (request.GET.get('szukaj') or '').strip().lower()
+    if fraza:
+        uczniowie_lista = [
+            u for u in uczniowie_lista
+            if fraza in u.imie_ucznia.lower()
+            or fraza in u.nazwisko_rodzica.lower()
+            or fraza in (u.korepetytor or '').lower()
+            or fraza in u.przedmiot.lower()
+        ]
+    liczba_lekcji = {}
+    for lekcja in Lekcja.objects.filter(uczen__in=uczniowie_lista):
+        liczba_lekcji[lekcja.uczen_id] = liczba_lekcji.get(lekcja.uczen_id, 0) + 1
+    for u in uczniowie_lista:
+        u.liczba_lekcji = liczba_lekcji.get(u.id, 0)
+    return render(request, 'konta/archiwum.html', {
+        'uczniowie': uczniowie_lista,
+        'fraza': (request.GET.get('szukaj') or '').strip(),
+    })
+
+
+@login_required
+def zakoncz_ucznia(request, uczen_id):
+    """Archiwizuje ucznia: znika z list bieżących, ale zostaje w archiwum (dane i lekcje nietknięte)."""
+    uczen = get_object_or_404(Uczen, pk=uczen_id)
+    if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
+        raise PermissionDenied
+    if request.method == 'POST':
+        nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
+        if nauczyciel:
+            for lekcja in Lekcja.objects.filter(uczen=uczen):
+                start = timezone.localtime(lekcja.data)
+                Dostepnosc.objects.filter(
+                    nauczyciel=nauczyciel,
+                    data_od=start.date(),
+                    godzina_od=start.time(),
+                ).delete()
+        uczen.zakonczona = True
+        uczen.save(update_fields=['zakonczona'])
+        imie = f'{uczen.imie_ucznia} {uczen.nazwisko_rodzica}'
+        messages.success(request, f'Współpraca z uczniem {imie} zakończona — trafił do archiwum. Godziny u korepetytora zwolnione.')
+        return redirect('lekcje')
+    return render(request, 'konta/zakoncz_ucznia.html', {'uczen': uczen})
+
+
+@login_required
+def przywroc_ucznia(request, uczen_id):
+    """Przywraca ucznia z archiwum na listę aktywnych."""
+    uczen = get_object_or_404(Uczen, pk=uczen_id)
+    if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
+        raise PermissionDenied
+    uczen.zakonczona = False
+    uczen.save(update_fields=['zakonczona'])
+    imie = f'{uczen.imie_ucznia} {uczen.nazwisko_rodzica}'
+    messages.success(request, f'Uczeń {imie} przywrócony z archiwum.')
+    return redirect('archiwum')
+
+@tylko_szef
+@login_required
+def pobierz_raport(request):
+    """Raport zapłaconych płatności jako plik tekstowy do pobrania (zamiast e-maila)."""
+    zaplaconi = Uczen.objects.filter(zaplacone=True, zakonczona=False)
+    linie = ['Raport zapłaconych płatności', '=' * 40, '']
+    for u in zaplaconi:
+        linie.append(
+            f'{u.imie_ucznia} {u.nazwisko_rodzica} — korepetytor: {u.korepetytor} '
+            f'— przedmiot: {u.przedmiot} — wpisał: {u.kto_umowil} '
+            f'— 1. lekcja: {u.pierwsza_lekcja:%d.%m.%Y %H:%M}'
+        )
+    linie.append('')
+    linie.append(f'Razem zapłaconych płatności: {len(zaplaconi)}.')
+    tresc = '\n'.join(linie)
+    odpowiedz = HttpResponse(tresc, content_type='text/plain; charset=utf-8')
+    odpowiedz['Content-Disposition'] = 'attachment; filename="raport_platnosci.txt"'
+    return odpowiedz
+
+
+def reset_hasla(request):
+    """Reset hasła z limitem prób: max 5 żądań na sesję (ochrona przed spamowaniem maili).
+    Celowo bez @login_required — z tego widoku korzystają osoby niezalogowane."""
+    from django.contrib.auth.views import PasswordResetView
+    if request.method == 'POST':
+        if request.session.get('proby_resetu', 0) >= 5:
+            messages.error(
+                request,
+                'Zbyt wiele prób resetu hasła — odczekaj ok. 10 minut i spróbuj ponownie.',
+            )
+            return redirect('logowanie')
+        request.session['proby_resetu'] = request.session.get('proby_resetu', 0) + 1
+    return PasswordResetView.as_view(
+        template_name='konta/reset_hasla.html',
+        subject_template_name='konta/mail_reset_temat.txt',
+        email_template_name='konta/mail_reset_tresc.txt',
+        success_url='/reset-hasla/wyslane/',
+    )(request)
+
+@login_required
 def kalendarz_nauczyciela(request, nauczyciel_id):
     """Kalendarz miesiąca z klikalnymi kafelkami godzin (co 30 minut)."""
     nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
@@ -378,6 +495,15 @@ def kalendarz_nauczyciela(request, nauczyciel_id):
             raise PermissionDenied
         # zwykły pracownik: kalendarz tylko do podglądu
     nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
+    fraza = (request.GET.get('szukaj') or '').strip().lower()
+    if fraza:
+        uczniowie_lista = [
+            u for u in uczniowie_lista
+            if fraza in u.imie_ucznia.lower()
+            or fraza in u.nazwisko_rodzica.lower()
+            or fraza in (u.korepetytor or '').lower()
+            or fraza in u.przedmiot.lower()
+        ]
     dzisiaj = date.today()
 
     rok = request.GET.get('rok')
@@ -556,24 +682,9 @@ def kalendarz_nauczyciela(request, nauczyciel_id):
             + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}'
         )
 
-    return render(request, 'konta/kalendarz.html', {
-        'nauczyciel': nauczyciel,
-        'tygodnie': tygodnie,
-        'dni_tygodnia': DNI_TYGODNIA,
-        'nazwa_miesiaca': MIESIACE[miesiac - 1],
-        'rok': rok,
-        'miesiac': miesiac,
-        'poprzedni_miesiac': poprzedni_miesiac,
-        'poprzedni_rok': poprzedni_rok,
-        'nastepny_miesiac': nastepny_miesiac,
-        'nastepny_rok': nastepny_rok,
-        'dostepnosci': dostepnosci_miesiaca.order_by('data_od', 'godzina_od'),
-        'wybrany_dzien': wybrany_dzien,
-        'godziny_na_dzien': godziny_na_dzien,
-        'kafelki': kafelki,
-        'plan_dnia': plan_dnia,
-        'przerwa_dnia': przerwa_dnia,
-        'edycja': edycja,
+    return render(request, 'konta/lekcje.html', {
+        'uczniowie': uczniowie_lista,
+        'fraza': (request.GET.get('szukaj') or '').strip(),
     })
 
 
@@ -728,9 +839,9 @@ def lekcje(request):
     if getattr(request.user, 'nauczyciel_id', None):
         raise PermissionDenied
     if czy_szef(request.user):
-        uczniowie_lista = list(Uczen.objects.all())
+        uczniowie_lista = list(Uczen.objects.filter(zakonczona=False))
     else:
-        uczniowie_lista = list(Uczen.objects.filter(umowil=request.user))
+        uczniowie_lista = list(Uczen.objects.filter(umowil=request.user, zakonczona=False))
     dzisiaj = date.today()
     liczba_lekcji = {}
     for lekcja in Lekcja.objects.filter(
@@ -896,9 +1007,9 @@ def kalendarz_lekcji(request, uczen_id):
 @login_required
 def platnosci(request):
     """Zakładka płatności: lista uczniów, statusy zapłacone i wysyłka raportu."""
-    uczniowie_lista = Uczen.objects.filter(zaplacone=False)
-    zaplaconi = Uczen.objects.filter(zaplacone=True)
-    wszyscy_uczniowie = list(Uczen.objects.all())
+    uczniowie_lista = Uczen.objects.filter(zaplacone=False, zakonczona=False)
+    zaplaconi = Uczen.objects.filter(zaplacone=True, zakonczona=False)
+    wszyscy_uczniowie = list(Uczen.objects.filter(zakonczona=False))
     email_odbiorcy = request.POST.get('email_raportu', '').strip()
 
     if request.method == 'POST' and 'oznacz_zaplacone' in request.POST:
@@ -929,7 +1040,6 @@ def platnosci(request):
         if not email_odbiorcy:
             messages.error(request, 'Wpisz adres e-mail, na który ma pójść raport.')
             return redirect('platnosci')
-
         linie = []
         for u in zaplaconi:
             linie.append(
@@ -938,12 +1048,20 @@ def platnosci(request):
             )
         podsumowanie = f'\n\nRazem zapłaconych płatności: {len(zaplaconi)}.'
         tresc = 'Raport zapłaconych płatności:\n\n' + '\n'.join(linie) + podsumowanie
-        send_mail(
-            'Raport zapłaconych płatności — Panel pracowniczy',
-            tresc,
-            None,
-            [email_odbiorcy],
-        )
+        try:
+            send_mail(
+                'Raport zapłaconych płatności — Panel pracowniczy',
+                tresc,
+                None,
+                [email_odbiorcy],
+            )
+        except Exception:
+            messages.warning(
+                request,
+                f'E-mail nie został wysłany (serwer pocztowy niedostępny) — '
+                'pobierz raport przyciskiem „Pobierz raport jako plik” i zapisz go ręcznie.',
+            )
+            return redirect('platnosci')
         RaportPlatnosci.objects.create(
             zawartosc=tresc,
             email_odbiorcy=email_odbiorcy,
@@ -952,30 +1070,6 @@ def platnosci(request):
         Uczen.objects.filter(zaplacone=True).delete()
         messages.success(request, f'Raport wysłano na {email_odbiorcy}. Zapłacone pozycje usunięto z listy.')
         return redirect('platnosci')
-
-    rozliczenia = []
-    for nauczyciel in Nauczyciel.objects.filter(aktywny=True).order_by('nazwisko', 'imie'):
-        nazwa = f'{nauczyciel.imie} {nauczyciel.nazwisko}'
-        jego_uczniowie = [u for u in wszyscy_uczniowie if (u.korepetytor or '').strip() == nazwa]
-        if jego_uczniowie:
-            zaplacone_lekcje = [u for u in jego_uczniowie if u.zaplacone]
-            kwota = sum(
-                nauczyciel.stawka_dla(u.przedmiot, u.poziom)
-                for u in zaplacone_lekcje
-            )
-            rozliczenia.append({
-                'nauczyciel': nauczyciel,
-                'liczba_uczniow': len(jego_uczniowie),
-                'liczba_zaplaconych': len(zaplacone_lekcje),
-                'kwota': kwota,
-            })
-
-    return render(request, 'konta/platnosci.html', {
-        'uczniowie': uczniowie_lista,
-        'zaplaconi': zaplaconi,
-        'email_raportu': email_odbiorcy,
-        'rozliczenia': rozliczenia,
-    })
 
 @tylko_szef
 @login_required

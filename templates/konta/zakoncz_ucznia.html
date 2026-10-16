@@ -1,0 +1,21 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Zakończ współpracę — {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}{% endblock %}
+
+{% block panel %}
+<section class="karta">
+  <h2>📦 Zakończyć współpracę z uczniem?</h2>
+  <p>Czy chcesz zakończyć współpracę z uczniem <strong>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</strong> (korepetytor: {{ uczen.korepetytor }})?</p>
+  <p class="podpowiedz">
+    Uczeń trafi do <strong>Archiwum</strong> — jego dane i historia lekcji zostaną zachowane.
+    Godziny zajęte przez jego lekcje wrócą do kalendarza korepetytora.
+    W każdej chwili można go przywrócić z archiwum.
+    Jeśli chcesz usunąć ucznia na stałe (razem z lekcjami), użyj przycisku usuwania na liście lekcji.
+  </p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="przycisk-usun">Tak, zakończ współpracę</button>
+    <a href="{% url 'lekcje' %}" class="powrot">← Anuluj</a>
+  </form>
+</section>
+{% endblock %}

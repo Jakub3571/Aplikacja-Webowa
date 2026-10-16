@@ -52,6 +52,9 @@ urlpatterns = [
     path('uzytkownicy/<int:user_id>/przelacz-szefa/', views.przelacz_szefa, name='przelacz_szefa'),
     path('uczniowie/<int:uczen_id>/edytuj/', views.edytuj_ucznia, name='edytuj_ucznia'),
     path('uczniowie/<int:uczen_id>/usun/', views.usun_ucznia, name='usun_ucznia'),
+    path('uczniowie/<int:uczen_id>/zakoncz/', views.zakoncz_ucznia, name='zakoncz_ucznia'),
+    path('uczniowie/<int:uczen_id>/przywroc/', views.przywroc_ucznia, name='przywroc_ucznia'),
+    path('archiwum/', views.archiwum_uczniow, name='archiwum'),
     path('uzytkownicy/<int:user_id>/edytuj/', views.edytuj_uzytkownika, name='edytuj_uzytkownika'),
     path('uzytkownicy/<int:user_id>/konto/', views.przelacz_konto, name='przelacz_konto'),
 ]

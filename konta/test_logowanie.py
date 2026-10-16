@@ -1,9 +1,10 @@
 """Testy przepływu logowania pracownika."""
 
-from datetime import date
+from datetime import date, datetime
 
 from django.core import mail
 from django.test import TestCase
+from django.utils import timezone
 
 from konta.models import (
     Dostepnosc,
@@ -221,7 +222,7 @@ class PlatnosciTests(TestCase):
 
     def dodaj_ucznia(self, imie='Kasia', zaplacone=False):
         return Uczen.objects.create(
-            pierwsza_lekcja='2026-10-05T17:00',
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 5, 17)),
             przedmiot='matematyka', poziom='rozszerzony',
             imie_ucznia=imie, nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
             telefon_glowny='600100200', email_glowny='e@f.pl',

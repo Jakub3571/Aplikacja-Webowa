@@ -4,6 +4,16 @@
 <div class="platnosci-uklad">
   <section class="karta">
     <h2>Lekcje</h2>
+        <form method="get" class="pole-szukania" style="margin-bottom: 1rem;">
+      <input
+        type="text"
+        name="szukaj"
+        value="{{ fraza }}"
+        placeholder="Szukaj ucznia, korepetytora lub przedmiotu..."
+      />
+      <button type="submit" class="przycisk-usun" style="background: var(--akcent);">Szukaj</button>
+      {% if fraza %}<a href="{% url 'lekcje' %}" class="powrot">wyczyść</a>{% endif %}
+    </form>
     {% if uczniowie %}
     <div class="tabela-wrapper">
       <table class="tabela">
@@ -37,6 +47,7 @@
             </td>
             <td>
               <a class="ikona-kalendarza" href="{% url 'edytuj_ucznia' uczen.id %}" title="Edytuj dane ucznia">✏️</a>
+              <a class="ikona-kalendarza" href="{% url 'zakoncz_ucznia' uczen.id %}" title="Zakończ współpracę (uczeń trafi do archiwum)">📦</a>
               <a class="ikona-kalendarza" href="{% url 'usun_ucznia' uczen.id %}" title="Usuń ucznia">🗑</a>
             </td>
           </tr>

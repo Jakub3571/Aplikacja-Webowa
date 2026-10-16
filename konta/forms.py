@@ -2,6 +2,8 @@
 
 from datetime import datetime, time
 
+from django.utils import timezone
+
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
 from django.contrib.auth.password_validation import validate_password
@@ -151,7 +153,7 @@ class FormularzUcznia(forms.ModelForm):
         if data and godzina:
             godziny, minuty = godzina.split(':')
             czas = time(int(godziny), int(minuty))
-            dane['pierwsza_lekcja'] = datetime.combine(data, czas)
+            dane['pierwsza_lekcja'] = timezone.make_aware(datetime.combine(data, czas))
         return dane
 
 class FormularzUzytkownika(forms.ModelForm):
@@ -226,7 +228,7 @@ class FormularzUzytkownika(forms.ModelForm):
         if dane.get('rola') == 'nauczyciel':
             dane['email'] = dane.get('email') or f"{dane.get('username', '')}@konta.local"
         elif not dane.get('email'):
-            self.add_error('email', 'Adres e-mail jest wymagany dla pracownika i admina.')
+            self.add_error('email', 'Adres e-mail jest wymagany dla osoby umawiającej i admina.')
         # nauczyciel: walidacja wierszy przedmiotow
         if dane.get('rola') == 'nauczyciel':
             pelne = [w for w in self.wiersze_przedmiotow if w['przedmiot']]

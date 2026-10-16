@@ -1,0 +1,76 @@
+{% extends 'konta/panel.html' %} {% block tytul %}Archiwum — Panel pracowniczy{%
+endblock %} {% block panel %}
+<div class="platnosci-uklad">
+	<section class="karta">
+		<h2>Archiwum uczniów ({{ uczniowie|length }})</h2>
+		<p class="podpowiedz">
+			Uczniowie ze zakończoną współpracą. Historia lekcji i danych pozostaje
+			zachowana — można przywrócić.
+		</p>
+		<form method="get" class="pole-szukania" style="margin-bottom: 1rem">
+			<input
+				type="text"
+				name="szukaj"
+				value="{{ fraza }}"
+				placeholder="Szukaj ucznia, korepetytora lub przedmiotu..."
+			/>
+			<button
+				type="submit"
+				class="przycisk-usun"
+				style="background: var(--akcent)"
+			>
+				Szukaj
+			</button>
+			{% if fraza %}<a href="{% url 'archiwum' %}" class="powrot">wyczyść</a>{%
+			endif %}
+		</form>
+		{% if uczniowie %}
+		<div class="tabela-wrapper">
+			<table class="tabela">
+				<thead>
+					<tr>
+						<th>Uczeń</th>
+						<th>Korepetytor</th>
+						<th>Przedmiot</th>
+						<th>1. lekcja</th>
+						<th>Lekcje razem</th>
+						<th>Dodano</th>
+						<th>Akcje</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for uczen in uczniowie %}
+					<tr>
+						<td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
+						<td>{{ uczen.korepetytor }}</td>
+						<td>{{ uczen.przedmiot }}</td>
+						<td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+						<td>{{ uczen.liczba_lekcji }}</td>
+						<td>{{ uczen.dodano|date:"d.m.Y H:i" }}</td>
+						<td>
+							<a
+								class="przycisk-umowa umowa-tak"
+								href="{% url 'przywroc_ucznia' uczen.id %}"
+								title="Przywróć ucznia do listy aktywnych"
+								>↩ przywróć</a
+							>
+							<a
+								class="ikona-kalendarza"
+								href="{% url 'usun_ucznia' uczen.id %}"
+								title="Usuń ucznia na stałe"
+								>🗑</a
+							>
+						</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+		{% else %}
+		<p class="podtytul">
+			Archiwum jest puste — brak uczniów ze zakończoną współpracą.
+		</p>
+		{% endif %}
+	</section>
+</div>
+{% endblock %}

@@ -66,6 +66,7 @@ class Uczen(models.Model):
     )
     link_meet = models.CharField('stały link Google Meet', max_length=200, blank=True)
     zaplacone = models.BooleanField('zapłacone', default=False)
+    zakonczona = models.BooleanField('współpraca zakończona (archiwum)', default=False)
     dodano = models.DateTimeField('data dodania', auto_now_add=True)
 
     class Meta:
