@@ -296,7 +296,7 @@ body {
   vertical-align: middle;
 }
 
-.kalendarz td a { display: block; color: inherit; text-decoration: none; }
+.kalendarz td a { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; padding: 0.3rem 0.1rem; color: inherit; text-decoration: none; }
 
 .kalendarz td.dzien-wybrany {
   outline: 3px solid var(--akcent);
@@ -393,19 +393,6 @@ body {
 
 .przycisk-zaplac:hover { background: #15803d; }
 
-.przycisk-usun {
-  padding: 0.3rem 0.75rem;
-  background: var(--blad);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.przycisk-usun:hover { opacity: 0.85; }
-
 .status-zaplacone { font-weight: 600; }
 .status-niezaplacone { font-weight: 600; opacity: 0.8; }
 
@@ -413,6 +400,20 @@ body {
   font-size: 1.3rem;
   text-decoration: none;
 }
+
+.przycisk-usun {
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  font-weight: 600;
+  margin-right: 0.75rem;
+}
+
+.przycisk-usun:hover { background: #b91c1c; }
 
 .kafelki-godzin {
   display: grid;
@@ -442,6 +443,37 @@ body {
   color: #fff;
   border-color: #16a34a;
   font-weight: 700;
+}
+
+.kafelek-przerwa {
+  background: #9ca3af;
+  color: #ffffff;
+  border-style: dashed;
+  font-style: italic;
+}
+
+.kafelek-przerwa:hover { background: #6b7280; }
+
+.kafelek-zajety {
+  background: #fca5a5;
+  color: #7f1d1d;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.kafelek-zajety:hover { background: #f87171; }
+
+.kropka-zajety {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: #fca5a5;
+}
+
+.kafelek-zaznaczony.kafelek-przerwa {
+  background: linear-gradient(135deg, #2563eb 0%, #2563eb 60%, #9ca3af 60%, #9ca3af 100%);
+  border: 2px dashed #e0e7ff;
 }
 
 .kalendarz-uklad {
@@ -562,139 +594,12 @@ body {
   font-style: italic;
 }
 
-.przerwa-form {
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--ramka);
-}
-
-.przerwa-form h3 {
-  margin-bottom: 0.35rem;
-}
-
-.przerwa-opcje {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0.75rem 0;
-}
-
-.przerwa-opcja {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.8rem;
-  border: 1px solid var(--ramka);
-  border-radius: 999px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  background: var(--karta);
-  color: var(--tekst);
-}
-
-.przerwa-opcja input {
-  accent-color: var(--akcent);
-}
-
-.przerwa-opcja.wybrana {
-  border-color: var(--akcent);
-  background: color-mix(in srgb, var(--akcent) 12%, var(--karta));
-  font-weight: 600;
-}
-
-.plan-dnia {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
-.plan-slot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.6rem 0.9rem;
-  border-radius: 0.5rem;
-  font-size: 0.95rem;
-}
-
-.plan-lekcja {
-  background: color-mix(in srgb, var(--akcent) 15%, var(--karta));
-  border-left: 4px solid var(--akcent);
-  font-weight: 600;
-}
-
-.plan-przerwa {
-  background: #9ca3af;
-  color: #ffffff;
-  border-left: 4px solid #6b7280;
-  font-style: italic;
-}
-
-.kafelek-przerwa {
-  background: #9ca3af;
-  color: #ffffff;
-  border-style: dashed;
-  font-style: italic;
-}
-
-.kafelek-przerwa:hover {
-  background: #6b7280;
-}
-
 .kalendarz-komunikat {
   margin-top: 0.75rem;
   min-height: 1.2rem;
   font-size: 0.9rem;
   color: var(--akcent);
   font-weight: 600;
-}
-
-.kafelek-zajety {
-  background: #fca5a5;
-  color: #7f1d1d;
-  cursor: not-allowed;
-  text-decoration: line-through;
-}
-
-.kafelek-zajety:hover {
-  background: #f87171;
-}
-
-.kropka-zajety {
-  display: inline-block;
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: 999px;
-  background: #fca5a5;
-}
-
-.przycisk-usun {
-  background: #dc2626;
-  color: #ffffff;
-  border: none;
-  border-radius: 0.5rem;
-  padding: 0.55rem 1rem;
-  font-size: 0.95rem;
-  cursor: pointer;
-  font-weight: 600;
-  margin-right: 0.75rem;
-}
-
-.przycisk-usun:hover {
-  background: #b91c1c;
-}
-
-.kafelek-zaznaczony.kafelek-przerwa {
-  background: linear-gradient(135deg, #2563eb 0%, #2563eb 60%, #9ca3af 60%, #9ca3af 100%);
-  border: 2px dashed #e0e7ff;
-}
-
-.kafelek-przerwa:not(.kafelek-zaznaczony) {
-  background: #9ca3af;
-  color: #ffffff;
-  border-style: dashed;
-  font-style: italic;
 }
 
 /* === Kalendarz nauczyciela — oś czasu w stylu Calendly === */
@@ -788,14 +693,6 @@ body {
   color: #ffffff;
 }
 
-.kalendarz td a {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
-  padding: 0.3rem 0.1rem;
-}
-
 .dzien-numer {
   font-weight: 600;
 }
@@ -829,13 +726,6 @@ body {
   cursor: not-allowed;
 }
 
-@media (max-width: 900px) {
-  .os-czasu .kafelek {
-    min-height: 48px;
-    font-size: 1rem;
-  }
-}
-
 /* Zajete godziny (lekcje uczniow) na osi czasu */
 .os-czasu .kafelek-zajety,
 .os-czasu .kafelek:disabled {
@@ -863,4 +753,11 @@ body {
   border-color: #dc2626;
   background: #fee2e2;
   color: #7f1d1d;
+}
+
+@media (max-width: 900px) {
+  .os-czasu .kafelek {
+    min-height: 48px;
+    font-size: 1rem;
+  }
 }
