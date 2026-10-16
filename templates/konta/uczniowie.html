@@ -139,4 +139,57 @@
     });
   });
 </script>
+
+
+<script>
+  (function () {
+    var polePrzedmiot = document.getElementById('id_przedmiot');
+    var polePoziom = document.getElementById('id_poziom');
+    var poleKorepetytor = document.getElementById('id_korepetytor');
+    if (!polePrzedmiot || !polePoziom || !poleKorepetytor) return;
+
+    var poleData = document.getElementById('id_data_pierwszej_lekcji');
+    var poleGodzina = document.getElementById('id_godzina_pierwszej_lekcji');
+
+    function odswiezKorepetytorow() {
+      var przedmiot = polePrzedmiot.value;
+      var poziom = polePoziom.value;
+      var dataLekcji = poleData ? poleData.value : '';
+      var godzinaLekcji = poleGodzina ? poleGodzina.value : '';
+      poleKorepetytor.innerHTML = '<option value="">— wybierz przedmiot i poziom —</option>';
+      if (!przedmiot || !poziom) return;
+      if (dataLekcji && godzinaLekcji) {
+        poleKorepetytor.innerHTML = '<option value="">— szukam korepetytorów dostępnych ' + dataLekcji + ' ' + godzinaLekcji + '... —</option>';
+      }
+      fetch('/korepetytorzy/dane/?przedmiot=' + encodeURIComponent(przedmiot) + '&poziom=' + encodeURIComponent(poziom) + '&data=' + encodeURIComponent(dataLekcji) + '&godzina=' + encodeURIComponent(godzinaLekcji), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      })
+        .then(function (odp) { return odp.json(); })
+        .then(function (dane) {
+          var opcje = '<option value="">— wybierz korepetytora —</option>';
+          dane.korepetytorzy.forEach(function (k) {
+            opcje += '<option value="' + k.nazwa + '">' + k.nazwa + '</option>';
+          });
+          if (!dane.korepetytorzy.length) {
+            if (dataLekcji && godzinaLekcji) {
+              opcje = '<option value="">— brak dostępnych korepetytorów ' + dataLekcji + ' o ' + godzinaLekcji + ' — zmień termin lub przedmiot —</option>';
+            } else {
+              opcje = '<option value="">— wybierz datę i godzinę 1. lekcji, aby zobaczyć dostępnych korepetytorów —</option>';
+            }
+          }
+          poleKorepetytor.innerHTML = opcje;
+        })
+        .catch(function () {
+          poleKorepetytor.innerHTML = '<option value="">— błąd pobierania listy —</option>';
+        });
+    }
+
+    polePrzedmiot.addEventListener('change', odswiezKorepetytorow);
+    polePoziom.addEventListener('change', odswiezKorepetytorow);
+    if (poleData) poleData.addEventListener('change', odswiezKorepetytorow);
+    if (poleGodzina) poleGodzina.addEventListener('change', odswiezKorepetytorow);
+    odswiezKorepetytorow();
+  })();
+</script>
+
 {% endblock %}

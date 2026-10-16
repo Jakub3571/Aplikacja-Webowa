@@ -245,6 +245,57 @@ def dostepnosci_nauczycieli():
         })
     return wynik
 
+@login_required
+def korepetytorzy_dane(request):
+    """AJAX: zwraca listę aktywnych korepetytorów dla przedmiotu i poziomu.
+    Gdy podano datę i godzinę 1. lekcji — tylko tych, którzy zaznaczyli ten termin w kalendarzu."""
+    if getattr(request.user, 'nauczyciel_id', None):
+        return JsonResponse({'blad': 'Brak uprawnień.'}, status=403)
+    przedmiot = request.GET.get('przedmiot', '')
+    poziom = request.GET.get('poziom', '')
+    data_txt = request.GET.get('data', '')
+    godzina_txt = request.GET.get('godzina', '')
+    if not przedmiot or not poziom:
+        return JsonResponse({'korepetytorzy': []})
+    poziom_nauczyciela = {
+        'szkoła średnia - podstawa': 'podstawa',
+        'szkoła średnia - rozszerzenie': 'rozszerzenie',
+        'studia': 'rozszerzenie',
+    }.get(poziom)
+
+    dzien = None
+    godzina = None
+    if data_txt and godzina_txt:
+        try:
+            dzien = date.fromisoformat(data_txt)
+            godzina = datetime.strptime(godzina_txt, '%H:%M').time()
+        except ValueError:
+            dzien, godzina = None, None
+
+    korepetytorzy = []
+    for n in Nauczyciel.objects.filter(aktywny=True).prefetch_related('przedmioty').order_by('nazwisko', 'imie'):
+        pasuje_przedmiot = any(
+            p.przedmiot == przedmiot and p.poziom == poziom_nauczyciela
+            for p in n.przedmioty.all()
+        )
+        if not pasuje_przedmiot:
+            continue
+        if dzien and godzina:
+            # lekcja trwa 60 min — korepetytor musi mieć zaznaczone oba półgodzinne sloty
+            start_slotu = datetime.combine(dzien, godzina)
+            zaznaczone = set()
+            for termin in Dostepnosc.objects.filter(nauczyciel=n, data_od=dzien):
+                start = datetime.combine(dzien, termin.godzina_od)
+                koniec = datetime.combine(dzien, termin.godzina_do)
+                while start < koniec:
+                    zaznaczone.add(start.strftime('%H:%M'))
+                    start += timedelta(minutes=30)
+            slot1 = start_slotu.strftime('%H:%M')
+            slot2 = (start_slotu + timedelta(minutes=30)).strftime('%H:%M')
+            if slot1 not in zaznaczone or slot2 not in zaznaczone:
+                continue
+        korepetytorzy.append({'nazwa': f'{n.imie} {n.nazwisko}'})
+    return JsonResponse({'korepetytorzy': korepetytorzy})
 
 @login_required
 def uczniowie(request):
@@ -657,7 +708,7 @@ def kalendarz_nauczyciela(request, nauczyciel_id):
             kafelki.append({
                 'etykieta': etykieta,
                 'zaznaczony': etykieta in zaznaczone,
-                'przerwa': etykieta in sloty_przerwy and etykieta not in zaznaczone,
+                'przerwa': etykieta in sloty_przerwy,
             })
 
     if request.method == 'POST' and 'zapisz_przerwe' in request.POST:

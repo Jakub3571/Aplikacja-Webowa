@@ -684,3 +684,15 @@ body {
 .przycisk-usun:hover {
   background: #b91c1c;
 }
+
+.kafelek-zaznaczony.kafelek-przerwa {
+  background: linear-gradient(135deg, #2563eb 0%, #2563eb 60%, #9ca3af 60%, #9ca3af 100%);
+  border: 2px dashed #e0e7ff;
+}
+
+.kafelek-przerwa:not(.kafelek-zaznaczony) {
+  background: #9ca3af;
+  color: #ffffff;
+  border-style: dashed;
+  font-style: italic;
+}

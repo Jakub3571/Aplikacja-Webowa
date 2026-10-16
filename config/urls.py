@@ -45,6 +45,7 @@ urlpatterns = [
     path('uczniowie/<int:uczen_id>/usun/', views.usun_ucznia, name='usun_ucznia'),
     path('uczniowie/<int:uczen_id>/zakoncz/', views.zakoncz_ucznia, name='zakoncz_ucznia'),
     path('uczniowie/<int:uczen_id>/przywroc/', views.przywroc_ucznia, name='przywroc_ucznia'),
+    path('korepetytorzy/dane/', views.korepetytorzy_dane, name='korepetytorzy_dane'),
     path('archiwum/', views.archiwum_uczniow, name='archiwum'),
     path('raport-platnosci/', views.pobierz_raport, name='pobierz_raport'),
     path('nauczyciele/<int:nauczyciel_id>/zakoncz-wspolprace/', views.zakoncz_wspolprace, name='zakoncz_wspolprace'),
