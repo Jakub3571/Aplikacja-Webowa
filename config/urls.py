@@ -9,16 +9,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.logowanie, name='logowanie'),
     path('wyloguj/', views.wyloguj, name='wyloguj'),
-    path(
-        'reset-hasla/',
-        auth_views.PasswordResetView.as_view(
-            template_name='konta/reset_hasla.html',
-            subject_template_name='konta/mail_reset_temat.txt',
-            email_template_name='konta/mail_reset_tresc.txt',
-            success_url='/reset-hasla/wyslane/',
-        ),
-        name='reset_hasla',
-    ),
+    path('reset-hasla/', views.reset_hasla, name='reset_hasla'),
     path(
         'reset-hasla/wyslane/',
         auth_views.PasswordResetDoneView.as_view(template_name='konta/reset_wyslane.html'),
@@ -55,6 +46,7 @@ urlpatterns = [
     path('uczniowie/<int:uczen_id>/zakoncz/', views.zakoncz_ucznia, name='zakoncz_ucznia'),
     path('uczniowie/<int:uczen_id>/przywroc/', views.przywroc_ucznia, name='przywroc_ucznia'),
     path('archiwum/', views.archiwum_uczniow, name='archiwum'),
+    path('raport-platnosci/', views.pobierz_raport, name='pobierz_raport'),
     path('nauczyciele/<int:nauczyciel_id>/zakoncz-wspolprace/', views.zakoncz_wspolprace, name='zakoncz_wspolprace'),
     path('nauczyciele/<int:nauczyciel_id>/przywroc-wspolprace/', views.przywroc_wspolprace, name='przywroc_wspolprace'),
     path('uzytkownicy/<int:user_id>/edytuj/', views.edytuj_uzytkownika, name='edytuj_uzytkownika'),
