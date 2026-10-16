@@ -36,7 +36,7 @@ POZIOM_UCZEN_NA_NAUCZYCIELA = {
 }
 
 GODZINY_LEKCJI = [
-    (f'{h:02d}:{m:02d}', f'{h:02d}:{m:02d}') for h in range(24) for m in (0, 30)
+    (f'{h:02d}:{m:02d}', f'{h:02d}:{m:02d}') for h in range(6, 21) for m in (0, 30)
 ]
 
 

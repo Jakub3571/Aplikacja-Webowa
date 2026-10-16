@@ -1,0 +1,20 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Zakończ współpracę — {{ nauczyciel.imie }} {{ nauczyciel.nazwisko }}{% endblock %}
+
+{% block panel %}
+<section class="karta">
+  <h2>📦 Zakończyć współpracę z korepetytorem?</h2>
+  <p>Czy chcesz zakończyć współpracę z <strong>{{ nauczyciel.imie }} {{ nauczyciel.nazwisko }}</strong>?</p>
+  <p class="podpowiedz">
+    Korepetytor stanie się <strong>nieaktywny</strong>: zniknie z list bieżących i z formularza dodawania ucznia,
+    ale jego konto, dane, przedmioty i zaznaczone godziny <strong>zostaną w bazie</strong> —
+    współpracę można wznowić jednym kliknięciem w Archiwum.
+  </p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="przycisk-usun">Tak, zakończ współpracę</button>
+    <a href="{% url 'archiwum' %}" class="powrot">← Anuluj</a>
+  </form>
+</section>
+{% endblock %}

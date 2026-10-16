@@ -55,6 +55,8 @@ urlpatterns = [
     path('uczniowie/<int:uczen_id>/zakoncz/', views.zakoncz_ucznia, name='zakoncz_ucznia'),
     path('uczniowie/<int:uczen_id>/przywroc/', views.przywroc_ucznia, name='przywroc_ucznia'),
     path('archiwum/', views.archiwum_uczniow, name='archiwum'),
+    path('nauczyciele/<int:nauczyciel_id>/zakoncz-wspolprace/', views.zakoncz_wspolprace, name='zakoncz_wspolprace'),
+    path('nauczyciele/<int:nauczyciel_id>/przywroc-wspolprace/', views.przywroc_wspolprace, name='przywroc_wspolprace'),
     path('uzytkownicy/<int:user_id>/edytuj/', views.edytuj_uzytkownika, name='edytuj_uzytkownika'),
     path('uzytkownicy/<int:user_id>/konto/', views.przelacz_konto, name='przelacz_konto'),
 ]

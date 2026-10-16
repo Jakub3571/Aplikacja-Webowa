@@ -1,76 +1,152 @@
-{% extends 'konta/panel.html' %} {% block tytul %}Archiwum — Panel pracowniczy{%
-endblock %} {% block panel %}
+{% extends 'konta/panel.html' %}
+{% block tytul %}Archiwum — Panel pracowniczy{% endblock %}
+{% block panel %}
 <div class="platnosci-uklad">
-	<section class="karta">
-		<h2>Archiwum uczniów ({{ uczniowie|length }})</h2>
-		<p class="podpowiedz">
-			Uczniowie ze zakończoną współpracą. Historia lekcji i danych pozostaje
-			zachowana — można przywrócić.
-		</p>
-		<form method="get" class="pole-szukania" style="margin-bottom: 1rem">
-			<input
-				type="text"
-				name="szukaj"
-				value="{{ fraza }}"
-				placeholder="Szukaj ucznia, korepetytora lub przedmiotu..."
-			/>
-			<button
-				type="submit"
-				class="przycisk-usun"
-				style="background: var(--akcent)"
-			>
-				Szukaj
-			</button>
-			{% if fraza %}<a href="{% url 'archiwum' %}" class="powrot">wyczyść</a>{%
-			endif %}
-		</form>
-		{% if uczniowie %}
-		<div class="tabela-wrapper">
-			<table class="tabela">
-				<thead>
-					<tr>
-						<th>Uczeń</th>
-						<th>Korepetytor</th>
-						<th>Przedmiot</th>
-						<th>1. lekcja</th>
-						<th>Lekcje razem</th>
-						<th>Dodano</th>
-						<th>Akcje</th>
-					</tr>
-				</thead>
-				<tbody>
-					{% for uczen in uczniowie %}
-					<tr>
-						<td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
-						<td>{{ uczen.korepetytor }}</td>
-						<td>{{ uczen.przedmiot }}</td>
-						<td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
-						<td>{{ uczen.liczba_lekcji }}</td>
-						<td>{{ uczen.dodano|date:"d.m.Y H:i" }}</td>
-						<td>
-							<a
-								class="przycisk-umowa umowa-tak"
-								href="{% url 'przywroc_ucznia' uczen.id %}"
-								title="Przywróć ucznia do listy aktywnych"
-								>↩ przywróć</a
-							>
-							<a
-								class="ikona-kalendarza"
-								href="{% url 'usun_ucznia' uczen.id %}"
-								title="Usuń ucznia na stałe"
-								>🗑</a
-							>
-						</td>
-					</tr>
-					{% endfor %}
-				</tbody>
-			</table>
-		</div>
-		{% else %}
-		<p class="podtytul">
-			Archiwum jest puste — brak uczniów ze zakończoną współpracą.
-		</p>
-		{% endif %}
-	</section>
+  <section class="karta">
+    <h2>Archiwum uczniów ({{ uczniowie|length }})</h2>
+    <p class="podpowiedz">Uczniowie ze zakończoną współpracą. Historia lekcji i danych pozostaje zachowana — można przywrócić.</p>
+    <form method="get" class="pole-szukania" style="margin-bottom: 1rem;">
+      <input
+        type="text"
+        name="szukaj"
+        value="{{ fraza }}"
+        placeholder="Szukaj ucznia, korepetytora lub przedmiotu..."
+      />
+      <button type="submit" class="przycisk-usun" style="background: var(--akcent);">Szukaj</button>
+      {% if fraza %}<a href="{% url 'archiwum' %}" class="powrot">wyczyść</a>{% endif %}
+    </form>
+    {% if uczniowie %}
+    <div class="tabela-wrapper">
+      <table class="tabela">
+        <thead>
+          <tr>
+            <th>Uczeń</th>
+            <th>Korepetytor</th>
+            <th>Przedmiot</th>
+            <th>1. lekcja</th>
+            <th>Lekcje razem</th>
+            <th>Dodano</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for uczen in uczniowie %}
+          <tr>
+            <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
+            <td>{{ uczen.korepetytor }}</td>
+            <td>{{ uczen.przedmiot }}</td>
+            <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+            <td>{{ uczen.liczba_lekcji }}</td>
+            <td>{{ uczen.dodano|date:"d.m.Y H:i" }}</td>
+            <td>
+              <a class="przycisk-umowa umowa-tak" href="{% url 'przywroc_ucznia' uczen.id %}" title="Przywróć ucznia do listy aktywnych">↩ przywróć</a>
+              <a class="ikona-kalendarza" href="{% url 'usun_ucznia' uczen.id %}" title="Usuń ucznia na stałe">🗑</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="podtytul">Archiwum uczniów jest puste — brak zakończonych współprac.</p>
+    {% endif %}
+  </section>
+
+  {% if request.user.is_superuser %}
+  <section class="karta">
+    <h2>Korepetytorzy ({{ korepetytorzy|length }})</h2>
+    <p class="podpowiedz">Wszyscy korepetytorzy. Zakończona współpraca = nieaktywny: znika z list bieżących, ale dane, godziny i konto zostają.</p>
+    {% if korepetytorzy %}
+    <div class="tabela-wrapper">
+      <table class="tabela">
+        <thead>
+          <tr>
+            <th>Korepetytor</th>
+            <th>Przedmioty</th>
+            <th>Status</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for n in korepetytorzy %}
+          <tr>
+            <td>{{ n.imie }} {{ n.nazwisko }}</td>
+            <td>{{ n.przedmioty_tekst }}</td>
+            <td>
+              {% if n.aktywny %}
+                <span class="umowa-tak">✔ współpraca</span>
+              {% else %}
+                <span class="umowa-nie">zakończona (archiwum)</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if n.aktywny %}
+              <a class="przycisk-umowa umowa-nie" href="{% url 'zakoncz_wspolprace' n.id %}" title="Zakończ współpracę — korepetytor trafi do archiwum">📦 zakończ współpracę</a>
+              {% else %}
+              <a class="przycisk-umowa umowa-tak" href="{% url 'przywroc_wspolprace' n.id %}" title="Przywróć współpracę">↩ przywróć</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="podtytul">Brak korepetytorów w systemie — utwórz im konta w zakładce „Użytkownicy”.</p>
+    {% endif %}
+  </section>
+
+  <section class="karta">
+    <h2>Pracownicy ({{ pracownicy|length }})</h2>
+    <p class="podpowiedz">Konta osób umawiających i adminów. Wyłączone konto nie może się logować, ale dane zostają w bazie.</p>
+    {% if pracownicy %}
+    <div class="tabela-wrapper">
+      <table class="tabela">
+        <thead>
+          <tr>
+            <th>Użytkownik</th>
+            <th>Imię i nazwisko</th>
+            <th>Rola</th>
+            <th>Status</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in pracownicy %}
+          <tr>
+            <td>{{ u.username }}</td>
+            <td>{{ u.first_name }} {{ u.last_name }}</td>
+            <td>
+              {% if u.is_superuser %}
+                <span class="umowa-tak">✔ admin</span>
+              {% else %}
+                <span class="umowa-nie">osoba umawiająca</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if u.is_active %}
+                <span class="umowa-tak">✔ aktywne</span>
+              {% else %}
+                <span class="umowa-nie">wyłączone</span>
+              {% endif %}
+            </td>
+            <td>
+              <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>
+              {% if u.is_active %}
+              <a class="przycisk-umowa umowa-nie" href="{% url 'przelacz_konto' u.id %}" title="Wyłącz konto (nie będzie się mogło logować)">wyłącz</a>
+              {% else %}
+              <a class="przycisk-umowa umowa-tak" href="{% url 'przelacz_konto' u.id %}" title="Włącz konto">włącz</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="podtytul">Brak kont pracowników.</p>
+    {% endif %}
+  </section>
+  {% endif %}
 </div>
 {% endblock %}

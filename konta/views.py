@@ -6,15 +6,19 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import PermissionDenied
+
+
 def moze_edytowac_kalendarz(user, nauczyciel_id):
     """Kalendarz edytuje: admin/szef albo nauczyciel-właściciel konta."""
     if czy_szef(user):
         return True
     return getattr(user, 'nauczyciel_id', None) == nauczyciel_id
+
+
 def czy_szef(u):
-    
     """Prawdziwy szef: superuser LUB konto o nazwie 'Admin'."""
     return bool(u.is_authenticated and (u.is_superuser or u.username.strip().lower() == 'admin'))
+
 
 def tylko_szef(widok):
     """Puszcza dalej tylko superusera (szefa); reszta dostaje stronę „brak dostępu"."""
@@ -23,11 +27,13 @@ def tylko_szef(widok):
             return True
         raise PermissionDenied
     return user_passes_test(sprawdz, login_url='logowanie')(widok)
+
+
 from django.core.mail import send_mail
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.http import HttpResponse, JsonResponse
 
 from .forms import (
     FormularzDyspozycyjnosc,
@@ -75,6 +81,7 @@ def inne_lekcje_nauczyciela(nauczyciel, uczen, dzien, godzina_start):
         if start_slotu < koniec_lekcji and start_lekcji < koniec_slotu:
             kolidujace.append(lekcja)
     return kolidujace
+
 
 def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
     """Sprawdza, czy slot (60 min) wypada w luce przerwy dnia nauczyciela.
@@ -125,6 +132,7 @@ def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
             return True
     return False
 
+
 MAX_PROB_LOGOWANIA = 5
 
 
@@ -150,66 +158,6 @@ def logowanie(request):
         messages.success(request, f'Witaj, {user.get_full_name() or user.username}!')
         return redirect('pulpit')
     return render(request, 'konta/logowanie.html', {'form': form})
-
-@login_required
-def wyloguj(request):
-    """Wylogowuje pracownika i wraca na stronę logowania."""
-    logout(request)
-    messages.info(request, 'Zostałeś wylogowany. Do zobaczenia!')
-    return redirect('logowanie')
-
-
-@login_required
-def pulpit(request):
-    """Strona startowa: szef widzi pulpit, pracownik od razu formularz ucznia."""
-    if not czy_szef(request.user):
-        if getattr(request.user, 'nauczyciel_id', None):
-            # nauczyciel: od razu swoj kalendarz (dni/godziny zaznacza sam w kalendarzu)
-            return redirect('kalendarz_nauczyciela', nauczyciel_id=request.user.nauczyciel_id)
-        return redirect('uczniowie')
-    return render(request, 'konta/pulpit.html')
-
-def dostepnosci_nauczycieli():
-    """Lista wszystkich nauczycieli z pogrupowanymi ich dostępnościami."""
-    dzis = date.today()
-    terminy = (
-        Dostepnosc.objects
-        .filter(data_do__gte=dzis)
-        .select_related('nauczyciel')
-        .order_by('data_od', 'godzina_od')
-    )
-    zgrupowane = {}
-    for termin in terminy:
-        klucz = termin.nauczyciel_id
-        if klucz not in zgrupowane:
-            zgrupowane[klucz] = {
-                'nauczyciel': termin.nauczyciel,
-                'dni': set(),
-                'godzina_od': termin.godzina_od,
-                'godzina_do': termin.godzina_do,
-            }
-        wpis = zgrupowane[klucz]
-        wpis['dni'].add(termin.data_od)
-        if termin.godzina_od < wpis['godzina_od']:
-            wpis['godzina_od'] = termin.godzina_od
-        if termin.godzina_do > wpis['godzina_do']:
-            wpis['godzina_do'] = termin.godzina_do
-
-    wynik = []
-    for nauczyciel in (
-        Nauczyciel.objects
-        .prefetch_related('przedmioty')
-        .filter(aktywny=True)
-        .order_by('nazwisko', 'imie')
-    ):
-        wpis = zgrupowane.get(nauczyciel.id)
-        wynik.append({
-            'nauczyciel': nauczyciel,
-            'dni': sorted(wpis['dni']) if wpis else [],
-            'godzina_od': wpis['godzina_od'] if wpis else None,
-            'godzina_do': wpis['godzina_do'] if wpis else None,
-        })
-    return wynik
 
 
 def wyslij_powiadomienie_o_uczniu(request, uczen):
@@ -238,16 +186,77 @@ def wyslij_powiadomienie_o_uczniu(request, uczen):
 
 
 @login_required
+def wyloguj(request):
+    """Wylogowuje pracownika i wraca na stronę logowania."""
+    logout(request)
+    messages.info(request, 'Zostałeś wylogowany. Do zobaczenia!')
+    return redirect('logowanie')
+
+
+@login_required
+def pulpit(request):
+    """Strona startowa: szef widzi pulpit, pracownik od razu formularz ucznia."""
+    if not czy_szef(request.user):
+        if getattr(request.user, 'nauczyciel_id', None):
+            # nauczyciel: od razu swój kalendarz (dni/godziny zaznacza sam w kalendarzu)
+            return redirect('kalendarz_nauczyciela', nauczyciel_id=request.user.nauczyciel_id)
+        return redirect('uczniowie')
+    return render(request, 'konta/pulpit.html')
+
+
+def dostepnosci_nauczycieli():
+    """Lista wszystkich nauczycieli z pogrupowanymi ich dostępnościami."""
+    dzis = date.today()
+    terminy = (
+        Dostepnosc.objects
+        .filter(data_do__gte=dzis)
+        .select_related('nauczyciel')
+        .order_by('data_od', 'godzina_od')
+    )
+    zgrupowane = {}
+    for termin in terminy:
+        klucz = termin.nauczyciel_id
+        if klucz not in zgrupowane:
+            zgrupowane[klucz] = {
+                'nauczyciel': termin.nauczyciel,
+                'dni': set(),
+                'godzina_od': termin.godzina_od,
+                'godzina_do': termin.godzina_do,
+            }
+        wpis = zgrupowane[klucz]
+        wpis['dni'].add(termin.data_od)
+        if termin.godzina_od < wpis['godzina_od']:
+            wpis['godzina_od'] = termin.godzina_od
+        if termin.godzina_do > wpis['godzina_do']:
+            wpis['godzina_do'] = termin.godzina_do
+    wynik = []
+    for nauczyciel in (
+        Nauczyciel.objects
+        .prefetch_related('przedmioty')
+        .filter(aktywny=True)
+        .order_by('nazwisko', 'imie')
+    ):
+        wpis = zgrupowane.get(nauczyciel.id)
+        wynik.append({
+            'nauczyciel': nauczyciel,
+            'dni': sorted(wpis['dni']) if wpis else [],
+            'godzina_od': wpis['godzina_od'] if wpis else None,
+            'godzina_do': wpis['godzina_do'] if wpis else None,
+        })
+    return wynik
+
+
+@login_required
 def uczniowie(request):
     """Zakładka uczniowie: lista, formularz dodawania i dostępność nauczycieli.
     Zwykły pracownik widzi tylko uczniów, których sam umówił.
     Konto nauczyciela nie ma tu wstępu (widzi tylko swój kalendarz)."""
     if getattr(request.user, 'nauczyciel_id', None):
         raise PermissionDenied
-    if czy_szef(request.user):         
-        uczniowie_lista = Uczen.objects.all()
+    if czy_szef(request.user):
+        uczniowie_lista = list(Uczen.objects.all())
     else:
-        uczniowie_lista = Uczen.objects.filter(umowil=request.user)
+        uczniowie_lista = list(Uczen.objects.filter(umowil=request.user))
     wybrany_przedmiot = request.POST.get('przedmiot') if request.method == 'POST' else None
     wybrany_poziom = request.POST.get('poziom') if request.method == 'POST' else None
 
@@ -281,6 +290,7 @@ def uczniowie(request):
         'nadchodzace_dostepnosci': dostepnosci_nauczycieli(),
     })
 
+
 @login_required
 def edytuj_ucznia(request, uczen_id):
     """Edycja danych ucznia: admin może edytować każdego, pracownik — tylko swoich."""
@@ -295,7 +305,7 @@ def edytuj_ucznia(request, uczen_id):
             przedmiot=request.POST.get('przedmiot'),
             poziom=request.POST.get('poziom'),
         )
-        # obecny korepetytor musi zostac na liscie, nawet jesli nauczyciel jest juz nieaktywny
+        # obecny korepetytor musi zostać na liście, nawet jeśli nauczyciel jest już nieaktywny
         if uczen.korepetytor and uczen.korepetytor not in [w for w, _ in form.fields['korepetytor'].choices]:
             form.fields['korepetytor'].choices += [(uczen.korepetytor, uczen.korepetytor)]
         if form.is_valid():
@@ -344,42 +354,6 @@ def usun_ucznia(request, uczen_id):
     return render(request, 'konta/usun_ucznia.html', {'uczen': uczen})
 
 
-@tylko_szef
-@login_required
-def edytuj_uzytkownika(request, user_id):
-    """Edycja konta: imię, nazwisko, email, telefon (bez hasla i roli)."""
-    uzytkownik = get_object_or_404(Pracownik, pk=user_id)
-    if request.method == 'POST':
-        uzytkownik.first_name = request.POST.get('first_name', '').strip()
-        uzytkownik.last_name = request.POST.get('last_name', '').strip()
-        email = request.POST.get('email', '').strip()
-        if not email:
-            messages.error(request, 'Adres e-mail jest wymagany.')
-            return render(request, 'konta/edytuj_uzytkownika.html', {'uzytkownik': uzytkownik})
-        uzytkownik.email = email
-        uzytkownik.telefon = request.POST.get('telefon', '').strip()
-        uzytkownik.save()
-        messages.success(request, f'Dane konta {uzytkownik.username} zostały zaktualizowane.')
-        return redirect('uzytkownicy')
-    return render(request, 'konta/edytuj_uzytkownika.html', {'uzytkownik': uzytkownik})
-
-
-@tylko_szef
-@login_required
-def przelacz_konto(request, user_id):
-    """Włącza/wyłącza konto: wyłączone konto nie może się logować (dane zostają w bazie)."""
-    uzytkownik = get_object_or_404(Pracownik, pk=user_id)
-    if uzytkownik.id == request.user.id:
-        messages.error(request, 'Nie możesz wyłączyć konta samemu sobie.')
-        return redirect('uzytkownicy')
-    uzytkownik.is_active = not uzytkownik.is_active
-    uzytkownik.save()
-    if uzytkownik.is_active:
-        messages.success(request, f'Konto {uzytkownik.username} zostało włączone.')
-    else:
-        messages.info(request, f'Konto {uzytkownik.username} zostało wyłączone — nie może się logować.')
-    return redirect('uzytkownicy')
-
 @login_required
 def archiwum_uczniow(request):
     """Zakładka archiwum: uczniowie ze zakończoną współpracą, z możliwością przywrócenia."""
@@ -403,8 +377,16 @@ def archiwum_uczniow(request):
         liczba_lekcji[lekcja.uczen_id] = liczba_lekcji.get(lekcja.uczen_id, 0) + 1
     for u in uczniowie_lista:
         u.liczba_lekcji = liczba_lekcji.get(u.id, 0)
+
+    korepetytorzy_lista = list(Nauczyciel.objects.order_by('nazwisko', 'imie'))
+    pracownicy_lista = [
+        u for u in Pracownik.objects.order_by('username')
+        if not u.nauczyciel and u.id != request.user.id
+    ]
     return render(request, 'konta/archiwum.html', {
         'uczniowie': uczniowie_lista,
+        'korepetytorzy': korepetytorzy_lista,
+        'pracownicy': pracownicy_lista,
         'fraza': (request.GET.get('szukaj') or '').strip(),
     })
 
@@ -447,6 +429,68 @@ def przywroc_ucznia(request, uczen_id):
 
 @tylko_szef
 @login_required
+def zakoncz_wspolprace(request, nauczyciel_id):
+    """Kończy współpracę z korepetytorem: staje się nieaktywny, znika z list bieżących (dane zostają)."""
+    nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
+    if request.method == 'POST':
+        nauczyciel.aktywny = False
+        nauczyciel.save(update_fields=['aktywny'])
+        imie = f'{nauczyciel.imie} {nauczyciel.nazwisko}'
+        messages.success(request, f'Zakończono współpracę z {imie} — korepetytor trafił do archiwum. Dane i godziny pozostają w bazie.')
+        return redirect('archiwum')
+    return render(request, 'konta/zakoncz_wspolprace.html', {'nauczyciel': nauczyciel})
+
+
+@tylko_szef
+@login_required
+def przywroc_wspolprace(request, nauczyciel_id):
+    """Przywraca korepetytora do współpracy."""
+    nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
+    nauczyciel.aktywny = True
+    nauczyciel.save(update_fields=['aktywny'])
+    imie = f'{nauczyciel.imie} {nauczyciel.nazwisko}'
+    messages.success(request, f'Wznowiono współpracę z {imie}.')
+    return redirect('archiwum')
+
+@tylko_szef
+@login_required
+def edytuj_uzytkownika(request, user_id):
+    """Edycja konta: imię, nazwisko, email, telefon (bez hasła i roli)."""
+    uzytkownik = get_object_or_404(Pracownik, pk=user_id)
+    if request.method == 'POST':
+        uzytkownik.first_name = request.POST.get('first_name', '').strip()
+        uzytkownik.last_name = request.POST.get('last_name', '').strip()
+        email = request.POST.get('email', '').strip()
+        if not email:
+            messages.error(request, 'Adres e-mail jest wymagany.')
+            return render(request, 'konta/edytuj_uzytkownika.html', {'uzytkownik': uzytkownik})
+        uzytkownik.email = email
+        uzytkownik.telefon = request.POST.get('telefon', '').strip()
+        uzytkownik.save()
+        messages.success(request, f'Dane konta {uzytkownik.username} zostały zaktualizowane.')
+        return redirect('uzytkownicy')
+    return render(request, 'konta/edytuj_uzytkownika.html', {'uzytkownik': uzytkownik})
+
+
+@tylko_szef
+@login_required
+def przelacz_konto(request, user_id):
+    """Włącza/wyłącza konto: wyłączone konto nie może się logować (dane zostają w bazie)."""
+    uzytkownik = get_object_or_404(Pracownik, pk=user_id)
+    if uzytkownik.id == request.user.id:
+        messages.error(request, 'Nie możesz wyłączyć konta samemu sobie.')
+        return redirect('uzytkownicy')
+    uzytkownik.is_active = not uzytkownik.is_active
+    uzytkownik.save()
+    if uzytkownik.is_active:
+        messages.success(request, f'Konto {uzytkownik.username} zostało włączone.')
+    else:
+        messages.info(request, f'Konto {uzytkownik.username} zostało wyłączone — nie może się logować.')
+    return redirect('uzytkownicy')
+
+
+@tylko_szef
+@login_required
 def pobierz_raport(request):
     """Raport zapłaconych płatności jako plik tekstowy do pobrania (zamiast e-maila)."""
     zaplaconi = Uczen.objects.filter(zaplacone=True, zakonczona=False)
@@ -483,7 +527,6 @@ def reset_hasla(request):
         email_template_name='konta/mail_reset_tresc.txt',
         success_url='/reset-hasla/wyslane/',
     )(request)
-
 @login_required
 def kalendarz_nauczyciela(request, nauczyciel_id):
     """Kalendarz miesiąca z klikalnymi kafelkami godzin (co 30 minut)."""
@@ -494,16 +537,6 @@ def kalendarz_nauczyciela(request, nauczyciel_id):
         if getattr(request.user, 'nauczyciel_id', None):
             raise PermissionDenied
         # zwykły pracownik: kalendarz tylko do podglądu
-    nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
-    fraza = (request.GET.get('szukaj') or '').strip().lower()
-    if fraza:
-        uczniowie_lista = [
-            u for u in uczniowie_lista
-            if fraza in u.imie_ucznia.lower()
-            or fraza in u.nazwisko_rodzica.lower()
-            or fraza in (u.korepetytor or '').lower()
-            or fraza in u.przedmiot.lower()
-        ]
     dzisiaj = date.today()
 
     rok = request.GET.get('rok')
@@ -682,9 +715,24 @@ def kalendarz_nauczyciela(request, nauczyciel_id):
             + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}'
         )
 
-    return render(request, 'konta/lekcje.html', {
-        'uczniowie': uczniowie_lista,
-        'fraza': (request.GET.get('szukaj') or '').strip(),
+    return render(request, 'konta/kalendarz.html', {
+        'nauczyciel': nauczyciel,
+        'tygodnie': tygodnie,
+        'dni_tygodnia': DNI_TYGODNIA,
+        'nazwa_miesiaca': MIESIACE[miesiac - 1],
+        'rok': rok,
+        'miesiac': miesiac,
+        'poprzedni_miesiac': poprzedni_miesiac,
+        'poprzedni_rok': poprzedni_rok,
+        'nastepny_miesiac': nastepny_miesiac,
+        'nastepny_rok': nastepny_rok,
+        'dostepnosci': dostepnosci_miesiaca.order_by('data_od', 'godzina_od'),
+        'wybrany_dzien': wybrany_dzien,
+        'godziny_na_dzien': godziny_na_dzien,
+        'kafelki': kafelki,
+        'plan_dnia': plan_dnia,
+        'przerwa_dnia': przerwa_dnia,
+        'edycja': edycja,
     })
 
 
@@ -831,6 +879,7 @@ def usun_termin(request, termin_id):
         + f'?rok={rok}&miesiac={miesiac}&dzien={dzien}'
     )
 
+
 @login_required
 def lekcje(request):
     """Zakładka lekcje: lista uczniów z liczbą lekcji i wejściem do kalendarza lekcji.
@@ -842,6 +891,15 @@ def lekcje(request):
         uczniowie_lista = list(Uczen.objects.filter(zakonczona=False))
     else:
         uczniowie_lista = list(Uczen.objects.filter(umowil=request.user, zakonczona=False))
+    fraza = (request.GET.get('szukaj') or '').strip().lower()
+    if fraza:
+        uczniowie_lista = [
+            u for u in uczniowie_lista
+            if fraza in u.imie_ucznia.lower()
+            or fraza in u.nazwisko_rodzica.lower()
+            or fraza in (u.korepetytor or '').lower()
+            or fraza in u.przedmiot.lower()
+        ]
     dzisiaj = date.today()
     liczba_lekcji = {}
     for lekcja in Lekcja.objects.filter(
@@ -854,6 +912,7 @@ def lekcje(request):
         u.liczba_lekcji = liczba_lekcji.get(u.id, 0)
     return render(request, 'konta/lekcje.html', {
         'uczniowie': uczniowie_lista,
+        'fraza': (request.GET.get('szukaj') or '').strip(),
     })
 
 @login_required
@@ -1003,6 +1062,7 @@ def kalendarz_lekcji(request, uczen_id):
         'liczba_lekcji': liczba_lekcji,
     })
 
+
 @tylko_szef
 @login_required
 def platnosci(request):
@@ -1016,14 +1076,14 @@ def platnosci(request):
         uczen = get_object_or_404(Uczen, pk=request.POST['uczen_id'])
         uczen.zaplacone = True
         uczen.save()
-        messages.success(request, f'{uczen.imie_ucznia} {uczen.nazwisko_rodzica} — oznaczono jako zapłacone.')
+        messages.success(request, f'{uczen.imie_ucznia} {uczen.nazwisko_rodzica} — oznaczono jako opłacone.')
         return redirect('platnosci')
 
     if request.method == 'POST' and 'odznacz_zaplacone' in request.POST:
         uczen = get_object_or_404(Uczen, pk=request.POST['uczen_id'])
         uczen.zaplacone = False
         uczen.save()
-        messages.info(request, f'{uczen.imie_ucznia} {uczen.nazwisko_rodzica} — cofnięto status zapłacone.')
+        messages.info(request, f'{uczen.imie_ucznia} {uczen.nazwisko_rodzica} — cofnięto status opłacone.')
         return redirect('platnosci')
 
     if request.method == 'POST' and 'usun_ucznia' in request.POST:
@@ -1071,6 +1131,31 @@ def platnosci(request):
         messages.success(request, f'Raport wysłano na {email_odbiorcy}. Zapłacone pozycje usunięto z listy.')
         return redirect('platnosci')
 
+    rozliczenia = []
+    for nauczyciel in Nauczyciel.objects.filter(aktywny=True).order_by('nazwisko', 'imie'):
+        nazwa = f'{nauczyciel.imie} {nauczyciel.nazwisko}'
+        jego_uczniowie = [u for u in wszyscy_uczniowie if (u.korepetytor or '').strip() == nazwa]
+        if jego_uczniowie:
+            zaplacone_lekcje = [u for u in jego_uczniowie if u.zaplacone]
+            kwota = sum(
+                nauczyciel.stawka_dla(u.przedmiot, u.poziom)
+                for u in zaplacone_lekcje
+            )
+            rozliczenia.append({
+                'nauczyciel': nauczyciel,
+                'liczba_uczniow': len(jego_uczniowie),
+                'liczba_zaplaconych': len(zaplacone_lekcje),
+                'kwota': kwota,
+            })
+
+    return render(request, 'konta/platnosci.html', {
+        'uczniowie': uczniowie_lista,
+        'zaplaconi': zaplaconi,
+        'email_raportu': email_odbiorcy,
+        'rozliczenia': rozliczenia,
+    })
+
+
 @tylko_szef
 @login_required
 def uzytkownicy(request):
@@ -1104,6 +1189,7 @@ def przelacz_szefa(request, user_id):
     else:
         messages.info(request, f'{uzytkownik.username} — odebrano uprawnienia admina.')
     return redirect('uzytkownicy')
+
 
 @login_required
 def kreator_dyspozycyjnosc(request):
@@ -1148,6 +1234,8 @@ def kreator_dyspozycyjnosc(request):
         )
         return redirect('kalendarz_nauczyciela', nauczyciel_id=nauczyciel.id)
     return render(request, 'konta/kreator_dyspozycyjnosc.html', {'form': form})
+
+
 def wyslij_zaproszenie_meet(uczen):
     """Wysyła e-mail do rodzica z linkiem do lekcji cyklicznej na Google Meet."""
     if not uczen.link_meet or not uczen.email_glowny:
@@ -1173,9 +1261,10 @@ def wyslij_zaproszenie_meet(uczen):
     except Exception:
         pass
 
+
 @login_required
 def umow_lekcje_cykliczna(request, uczen_id):
-    """Umawia stałe lekcje ucznia: wiele slotów w tygodniu, presets okresu,
+    """Umawia stałe lekcje ucznia: wiele slotów w tygodniu, presety okresu,
     blokada terminów u korepetytora i e-mail z linkiem Meet do rodzica."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
     if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
@@ -1268,6 +1357,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
         'godziny': [f'{h:02d}:{m:02d}' for h in range(6, 24) for m in (0, 30)],
     })
 
+
 @login_required
 def zmiana_hasla(request):
     """Pozwala zalogowanemu pracownikowi zmienić własne hasło."""
@@ -1280,5 +1370,5 @@ def zmiana_hasla(request):
 
 
 def brak_dostepu(request, exception=None):
-    """Strona wyświetlana, gdy pracownik nie ma uprawnień (błąd 403)."""
+    """Strona 403 — brak uprawnień."""
     return render(request, 'konta/brak_dostepu.html', status=403)
