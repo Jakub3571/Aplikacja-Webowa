@@ -761,3 +761,57 @@ body {
     font-size: 1rem;
   }
 }
+
+/* === Moj tydzien — 7 dni w stylu Calendly === */
+
+.tydzien-uklad { max-width: 60rem; margin: 0 auto; }
+
+.tydzien-karta { max-width: none; }
+
+.tydzien-siatka {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.tydzien-naglowek-dnia {
+  margin: 0 0 0.5rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.tydzien-sloty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 22rem;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.tydzien-slot {
+  width: 100%;
+  padding: 0.4rem 0.2rem;
+  border: 1px solid var(--ramka);
+  border-radius: 0.5rem;
+  background: var(--tlo);
+  color: var(--tekst);
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.tydzien-slot:hover { border-color: var(--akcent); }
+
+.tydzien-slot.kafelek-zaznaczony {
+  background: #16a34a;
+  color: #fff;
+  border-color: #16a34a;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .tydzien-siatka { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

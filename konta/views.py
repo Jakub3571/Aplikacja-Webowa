@@ -198,8 +198,8 @@ def pulpit(request):
     """Strona startowa: szef widzi pulpit, pracownik od razu formularz ucznia."""
     if not czy_szef(request.user):
         if getattr(request.user, 'nauczyciel_id', None):
-            # nauczyciel: od razu swój kalendarz (dni/godziny zaznacza sam w kalendarzu)
-            return redirect('kalendarz_nauczyciela', nauczyciel_id=request.user.nauczyciel_id)
+            # nauczyciel: od razu swój tydzień w stylu Calendly (godziny dodaje plusikiem)
+            return redirect('moj_tydzien')
         return redirect('uczniowie')
     return render(request, 'konta/pulpit.html')
 
@@ -1410,6 +1410,73 @@ def kreator_dyspozycyjnosc(request):
         return redirect('kalendarz_nauczyciela', nauczyciel_id=nauczyciel.id)
     return render(request, 'konta/kreator_dyspozycyjnosc.html', {'form': form})
 
+@login_required
+def moj_tydzien(request):
+    """Widok tygodnia nauczyciela w stylu Calendly: 7 dni obok siebie,
+    godziny dodaje się pojedynczym kliknięciem, przerwa 5/10/15/30 min pigułkami."""
+    nauczyciel_id = getattr(request.user, 'nauczyciel_id', None)
+    if not nauczyciel_id:
+        raise PermissionDenied
+    nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
+
+    dzis = date.today()
+    try:
+        start = date(
+            int(request.GET.get('rok') or dzis.year),
+            int(request.GET.get('miesiac') or dzis.month),
+            int(request.GET.get('dzien') or dzis.day),
+        )
+    except ValueError:
+        start = dzis
+    # tydzień zaczyna się w poniedziałek (jak w Calendly)
+    poniedzialek = start - timedelta(days=start.weekday())
+    dni_tygodnia = [poniedzialek + timedelta(days=i) for i in range(7)]
+
+    poprzedni = poniedzialek - timedelta(days=7)
+    nastepny = poniedzialek + timedelta(days=7)
+
+    # zaznaczone godziny i przerwy dla całego tygodnia
+    zaznaczone = set()
+    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__in=dni_tygodnia):
+        start_slot = datetime.combine(termin.data_od, termin.godzina_od)
+        koniec_slot = datetime.combine(termin.data_od, termin.godzina_do)
+        while start_slot < koniec_slot:
+            zaznaczone.add((termin.data_od, start_slot.strftime('%H:%M')))
+            start_slot += timedelta(minutes=30)
+
+    przerwy = {}
+    for wpis in PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data__in=dni_tygodnia):
+        przerwy[wpis.data] = wpis.minuty
+
+    godziny = [f'{h:02d}:{m:02d}' for h in range(6, 21) for m in (0, 30)]
+
+    dni = []
+    for dzien in dni_tygodnia:
+        dni.append({
+            'data': dzien,
+            'przerwa': przerwy.get(dzien, 0),
+        })
+
+    pary_zaznaczone = []
+    for dzien in dni_tygodnia:
+        for godzina in godziny:
+            if (dzien, godzina) in zaznaczone:
+                pary_zaznaczone.append((dzien, godzina))
+
+    return render(request, 'konta/moj_tydzien.html', {
+        'nauczyciel': nauczyciel,
+        'dni': dni,
+        'godziny': godziny,
+        'pary_zaznaczone': pary_zaznaczone,
+        'poprzedni_tydzien': poprzedni,
+        'nastepny_tydzien': nastepny,
+    })
+
+
+@login_required
+def kreator_dyspozycyjnosc(request):
+    """Stary kreator formularzowy — zastąpiony widokiem tygodnia (styl Calendly)."""
+    return redirect('moj_tydzien')
 
 def wyslij_zaproszenie_meet(uczen):
     """Wysyła e-mail do rodzica z linkiem do lekcji cyklicznej na Google Meet."""

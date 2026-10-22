@@ -1,0 +1,176 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Mój tydzień — Panel pracowniczy{% endblock %}
+
+{% block panel %}
+<div class="tydzien-uklad">
+  <section class="karta tydzien-karta">
+    <div class="kalendarz-naglowek">
+      <a class="strzalka" href="?rok={{ poprzedni_tydzien.year }}&miesiac={{ poprzedni_tydzien.month }}&dzien={{ poprzedni_tydzien.day }}">&larr;</a>
+      <h2>🗓 Mój tydzień: {{ poprzedni_tydzien|date:"d.m" }} – {{ nastepny_tydzien|date:"d.m.Y" }}</h2>
+      <a class="strzalka" href="?rok={{ nastepny_tydzien.year }}&miesiac={{ nastepny_tydzien.month }}&dzien={{ nastepny_tydzien.day }}">&rarr;</a>
+    </div>
+    <p class="podpowiedz">
+      Dodawaj godziny pojedynczo — kliknij slot, żeby go włączyć (＋), kliknij ponownie, żeby wyłączyć.
+      Godziny zapisują się od razu, jak w Calendly. Dni i godziny zmienisz strzałkami u góry.
+    </p>
+
+    <div class="przerwa-form">
+      <h3>Przerwa między zajęciami (ten tydzień)</h3>
+      <p class="podpowiedz">
+        Zalecamy 5 lub 10 minut na przełączenie się między lekcjami.
+        Przyciski poniżej ustawiają przerwę na cały tydzień.
+      </p>
+      <div class="przerwa-opcje" id="przerwa-opcje-tydzien">
+        <button type="button" class="przerwa-opcja przycisk-kalendarz" data-przerwa="0">bez przerwy</button>
+        <button type="button" class="przerwa-opcja przycisk-kalendarz" data-przerwa="5">5 min</button>
+        <button type="button" class="przerwa-opcja przycisk-kalendarz" data-przerwa="10">10 min</button>
+        <button type="button" class="przerwa-opcja przycisk-kalendarz" data-przerwa="15">15 min</button>
+        <button type="button" class="przerwa-opcja przycisk-kalendarz" data-przerwa="30">30 min</button>
+      </div>
+    </div>
+
+    <div class="tydzien-siatka" id="tydzien-siatka"
+         data-url="{% url 'kalendarz_dane' nauczyciel.id %}">
+      {% for dzien in dni %}
+      <div class="tydzien-dzien" data-dzien="{{ dzien.data|date:'Y-m-d' }}">
+        <h3 class="tydzien-naglowek-dnia">{{ dzien.data|date:"D" }}<br>{{ dzien.data|date:"d.m" }}</h3>
+        <div class="tydzien-sloty">
+          {% for godzina in godziny %}
+          <button
+            type="button"
+            class="kafelek tydzien-slot"
+            data-dzien="{{ dzien.data|date:'Y-m-d' }}"
+            data-godzina="{{ godzina }}"
+          >{{ godzina }}</button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <p class="kalendarz-komunikat" id="tydzien-komunikat"></p>
+
+    <div class="start-link-do-kalendarza">
+      <h3>📲 Udostępnij swój kalendarz</h3>
+      <p class="podpowiedz">Skopiuj link i wyślij na grupę na WhatsApp — jak „Copy link" w Calendly.</p>
+      <div class="pole-linku">
+        <input type="text" id="link-kalendarza" readonly
+               value="{{ request.scheme }}://{{ request.get_host }}{% url 'kalendarz_nauczyciela' nauczyciel.id %}" />
+        <button type="button" class="przycisk-kalendarz" id="kopiuj-link">📋 Skopiuj link</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  (function () {
+    var siatka = document.getElementById('tydzien-siatka');
+    var komunikat = document.getElementById('tydzien-komunikat');
+    if (!siatka) return;
+    var url = siatka.dataset.url;
+
+    var zaznaczone = [];
+    {% for dzien, godzina in pary_zaznaczone %}
+    zaznaczone.push('{{ dzien|date:"Y-m-d" }}|{{ godzina }}');
+    {% endfor %}
+
+    function odswiezWidok() {
+      siatka.querySelectorAll('.tydzien-slot').forEach(function (przycisk) {
+        var klucz = przycisk.dataset.dzien + '|' + przycisk.dataset.godzina;
+        przycisk.classList.toggle('kafelek-zaznaczony', zaznaczone.indexOf(klucz) !== -1);
+      });
+    }
+    odswiezWidok();
+
+    function tokenCsrf() {
+      var ciastka = document.cookie.split(';');
+      for (var i = 0; i < ciastka.length; i++) {
+        var czesc = ciastka[i].trim();
+        if (czesc.indexOf('csrftoken=') === 0) return czesc.substring('csrftoken='.length);
+      }
+      return '';
+    }
+
+    siatka.addEventListener('click', function (zdarzenie) {
+      var przycisk = zdarzenie.target.closest('.tydzien-slot');
+      if (!przycisk) return;
+      var klucz = przycisk.dataset.dzien + '|' + przycisk.dataset.godzina;
+      var bylobyZaznaczone = zaznaczone.indexOf(klucz) === -1;
+      var dane = new FormData();
+      dane.append('dzien', przycisk.dataset.dzien);
+      dane.append('godzina', przycisk.dataset.godzina);
+      dane.append('akcja', 'przelacz_godzine');
+      fetch(url, {
+        method: 'POST',
+        body: dane,
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf() },
+      })
+        .then(function (odp) { return odp.json(); })
+        .then(function (wynik) {
+          if (wynik.blad) { komunikat.textContent = wynik.blad; return; }
+          if (bylobyZaznaczone) zaznaczone.push(klucz); else {
+            var idx = zaznaczone.indexOf(klucz);
+            if (idx !== -1) zaznaczone.splice(idx, 1);
+          }
+          komunikat.textContent = wynik.komunikat || '';
+          odswiezWidok();
+        })
+        .catch(function () { komunikat.textContent = 'Błąd połączenia — spróbuj ponownie.'; });
+    });
+
+    var opcjePrzerwy = document.getElementById('przerwa-opcje-tydzien');
+    if (opcjePrzerwy) {
+      opcjePrzerwy.addEventListener('click', function (zdarzenie) {
+        var przycisk = zdarzenie.target.closest('[data-przerwa]');
+        if (!przycisk) return;
+        var przerwa = przycisk.dataset.przerwa;
+        var dni = [];
+        siatka.querySelectorAll('.tydzien-dzien').forEach(function (kol) {
+          dni.push(kol.dataset.dzien);
+        });
+        var zakonczone = 0;
+        dni.forEach(function (dzien) {
+          var dane = new FormData();
+          dane.append('dzien', dzien);
+          dane.append('akcja', 'zapisz_przerwe');
+          dane.append('przerwa', przerwa);
+          fetch(url, {
+            method: 'POST',
+            body: dane,
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf() },
+          })
+            .then(function (odp) { return odp.json(); })
+            .then(function (wynik) {
+              zakonczone += 1;
+              if (zakonczone === dni.length) {
+                komunikat.textContent = przerwa === '0'
+                  ? 'Przerwa usunięta na cały tydzień.'
+                  : 'Przerwa ' + przerwa + ' min ustawiona na cały tydzień.';
+              }
+            });
+        });
+      });
+    }
+
+    var przyciskKopiuj = document.getElementById('kopiuj-link');
+    var poleLinku = document.getElementById('link-kalendarza');
+    if (przyciskKopiuj && poleLinku) {
+      przyciskKopiuj.addEventListener('click', function () {
+        poleLinku.select();
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) {}
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(poleLinku.value).then(function () {
+            przyciskKopiuj.textContent = '✔ Skopiowano!';
+            setTimeout(function () { przyciskKopiuj.textContent = '📋 Skopiuj link'; }, 2000);
+          }).catch(function () {});
+        } else if (ok) {
+          przyciskKopiuj.textContent = '✔ Skopiowano!';
+          setTimeout(function () { przyciskKopiuj.textContent = '📋 Skopiuj link'; }, 2000);
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}
