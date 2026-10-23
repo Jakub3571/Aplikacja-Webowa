@@ -148,7 +148,7 @@ class DodawanieUczniaTests(TestCase):
         self.client.force_login(self.user)
         r = self.client.post(
             '/uczniowie/',
-            {'przedmiot': 'matematyka', 'poziom': 'szkoła średnia - rozszerzenie',
+            {'przedmiot': 'matematyka', 'poziom': 'srednia rozszerzenie + studia',
              'wybierz_przedmiot': '1'},
             follow=True,
         )
@@ -167,7 +167,7 @@ class DodawanieUczniaTests(TestCase):
         self.client.force_login(self.user)
         r = self.client.post(
             '/uczniowie/',
-            {'przedmiot': 'matematyka', 'poziom': 'szkoła średnia - rozszerzenie',
+            {'przedmiot': 'matematyka', 'poziom': 'srednia rozszerzenie + studia',
              'wybierz_przedmiot': '1'},
             follow=True,
         )
