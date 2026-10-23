@@ -106,7 +106,7 @@ class DodawanieUczniaTests(TestCase):
             imie='Jan', nazwisko='Kowalski', email='jan@k.pl',
         )
         PrzedmiotNauczyciela.objects.create(
-            nauczyciel=self.nauczyciel, przedmiot='matematyka', poziom='rozszerzenie',
+            nauczyciel=self.nauczyciel, przedmiot='matematyka', poziom='srednia rozszerzenie + studia',
         )
 
     def test_formularz_ucznia_zapisuje_do_bazy(self):
@@ -121,7 +121,7 @@ class DodawanieUczniaTests(TestCase):
             'data_pierwszej_lekcji': '2026-10-05',
             'godzina_pierwszej_lekcji': '17:00',
             'przedmiot': 'matematyka',
-            'poziom': 'szkoła średnia - rozszerzenie',
+            'poziom': 'srednia rozszerzenie + studia',
             'imie_ucznia': 'Kasia',
             'nazwisko_rodzica': 'Nowak',
             'rodzic': 'Ewa Nowak',
@@ -143,7 +143,7 @@ class DodawanieUczniaTests(TestCase):
             imie='Anna', nazwisko='Nowak', email='anna@n.pl',
         )
         PrzedmiotNauczyciela.objects.create(
-            nauczyciel=inny, przedmiot='angielski', poziom='podstawa',
+            nauczyciel=inny, przedmiot='angielski', poziom='srednia podstawa',
         )
         self.client.force_login(self.user)
         r = self.client.post(
@@ -162,7 +162,7 @@ class DodawanieUczniaTests(TestCase):
             imie='Ola', nazwisko='Wiśniewska', email='ola@n.pl',
         )
         PrzedmiotNauczyciela.objects.create(
-            nauczyciel=podstawowy, przedmiot='matematyka', poziom='podstawa',
+            nauczyciel=podstawowy, przedmiot='matematyka', poziom='srednia podstawa',
         )
         self.client.force_login(self.user)
         r = self.client.post(
@@ -184,7 +184,7 @@ class NauczycieleTests(TestCase):
             imie='Jan', nazwisko='Kowalski', email='jan@k.pl',
         )
         PrzedmiotNauczyciela.objects.create(
-            nauczyciel=self.nauczyciel, przedmiot='matematyka', poziom='podstawa',
+            nauczyciel=self.nauczyciel, przedmiot='matematyka', poziom='srednia podstawa',
         )
 
     def test_kalendarz_przelnacza_kafelek(self):
@@ -381,7 +381,7 @@ class KontoNauczycielaTests(TestCase):
             'haslo2': 'M0taneHaslo!',
             'rola': 'nauczyciel',
             'w_przedmiot': ['matematyka'],
-            'w_poziom': ['podstawa'],
+            'w_poziom': ['srednia podstawa'],
             'w_stawka': ['50'],
         }
         r = self.client.post('/uzytkownicy/', dane, follow=True)
@@ -452,7 +452,7 @@ class KreatorDyspozycyjnoscTests(TestCase):
             'haslo2': 'M0taneHaslo!',
             'rola': 'nauczyciel',
             'w_przedmiot': ['matematyka'],
-            'w_poziom': ['podstawa'],
+            'w_poziom': ['srednia podstawa'],
             'w_stawka': ['50'],
         }
         self.client.post('/uzytkownicy/', dane, follow=True)
@@ -524,7 +524,7 @@ class LekcjeCykliczneTests(TestCase):
         self.pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
         self.uczen = Uczen.objects.create(
             pierwsza_lekcja='2026-10-06T17:00',
-            przedmiot='matematyka', poziom='szkoła średnia - podstawa',
+            przedmiot='matematyka', poziom='srednia podstawa',
             imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
             telefon_glowny='600100200', email_glowny='ewa@f.pl',
             telefon_dodatkowy='600300400', email_dodatkowy='r@f.pl',
@@ -536,7 +536,7 @@ class LekcjeCykliczneTests(TestCase):
     def test_pracownik_widzi_tylko_swoich_uczniow(self):
         Uczen.objects.create(
             pierwsza_lekcja='2026-10-07T17:00',
-            przedmiot='fizyka', poziom='szkoła średnia - podstawa',
+            przedmiot='fizyka', poziom='srednia podstawa',
             imie_ucznia='Ola', nazwisko_rodzica='Wiśniewska', rodzic='Ala Wiśniewska',
             telefon_glowny='600100200', email_glowny='ola@f.pl',
             telefon_dodatkowy='600300400', email_dodatkowy='r@f.pl',
@@ -582,7 +582,7 @@ class LekcjeCykliczneTests(TestCase):
     def test_pracownik_nie_umowi_cyklicznej_cudzemu_uczniowi(self):
         obcy = Uczen.objects.create(
             pierwsza_lekcja='2026-10-07T17:00',
-            przedmiot='fizyka', poziom='szkoła średnia - podstawa',
+            przedmiot='fizyka', poziom='srednia podstawa',
             imie_ucznia='Ola', nazwisko_rodzica='Wiśniewska', rodzic='Ala Wiśniewska',
             telefon_glowny='600100200', email_glowny='ola@f.pl',
             telefon_dodatkowy='600300400', email_dodatkowy='r@f.pl',
@@ -616,7 +616,7 @@ class NauczycielTylkoKalendarzTests(TestCase):
             'haslo2': 'M0taneHaslo!',
             'rola': 'nauczyciel',
             'w_przedmiot': ['matematyka'],
-            'w_poziom': ['podstawa'],
+            'w_poziom': ['srednia podstawa'],
             'w_stawka': ['50'],
         }
         self.client.post('/uzytkownicy/', dane, follow=True)
@@ -657,15 +657,15 @@ class StawkiPrzedmiotowTests(TestCase):
             'haslo2': 'M0taneHaslo!',
             'rola': 'nauczyciel',
             'w_przedmiot': ['angielski', 'matematyka'],
-            'w_poziom': ['podstawa', 'rozszerzenie'],
+            'w_poziom': ['srednia podstawa', 'srednia rozszerzenie + studia'],
             'w_stawka': ['40', '50'],
         }
         r = self.client.post('/uzytkownicy/', dane, follow=True)
         self.assertContains(r, 'został dodany')
         user = Pracownik.objects.get(username='a.nowak')
         wiersze = {(p.przedmiot, p.poziom): p for p in user.nauczyciel.przedmioty.all()}
-        self.assertEqual(str(wiersze[('angielski', 'podstawa')].stawka), '40.00')
-        self.assertEqual(str(wiersze[('matematyka', 'rozszerzenie')].stawka), '50.00')
+        self.assertEqual(str(wiersze[('angielski', 'srednia podstawa')].stawka), '40.00')
+        self.assertEqual(str(wiersze[('matematyka', 'srednia rozszerzenie + studia')].stawka), '50.00')
 
     def test_nauczyciel_bez_przedmiotu_odrzucony(self):
         self.client.force_login(self.admin)
@@ -689,7 +689,7 @@ class StaleLekcjeMultiSlotTests(TestCase):
         self.nauczyciel = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='j@n.pl')
         self.uczen = Uczen.objects.create(
             pierwsza_lekcja='2026-10-06T17:00',
-            przedmiot='matematyka', poziom='szkoła średnia - podstawa',
+            przedmiot='matematyka', poziom='srednia podstawa',
             imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
             telefon_glowny='600100200', email_glowny='ewa@f.pl',
             telefon_dodatkowy='600300400', email_dodatkowy='r@f.pl',

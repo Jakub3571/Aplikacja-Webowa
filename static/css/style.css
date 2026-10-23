@@ -864,3 +864,114 @@ body {
   border-color: #dc2626;
   background: #dc2626;
 }
+
+/* === Moj tydzien — dni w wierszach z plusikiem zakresu (styl Calendly) === */
+
+.dzien-wiersz {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--ramka);
+  border-radius: 0.6rem;
+  margin-bottom: 0.5rem;
+  background: var(--tlo);
+}
+
+.dzien-wiersz:has(.zakres-pigulka) {
+  border-color: #16a34a;
+  background: color-mix(in srgb, #16a34a 8%, var(--tlo));
+}
+
+.dzien-nazwa {
+  display: flex;
+  flex-direction: column;
+  min-width: 5.5rem;
+}
+
+.dzien-data { font-size: 0.8rem; opacity: 0.7; }
+
+.dzien-zakresy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex: 1;
+  align-items: center;
+}
+
+.zakres-pigulka {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.zakres-usun {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0;
+}
+
+.zakres-usun:hover { opacity: 0.7; }
+
+.zakres-pusty {
+  opacity: 0.5;
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+.zakres-dodaj {
+  font-size: 1rem !important;
+  min-width: 2.2rem;
+}
+
+.zakres-okienko {
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border: 2px solid var(--akcent);
+  border-radius: 0.75rem;
+  background: var(--karta);
+}
+
+.zakres-pola {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.zakres-pola label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.zakres-pola select {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--ramka);
+  border-radius: 0.5rem;
+  background: var(--tlo);
+  color: var(--tekst);
+  font-family: inherit;
+}
+
+.zakres-myslnik { font-weight: 700; opacity: 0.6; }
+
+@media (max-width: 900px) {
+  .dzien-wiersz { flex-wrap: wrap; }
+  .dzien-nazwa { flex: 1 1 100%; }
+}
+
+/* Okienko zakresu wewnatrz wiersza dnia */
+.dzien-wiersz { flex-wrap: wrap; }
+.zakres-okienko { margin-top: 0.75rem; }

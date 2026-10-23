@@ -79,8 +79,9 @@ class Uczen(models.Model):
 
 
 POZIOMY_NAUCZYCIELA = [
-    ('podstawa', 'podstawa'),
-    ('rozszerzenie', 'rozszerzenie'),
+    ('podstawowka', 'podstawówka'),
+    ('srednia podstawa', 'średnia podstawa'),
+    ('srednia rozszerzenie + studia', 'srednia rozszerzenie + studia'),
 ]
 
 
@@ -118,10 +119,12 @@ class Nauczyciel(models.Model):
         """Stawka dla przedmiotu i poziomu ucznia (z kart przedmiotów);
         jeśli nie znajdzie, fallback do ogólnej stawki nauczyciela."""
         poziom_nauczyciela = {
-            'szkoła średnia - podstawa': 'podstawa',
-            'szkoła średnia - rozszerzenie': 'rozszerzenie',
-            'studia': 'rozszerzenie',
-        }.get(poziom_ucznia)
+            'podstawówka': 'podstawówka',
+            'srednia podstawa': 'srednia podstawa',
+            'srednia rozszerzenie + studia': 'srednia rozszerzenie + studia',
+            'srednia rozszerzenie': 'srednia rozszerzenie + studia',
+            'studia': 'srednia rozszerzenie + studia',
+        }.get(poziom_ucznia, poziom_ucznia)
         for p in self.przedmioty.all():
             if p.przedmiot == przedmiot and p.poziom == poziom_nauczyciela:
                 return p.stawka

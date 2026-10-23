@@ -22,17 +22,17 @@ WYBIERZ_PRZEDMIOT = [('', '— wybierz przedmiot —')] + list(PRZEDMIOTY)
 
 POZIOMY = [
     ('', '— wybierz poziom —'),
-    ('szkoła średnia - podstawa', 'szkoła średnia - podstawa'),
-    ('szkoła średnia - rozszerzenie', 'szkoła średnia - rozszerzenie'),
-    ('studia', 'studia'),
+    ('podstawówka', 'podstawówka'),
+    ('srednia podstawa', 'średnia podstawa'),
+    ('srednia rozszerzenie + studia', 'średnia rozszerzenie + studia'),
 ]
 
 # Mapowanie poziomu ucznia na poziom nauczyciela: poziom "szkoła średnia - podstawa"
 # wymaga nauczyciela z poziomem "podstawa", a "rozszerzenie" oraz "studia" — "rozszerzenie".
 POZIOM_UCZEN_NA_NAUCZYCIELA = {
-    'szkoła średnia - podstawa': 'podstawa',
-    'szkoła średnia - rozszerzenie': 'rozszerzenie',
-    'studia': 'rozszerzenie',
+    'podstawówka': 'podstawówka',
+    'srednia podstawa': 'srednia podstawa',
+    'srednia rozszerzenie + studia': 'srednia rozszerzenie + studia',
 }
 
 GODZINY_LEKCJI = [
@@ -121,9 +121,9 @@ class FormularzUcznia(forms.ModelForm):
         if przedmiot:
             wpisane_przedmioty = PrzedmiotNauczyciela.objects.filter(przedmiot=przedmiot)
             if poziom:
-                poziom_nauczyciela = POZIOM_UCZEN_NA_NAUCZYCIELA.get(poziom)
-                if poziom_nauczyciela:
-                    wpisane_przedmioty = wpisane_przedmioty.filter(poziom=poziom_nauczyciela)
+                # nowy poziom używany 1:1; stare wartości przetłumaczone słownikiem
+                poziom_nauczyciela = POZIOM_UCZEN_NA_NAUCZYCIELA.get(poziom, poziom)
+                wpisane_przedmioty = wpisane_przedmioty.filter(poziom=poziom_nauczyciela)
             nauczyciele = (
                 Nauczyciel.objects
                 .filter(przedmioty__in=wpisane_przedmioty, aktywny=True)
@@ -192,7 +192,7 @@ class FormularzUzytkownika(forms.ModelForm):
             for idx, przedmiot in enumerate(przedmioty):
                 if not przedmiot:
                     continue
-                poziom = poziomy[idx] if idx < len(poziomy) else 'podstawa'
+                poziom = poziomy[idx] if idx < len(poziomy) else 'podstawówka'
                 stawka = stawki[idx] if idx < len(stawki) else '0'
                 self.wiersze_przedmiotow.append({
                     'przedmiot': przedmiot,
@@ -200,7 +200,7 @@ class FormularzUzytkownika(forms.ModelForm):
                     'stawka': stawka,
                 })
         if not self.wiersze_przedmiotow:
-            self.wiersze_przedmiotow = [{'przedmiot': '', 'poziom': 'podstawa', 'stawka': ''}]
+            self.wiersze_przedmiotow = [{'przedmiot': '', 'poziom': 'podstawówka', 'stawka': ''}]
         self.fields_przedmioty = list(PRZEDMIOTY)
         self.fields['email'].required = False
 

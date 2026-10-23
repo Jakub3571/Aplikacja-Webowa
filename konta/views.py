@@ -299,10 +299,12 @@ def korepetytorzy_dane(request):
     if not przedmiot or not poziom:
         return JsonResponse({'korepetytorzy': []})
     poziom_nauczyciela = {
-        'szkoła średnia - podstawa': 'podstawa',
-        'szkoła średnia - rozszerzenie': 'rozszerzenie',
-        'studia': 'rozszerzenie',
-    }.get(poziom)
+        'podstawówka': 'podstawówka',
+        'srednia podstawa': 'srednia podstawa',
+        'srednia rozszerzenie + studia': 'srednia rozszerzenie + studia',
+        'srednia rozszerzenie': 'srednia rozszerzenie + studia',
+        'studia': 'srednia rozszerzenie + studia',
+    }.get(poziom, poziom)
 
     dzien = None
     godzina = None
@@ -1024,6 +1026,19 @@ def kalendarz_dane(request, nauczyciel_id):
         else:
             PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien_data).delete()
         komunikat = f'Plan dnia {zrodlo:%d.%m.%Y} wklejono na {dzien_data:%d.%m.%Y}.'
+    elif akcja == 'usun_zakres':
+        try:
+            start = datetime.strptime(request.POST.get('od', ''), '%H:%M').time()
+            koniec_zakresu = datetime.strptime(request.POST.get('do', ''), '%H:%M').time()
+        except ValueError:
+            return JsonResponse({'blad': 'Nieprawidłowy zakres godzin.'}, status=400)
+        Dostepnosc.objects.filter(
+            nauczyciel=nauczyciel,
+            data_od=dzien_data,
+            godzina_od__gte=start,
+            godzina_do__lte=koniec_zakresu,
+        ).delete()
+        komunikat = f'Godziny {start:%H:%M}–{koniec_zakresu:%H:%M} usunięto.'
     elif akcja == 'wyczysc_dzien':
         usuniete = Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).count()
         Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).delete()
@@ -1491,39 +1506,43 @@ def moj_tydzien(request):
     poprzedni = poniedzialek - timedelta(days=7)
     nastepny = poniedzialek + timedelta(days=7)
 
-    # zaznaczone godziny i przerwy dla całego tygodnia
-    zaznaczone = set()
-    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__in=dni_tygodnia):
-        start_slot = datetime.combine(termin.data_od, termin.godzina_od)
-        koniec_slot = datetime.combine(termin.data_od, termin.godzina_do)
-        while start_slot < koniec_slot:
-            zaznaczone.add((termin.data_od, start_slot.strftime('%H:%M')))
-            start_slot += timedelta(minutes=30)
+    # zakresy dostępności pogrupowane per dzień (scalamy sąsiednie sloty w jeden zakres)
+    sloty_dnia = {}
+    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__in=dni_tygodnia).order_by('data_od', 'godzina_od'):
+        sloty_dnia.setdefault(termin.data_od, []).append(termin)
 
-    przerwy = {}
+    dzisiaj = date.today()
+    przerwy_dni = {}
     for wpis in PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data__in=dni_tygodnia):
-        przerwy[wpis.data] = wpis.minuty
-
-    godziny = [f'{h:02d}:{m:02d}' for h in range(6, 21) for m in (0, 30)]
+        przerwy_dni[wpis.data] = wpis.minuty
 
     dni = []
     for dzien in dni_tygodnia:
+        zakresy = []
+        aktualny = None
+        for termin in sloty_dnia.get(dzien, []):
+            od = termin.godzina_od.strftime('%H:%M')
+            do_ = termin.godzina_do.strftime('%H:%M')
+            if aktualny and aktualny['do'] == od:
+                aktualny['do'] = do_
+            else:
+                if aktualny:
+                    zakresy.append(aktualny)
+                aktualny = {'od': od, 'do': do_}
+        if aktualny:
+            zakresy.append(aktualny)
         dni.append({
             'data': dzien,
-            'przerwa': przerwy.get(dzien, 0),
+            'zakresy': zakresy,
+            'dzisiaj': dzien == dzisiaj,
         })
 
-    pary_zaznaczone = []
-    for dzien in dni_tygodnia:
-        for godzina in godziny:
-            if (dzien, godzina) in zaznaczone:
-                pary_zaznaczone.append((dzien, godzina))
+    godziny = [f'{h:02d}:{m:02d}' for h in range(6, 22) for m in (0, 30)]
 
     return render(request, 'konta/moj_tydzien.html', {
         'nauczyciel': nauczyciel,
         'dni': dni,
         'godziny': godziny,
-        'pary_zaznaczone': pary_zaznaczone,
         'poprzedni_tydzien': poprzedni,
         'nastepny_tydzien': nastepny,
     })
