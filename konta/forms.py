@@ -86,6 +86,7 @@ class FormularzUcznia(forms.ModelForm):
     godzina_pierwszej_lekcji = forms.ChoiceField(
         label='godzina 1. lekcji',
         choices=GODZINY_LEKCJI,
+        help_text='Godziny pojawiają się po wybraniu daty, przedmiotu i poziomu — to wolne terminy korepetytorów.',
     )
 
     class Meta:
@@ -117,6 +118,10 @@ class FormularzUcznia(forms.ModelForm):
 
     def __init__(self, *args, przedmiot=None, poziom=None, **kwargs):
         super().__init__(*args, **kwargs)
+        # przy GET: godzina to sam placeholder (JS wypełni po wyborze daty/przedmiotu/poziomu);
+        # przy POST: pełna siatka 5-min — dostępność i tak pilnuje widok (nauczyciel_wolny_o)
+        if not self.is_bound:
+            self.fields['godzina_pierwszej_lekcji'].choices = [('', '— najpierw data, przedmiot i poziom —')]
         nauczyciele = Nauczyciel.objects.none()
         if przedmiot:
             wpisane_przedmioty = PrzedmiotNauczyciela.objects.filter(przedmiot=przedmiot)
@@ -140,7 +145,7 @@ class FormularzUcznia(forms.ModelForm):
                 )
                 for n in nauczyciele
             ],
-            help_text='Nauczyciel prowadzący lekcje — lista zależna od wybranego przedmiotu i poziomu',
+            help_text='Lista korepetytorów pojawia się po wybraniu daty, przedmiotu, poziomu i godziny — tylko dostępni o wybranej godzinie.',
         )
         for nazwa, pole in self.fields.items():
             pole.required = True
@@ -164,6 +169,7 @@ class FormularzUzytkownika(forms.ModelForm):
         label='rola',
         choices=[
             ('pracownik', 'osoba umawiająca'),
+            ('koordynator', 'koordynator (edycja, bez usuwania)'),
             ('nauczyciel', 'korepetytor'),
             ('admin', 'admin (pełny dostęp)'),
         ],

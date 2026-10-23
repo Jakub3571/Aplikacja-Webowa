@@ -975,3 +975,12 @@ body {
 /* Okienko zakresu wewnatrz wiersza dnia */
 .dzien-wiersz { flex-wrap: wrap; }
 .zakres-okienko { margin-top: 0.75rem; }
+
+.krok-info {
+  background: color-mix(in srgb, var(--akcent) 8%, var(--karta));
+  border-left: 4px solid var(--akcent);
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}

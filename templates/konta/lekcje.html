@@ -48,7 +48,9 @@
             <td>
               <a class="ikona-kalendarza" href="{% url 'edytuj_ucznia' uczen.id %}" title="Edytuj dane ucznia">✏️</a>
               <a class="ikona-kalendarza" href="{% url 'zakoncz_ucznia' uczen.id %}" title="Zakończ współpracę (uczeń trafi do archiwum)">📦</a>
+              {% if czy_szef %}
               <a class="ikona-kalendarza" href="{% url 'usun_ucznia' uczen.id %}" title="Usuń ucznia">🗑</a>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}

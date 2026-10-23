@@ -39,7 +39,9 @@
             <td>{{ uczen.dodano|date:"d.m.Y H:i" }}</td>
             <td>
               <a class="przycisk-umowa umowa-tak" href="{% url 'przywroc_ucznia' uczen.id %}" title="Przywróć ucznia do listy aktywnych">↩ przywróć</a>
+              {% if czy_szef %}
               <a class="ikona-kalendarza" href="{% url 'usun_ucznia' uczen.id %}" title="Usuń ucznia na stałe">🗑</a>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}

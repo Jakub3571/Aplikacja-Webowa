@@ -19,6 +19,12 @@ def czy_szef(u):
     """Prawdziwy szef: superuser LUB konto o nazwie 'Admin'."""
     return bool(u.is_authenticated and (u.is_superuser or u.username.strip().lower() == 'admin'))
 
+def czy_koordynator(u):
+    """Koordynator: konto o nazwie zaczynającej się od 'koordynator'.
+    Widzi wszystkich uczniów, może edytować, ale nie może usuwać."""
+    if not u.is_authenticated:
+        return False
+    return u.username.strip().lower().startswith('koordynator')
 
 def tylko_szef(widok):
     """Puszcza dalej tylko superusera (szefa); reszta dostaje stronę „brak dostępu"."""
@@ -390,7 +396,7 @@ def uczniowie(request):
     Konto nauczyciela nie ma tu wstępu (widzi tylko swój kalendarz)."""
     if getattr(request.user, 'nauczyciel_id', None):
         raise PermissionDenied
-    if czy_szef(request.user):
+    if czy_szef(request.user) or czy_koordynator(request.user):
         uczniowie_lista = list(Uczen.objects.all())
     else:
         uczniowie_lista = list(Uczen.objects.filter(umowil=request.user))
@@ -447,7 +453,7 @@ def uczniowie(request):
 def edytuj_ucznia(request, uczen_id):
     """Edycja danych ucznia: admin może edytować każdego, pracownik — tylko swoich."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
-    if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
+    if not czy_szef(request.user) and not czy_koordynator(request.user) and uczen.umowil_id != request.user.id:
         raise PermissionDenied
 
     if request.method == 'POST':
@@ -485,9 +491,10 @@ def edytuj_ucznia(request, uczen_id):
 
 @login_required
 def usun_ucznia(request, uczen_id):
-    """Usuwa ucznia wraz z jego lekcjami i zwalnia zablokowane godziny u korepetytora."""
+    """Usuwa ucznia wraz z jego lekcjami i zwalnia zablokowane godziny u korepetytora.
+    TYLKO szef — koordynatorzy i osoby umawiające mogą edytować, ale nie usuwać."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
-    if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
+    if not czy_szef(request.user):
         raise PermissionDenied
     if request.method == 'POST':
         nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
@@ -511,7 +518,7 @@ def archiwum_uczniow(request):
     """Zakładka archiwum: uczniowie ze zakończoną współpracą, z możliwością przywrócenia."""
     if getattr(request.user, 'nauczyciel_id', None):
         raise PermissionDenied
-    if czy_szef(request.user):
+    if czy_szef(request.user) or czy_koordynator(request.user):
         uczniowie_lista = list(Uczen.objects.filter(zakonczona=True))
     else:
         uczniowie_lista = list(Uczen.objects.filter(umowil=request.user, zakonczona=True))
@@ -540,6 +547,7 @@ def archiwum_uczniow(request):
         'korepetytorzy': korepetytorzy_lista,
         'pracownicy': pracownicy_lista,
         'fraza': (request.GET.get('szukaj') or '').strip(),
+        'czy_szef': czy_szef(request.user),
     })
 
 
@@ -1176,7 +1184,7 @@ def lekcje(request):
     Konto nauczyciela nie ma tu wstępu (widzi tylko swój kalendarz)."""
     if getattr(request.user, 'nauczyciel_id', None):
         raise PermissionDenied
-    if czy_szef(request.user):
+    if czy_szef(request.user) or czy_koordynator(request.user):
         uczniowie_lista = list(Uczen.objects.filter(zakonczona=False))
     else:
         uczniowie_lista = list(Uczen.objects.filter(umowil=request.user, zakonczona=False))
@@ -1202,13 +1210,14 @@ def lekcje(request):
     return render(request, 'konta/lekcje.html', {
         'uczniowie': uczniowie_lista,
         'fraza': (request.GET.get('szukaj') or '').strip(),
+        'czy_szef': czy_szef(request.user),
     })
 
 @login_required
 def kalendarz_lekcji(request, uczen_id):
     """Kalendarz lekcji ucznia: miesiąc, dni i kafelki godzin do wpisywania lekcji."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
-    if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
+    if not czy_szef(request.user) and not czy_koordynator(request.user) and uczen.umowil_id != request.user.id:
         raise PermissionDenied
     dzisiaj = date.today()
 

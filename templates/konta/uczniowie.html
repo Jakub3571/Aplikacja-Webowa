@@ -18,19 +18,22 @@
     {% endif %}
     <form method="post" class="formularz" id="formularz-ucznia">
       {% csrf_token %}
-      <label for="{{ form.data_pierwszej_lekcji.id_for_label }}">Data 1. lekcji <span class="gwiazdka">*</span></label>
+      <p class="krok-info">Krok 1: wybierz datę → Krok 2: przedmiot → Krok 3: poziom → Krok 4: godzina (wolne terminy) → Krok 5: korepetytor.</p>
+
+      <label for="{{ form.data_pierwszej_lekcji.id_for_label }}">Krok 1 — data 1. lekcji <span class="gwiazdka">*</span></label>
       {{ form.data_pierwszej_lekcji }}
 
-      <label for="{{ form.godzina_pierwszej_lekcji.id_for_label }}">Godzina 1. lekcji <span class="gwiazdka">*</span></label>
-      {{ form.godzina_pierwszej_lekcji }}
-
-      <label for="{{ form.przedmiot.id_for_label }}">Przedmiot <span class="gwiazdka">*</span></label>
+      <label for="{{ form.przedmiot.id_for_label }}">Krok 2 — przedmiot <span class="gwiazdka">*</span></label>
       {{ form.przedmiot }}
       {% if form.przedmiot.help_text %}<p class="podpowiedz">{{ form.przedmiot.help_text }}</p>{% endif %}
 
-      <label for="{{ form.poziom.id_for_label }}">Poziom <span class="gwiazdka">*</span></label>
+      <label for="{{ form.poziom.id_for_label }}">Krok 3 — poziom <span class="gwiazdka">*</span></label>
       {{ form.poziom }}
       {% if form.poziom.help_text %}<p class="podpowiedz">{{ form.poziom.help_text }}</p>{% endif %}
+
+      <label for="{{ form.godzina_pierwszej_lekcji.id_for_label }}">Krok 4 — godzina 1. lekcji (dostępne godziny korepetytorów) <span class="gwiazdka">*</span></label>
+      {{ form.godzina_pierwszej_lekcji }}
+      <p class="podpowiedz">Lista pokazuje tylko godziny, w których korepetytorzy z tym przedmiotem i poziomem mają wolny termin.</p>
 
       <label for="{{ form.imie_ucznia.id_for_label }}">Uczeń — imię <span class="gwiazdka">*</span></label>
       {{ form.imie_ucznia }}
@@ -60,7 +63,7 @@
       {{ form.email_dodatkowy }}
       {% if form.email_dodatkowy.help_text %}<p class="podpowiedz">{{ form.email_dodatkowy.help_text }}</p>{% endif %}
 
-      <label for="{{ form.korepetytor.id_for_label }}">Korepetytor <span class="gwiazdka">*</span></label>
+     <label for="{{ form.korepetytor.id_for_label }}">Krok 5 — korepetytor (dostępni o wybranej godzinie) <span class="gwiazdka">*</span></label>
       {{ form.korepetytor }}
       {% if form.korepetytor.help_text %}<p class="podpowiedz">{{ form.korepetytor.help_text }}</p>{% endif %}
 
