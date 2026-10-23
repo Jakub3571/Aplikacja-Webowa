@@ -22,15 +22,16 @@ WYBIERZ_PRZEDMIOT = [('', '— wybierz przedmiot —')] + list(PRZEDMIOTY)
 
 POZIOMY = [
     ('', '— wybierz poziom —'),
-    ('podstawówka', 'podstawówka'),
+    ('podstawowka', 'podstawówka'),
     ('srednia podstawa', 'średnia podstawa'),
     ('srednia rozszerzenie + studia', 'średnia rozszerzenie + studia'),
 ]
 
-# Mapowanie poziomu ucznia na poziom nauczyciela: poziom "szkoła średnia - podstawa"
-# wymaga nauczyciela z poziomem "podstawa", a "rozszerzenie" oraz "studia" — "rozszerzenie".
+# Mapowanie poziomu ucznia na poziom nauczyciela: 1:1 — te same klucze.
+# 'podstawówka' (z ogonkiem) też rozpoznawana — bezpiecznik dla starszych danych.
 POZIOM_UCZEN_NA_NAUCZYCIELA = {
-    'podstawówka': 'podstawówka',
+    'podstawowka': 'podstawowka',
+    'podstawówka': 'podstawowka',
     'srednia podstawa': 'srednia podstawa',
     'srednia rozszerzenie + studia': 'srednia rozszerzenie + studia',
 }

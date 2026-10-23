@@ -119,7 +119,8 @@ class Nauczyciel(models.Model):
         """Stawka dla przedmiotu i poziomu ucznia (z kart przedmiotów);
         jeśli nie znajdzie, fallback do ogólnej stawki nauczyciela."""
         poziom_nauczyciela = {
-            'podstawówka': 'podstawówka',
+            'podstawowka': 'podstawowka',
+            'podstawówka': 'podstawowka',
             'srednia podstawa': 'srednia podstawa',
             'srednia rozszerzenie + studia': 'srednia rozszerzenie + studia',
             'srednia rozszerzenie': 'srednia rozszerzenie + studia',

@@ -312,7 +312,8 @@ def korepetytorzy_dane(request):
     if not przedmiot or not poziom:
         return JsonResponse({'korepetytorzy': []})
     poziom_nauczyciela = {
-        'podstawówka': 'podstawówka',
+        'podstawowka': 'podstawowka',
+        'podstawówka': 'podstawowka',
         'srednia podstawa': 'srednia podstawa',
         'srednia rozszerzenie + studia': 'srednia rozszerzenie + studia',
         'srednia rozszerzenie': 'srednia rozszerzenie + studia',
