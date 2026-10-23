@@ -5,6 +5,8 @@ from datetime import date, datetime
 from django.core import mail
 from django.test import TestCase
 from django.utils import timezone
+from datetime import date
+from konta.models import Dostepnosc
 
 from konta.models import (
     Dostepnosc,
@@ -109,6 +111,12 @@ class DodawanieUczniaTests(TestCase):
 
     def test_formularz_ucznia_zapisuje_do_bazy(self):
         self.client.force_login(self.user)
+                # nauczyciel musi mieć zaznaczone godziny w kalendarzu (17:00 mieści się w 16:00-19:00)
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel,
+            data_od=date(2026, 10, 5), data_do=date(2026, 10, 5),
+            godzina_od='16:00', godzina_do='19:00',
+        )
         dane = {
             'data_pierwszej_lekcji': '2026-10-05',
             'godzina_pierwszej_lekcji': '17:00',

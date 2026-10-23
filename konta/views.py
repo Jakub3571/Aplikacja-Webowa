@@ -62,6 +62,47 @@ def nauczyciel_z_korepetytora(korepetytor):
     imie, nazwisko = korepetytor.split(' ', 1)
     return Nauczyciel.objects.filter(imie__iexact=imie.strip(), nazwisko__iexact=nazwisko.strip()).first()
 
+def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None):
+    """Czy lekcja (60 min od start_lekcji) koliduje z istniejącą lekcją nauczyciela
+    lub wypada w okienku przerwy po innej lekcji.
+
+    Przerwa to stałe okno po KAŻDEJ lekcji (np. 5 min): lekcja efektywnie
+    zajmuje [start, koniec + przerwa). Dwie lekcje kolidują, gdy te przedziały się pokrywają.
+    """
+    if not nauczyciel:
+        return False
+    if przerwa_min is None:
+        przerwa_min = nauczyciel.przerwa or 0
+    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+    koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
+    for lekcja in Lekcja.objects.select_related('uczen').filter(data__date=dzien):
+        if (lekcja.uczen.korepetytor or '').strip().lower() != nazwa_nauczyciela:
+            continue
+        l_start = timezone.localtime(lekcja.data).replace(tzinfo=None)
+        l_koniec = l_start + timedelta(minutes=GODZINA_LEKCJI)
+        # 1) lekcje nie mogą na siebie nachodzić (bez przerwy)
+        if l_start < koniec and start_lekcji < l_koniec:
+            return True
+        # 2) nasza lekcja zaczyna się w oknie przerwy po tamtej lekcji:
+        #    [l_koniec, l_koniec + przerwa)
+        if przerwa_min and l_koniec <= start_lekcji < l_koniec + timedelta(minutes=przerwa_min):
+            return True
+    return False
+
+
+def nauczyciel_wolny_o(nauczyciel, dzien, start_lekcji):
+    """Czy nauczyciel może przyjąć lekcję 60 min od start_lekcji:
+    cała lekcja mieści się w którymś z jego zaznaczonych zakresów dostępności
+    i nie koliduje z innymi lekcjami ani okienkiem przerwy po nich."""
+    if not nauczyciel:
+        return False
+    koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
+    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien):
+        s = datetime.combine(dzien, termin.godzina_od)
+        e = datetime.combine(dzien, termin.godzina_do)
+        if s <= start_lekcji and koniec <= e:
+            return not kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji)
+    return False
 
 def inne_lekcje_nauczyciela(nauczyciel, uczen, dzien, godzina_start):
     """Lekcje innych uczniów tego nauczyciela nachodzące na slot (60 min od godzina_start)."""
@@ -265,14 +306,65 @@ def korepetytorzy_dane(request):
 
     dzien = None
     godzina = None
-    if data_txt and godzina_txt:
+    if data_txt:
         try:
             dzien = date.fromisoformat(data_txt)
+        except ValueError:
+            dzien = None
+    if godzina_txt:
+        try:
             godzina = datetime.strptime(godzina_txt, '%H:%M').time()
         except ValueError:
-            dzien, godzina = None, None
+            godzina = None
 
     korepetytorzy = []
+        # tryb GODZINY: dla przedmiotu/poziomu/daty zwracamy dostępne godziny lekcji (z przerwami)
+    tryb = request.GET.get('tryb', '')
+    if tryb == 'godziny' and dzien:
+        godziny_wynik = []
+        for n in Nauczyciel.objects.filter(aktywny=True).prefetch_related('przedmioty').order_by('nazwisko', 'imie'):
+            pasuje_przedmiot = any(
+                p.przedmiot == przedmiot and p.poziom == poziom_nauczyciela
+                for p in n.przedmioty.all()
+            )
+            if not pasuje_przedmiot:
+                continue
+            # zakresy dostępności nauczyciela w tym dniu (od-do)
+            zakresy = []
+            for termin in Dostepnosc.objects.filter(nauczyciel=n, data_od=dzien).order_by('godzina_od'):
+                zakresy.append((
+                    datetime.combine(dzien, termin.godzina_od),
+                    datetime.combine(dzien, termin.godzina_do),
+                ))
+            if not zakresy:
+                continue
+            # lekcje nauczyciela tego dnia -> wyliczamy godziny wolne w każdym zakresie
+            przerwa = n.przerwa or 0
+            lekcje_dnia = []
+            for lekcja in Lekcja.objects.select_related('uczen').filter(data__date=dzien):
+                if (lekcja.uczen.korepetytor or '').strip().lower() != f'{n.imie} {n.nazwisko}'.strip().lower():
+                    continue
+                l_start = timezone.localtime(lekcja.data).replace(tzinfo=None)
+                lekcje_dnia.append(l_start)
+            for poczatek, koniec_zakresu in zakresy:
+                # kandydackie starty co 5 min w zakresie (lekcja 60 min)
+                kursor = poczatek
+                while kursor + timedelta(minutes=GODZINA_LEKCJI) <= koniec_zakresu:
+                    etykieta = kursor.strftime('%H:%M')
+                    koliduje = False
+                    for l_start in lekcje_dnia:
+                        l_koniec = l_start + timedelta(minutes=GODZINA_LEKCJI)
+                        if l_start < kursor + timedelta(minutes=GODZINA_LEKCJI) and kursor < l_koniec:
+                            koliduje = True
+                            break
+                        if przerwa and l_koniec <= kursor < l_koniec + timedelta(minutes=przerwa):
+                            koliduje = True
+                            break
+                    if not koliduje:
+                        godziny_wynik.append({'godzina': etykieta, 'korepetytor': f'{n.imie} {n.nazwisko}'})
+                    kursor += timedelta(minutes=5)
+        godziny_wynik = sorted(godziny_wynik, key=lambda g: g['godzina'])
+        return JsonResponse({'godziny': godziny_wynik})
     for n in Nauczyciel.objects.filter(aktywny=True).prefetch_related('przedmioty').order_by('nazwisko', 'imie'):
         pasuje_przedmiot = any(
             p.przedmiot == przedmiot and p.poziom == poziom_nauczyciela
@@ -281,18 +373,10 @@ def korepetytorzy_dane(request):
         if not pasuje_przedmiot:
             continue
         if dzien and godzina:
-            # lekcja trwa 60 min — korepetytor musi mieć zaznaczone oba półgodzinne sloty
-            start_slotu = datetime.combine(dzien, godzina)
-            zaznaczone = set()
-            for termin in Dostepnosc.objects.filter(nauczyciel=n, data_od=dzien):
-                start = datetime.combine(dzien, termin.godzina_od)
-                koniec = datetime.combine(dzien, termin.godzina_do)
-                while start < koniec:
-                    zaznaczone.add(start.strftime('%H:%M'))
-                    start += timedelta(minutes=30)
-            slot1 = start_slotu.strftime('%H:%M')
-            slot2 = (start_slotu + timedelta(minutes=30)).strftime('%H:%M')
-            if slot1 not in zaznaczone or slot2 not in zaznaczone:
+            # lekcja (60 min) musi mieścić się w zakresie dostępności nauczyciela
+            # i nie kolidować z lekcjami ani okienkiem przerwy po nich
+            start_lekcji = datetime.combine(dzien, godzina)
+            if not nauczyciel_wolny_o(n, dzien, start_lekcji):
                 continue
         korepetytorzy.append({'nazwa': f'{n.imie} {n.nazwisko}'})
     return JsonResponse({'korepetytorzy': korepetytorzy})
@@ -328,6 +412,21 @@ def uczniowie(request):
     if request.method == 'POST' and form.is_valid():
         uczen = form.save(commit=False)
         uczen.pierwsza_lekcja = form.cleaned_data['pierwsza_lekcja']
+        # nauczyciel musi być wolny: zakres + brak kolizji z lekcjami i przerwami
+        nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
+        start_dt = timezone.localtime(uczen.pierwsza_lekcja).replace(tzinfo=None)
+        if nauczyciel and not nauczyciel_wolny_o(nauczyciel, start_dt.date(), start_dt):
+            messages.error(
+                request,
+                f'{uczen.korepetytor} nie może przyjąć lekcji {start_dt:%d.%m.%Y} o {start_dt:%H:%M} '
+                '— godzina nie jest w jego kalendarzu albo koliduje z inną lekcją/przerwą. '
+                'Wybierz inną godzinę z listy dostępnych.',
+            )
+            return render(request, 'konta/uczniowie.html', {
+                'form': form,
+                'uczniowie': uczniowie_lista,
+                'nadchodzace_dostepnosci': dostepnosci_nauczycieli(),
+            })
         uczen.kto_umowil = request.user.get_full_name() or request.user.username
         uczen.umowil = request.user
         uczen.save()

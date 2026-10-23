@@ -11,8 +11,9 @@
       <a class="strzalka" href="?rok={{ nastepny_tydzien.year }}&miesiac={{ nastepny_tydzien.month }}&dzien={{ nastepny_tydzien.day }}">&rarr;</a>
     </div>
     <p class="podpowiedz">
-      Kliknij plusik obok godziny, żeby dodać ją pojedynczo (jak w Calendly). Plusik zmieni się w ✔.
-      Kliknij dodaną godzinę, żeby ją usunąć. Godziny zapisują się od razu, strzałkami u góry zmieniasz tydzień.
+      Dodaj zakres godzin: kliknij godzinę początkową, przytrzymaj <strong>Shift</strong> i kliknij końcową —
+      cały zakres między nimi się zaznaczy (jak w Calendly). Pojedynczy plusik dodaje jedną godzinę,
+      klik na dodaną godzinę ją usuwa. Godziny zapisują się od razu, strzałkami u góry zmieniasz tydzień.
     </p>
 
     <div class="przerwa-form">
@@ -96,9 +97,45 @@
     }
 
     siatka.addEventListener('click', function (zdarzenie) {
+      var ostatniKliknietySlot = null;
       var przycisk = zdarzenie.target.closest('.tydzien-slot');
       if (!przycisk) return;
       var klucz = przycisk.dataset.dzien + '|' + przycisk.dataset.godzina;
+            // Shift+klik: zaznacz cały zakres od ostatnio klikniętego slotu
+      if (zdarzenie.shiftKey && ostatniKliknietySlot) {
+        var tenDzien = przycisk.dataset.dzien;
+        var sloty = Array.prototype.slice.call(
+          siatka.querySelectorAll('.tydzien-slot[data-dzien="' + tenDzien + '"]')
+        );
+        var i1 = sloty.indexOf(ostatniKliknietySlot);
+        var i2 = sloty.indexOf(przycisk);
+        if (i1 !== -1 && tenDzien === ostatniKliknietySlot.dataset.dzien) {
+          var od = Math.min(i1, i2);
+          var doIdx = Math.max(i1, i2);
+          var dane = new FormData();
+          dane.append('dzien', tenDzien);
+          dane.append('od', sloty[od].dataset.godzina);
+          dane.append('do', sloty[doIdx + 1].dataset.godzina);
+          dane.append('akcja', 'zaznacz_zakres');
+          fetch(url, {
+            method: 'POST',
+            body: dane,
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf() },
+          })
+            .then(function (odp) { return odp.json(); })
+            .then(function (wynik) {
+              if (wynik.blad) { komunikat.textContent = wynik.blad; return; }
+              for (var i = od; i <= doIdx; i++) {
+                var k = tenDzien + '|' + sloty[i].dataset.godzina;
+                if (zaznaczone.indexOf(k) === -1) zaznaczone.push(k);
+              }
+              komunikat.textContent = wynik.komunikat || '';
+              odswiezWidok();
+            });
+          ostatniKliknietySlot = przycisk;
+          return;
+        }
+      }
       var bylobyZaznaczone = zaznaczone.indexOf(klucz) === -1;
       var dane = new FormData();
       dane.append('dzien', przycisk.dataset.dzien);
@@ -120,6 +157,7 @@
           odswiezWidok();
         })
         .catch(function () { komunikat.textContent = 'Błąd połączenia — spróbuj ponownie.'; });
+        ostatniKliknietySlot = przycisk;
     });
 
     var opcjePrzerwy = document.getElementById('przerwa-opcje-tydzien');
