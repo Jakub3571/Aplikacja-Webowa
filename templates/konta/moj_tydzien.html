@@ -36,6 +36,7 @@
           {% endif %}
         </div>
         <button type="button" class="zakres-dodaj przycisk-kalendarz" data-dzien="{{ dzien.data|date:'Y-m-d' }}">＋</button>
+        <button type="button" class="zakres-powtorz przycisk-kalendarz" data-dzien="{{ dzien.data|date:'Y-m-d' }}" title="Powtórz ten plan co tydzień do końca miesiąca">🔁</button>
         <div class="zakres-okienko" style="display: none;">
           <div class="zakres-pola">
             <label>pracuję od
@@ -99,7 +100,7 @@
     }
 
     function odswiezStrone() {
-      window.location.reload();
+      window.location.reload(true);
     }
 
     lista.addEventListener('click', function (zdarzenie) {
@@ -116,6 +117,24 @@
       }
 
       var usun = zdarzenie.target.closest('.zakres-usun');
+            var powtorz = zdarzenie.target.closest('.zakres-powtorz');
+      if (powtorz) {
+        var dane = new FormData();
+        dane.append('dzien', powtorz.dataset.dzien);
+        dane.append('akcja', 'powtorz_tygodniowo');
+        fetch(url, {
+          method: 'POST',
+          body: dane,
+          headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf() },
+        })
+          .then(function (odp) { return odp.json(); })
+          .then(function (wynik) {
+            if (wynik.blad) { komunikat.textContent = wynik.blad; return; }
+            komunikat.textContent = wynik.komunikat || '';
+            odswiezStrone();
+          });
+        return;
+      }
       if (usun) {
         var dane = new FormData();
         dane.append('dzien', usun.dataset.dzien);

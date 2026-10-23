@@ -1190,11 +1190,17 @@ def usun_termin(request, termin_id):
 @login_required
 def lekcje(request):
     """Zakładka lekcje: lista uczniów z liczbą lekcji i wejściem do kalendarza lekcji.
-    Admin widzi wszystkich uczniów, zwykły pracownik — tylko swoich.
-    Konto nauczyciela nie ma tu wstępu (widzi tylko swój kalendarz)."""
-    if getattr(request.user, 'nauczyciel_id', None):
-        raise PermissionDenied
-    if czy_szef(request.user) or czy_koordynator(request.user):
+    Admin i koordynator widzą wszystkich, pracownik — swoich,
+    korepetytor — uczniów przypisanych do niego (wg pola korepetytor)."""
+    nauczyciel_id = getattr(request.user, 'nauczyciel_id', None)
+    if nauczyciel_id:
+        nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
+        nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+        uczniowie_lista = [
+            u for u in Uczen.objects.filter(zakonczona=False)
+            if (u.korepetytor or '').strip().lower() == nazwa_nauczyciela
+        ]
+    elif czy_szef(request.user) or czy_koordynator(request.user):
         uczniowie_lista = list(Uczen.objects.filter(zakonczona=False))
     else:
         uczniowie_lista = list(Uczen.objects.filter(umowil=request.user, zakonczona=False))
@@ -1221,13 +1227,21 @@ def lekcje(request):
         'uczniowie': uczniowie_lista,
         'fraza': (request.GET.get('szukaj') or '').strip(),
         'czy_szef': czy_szef(request.user),
+        'jest_nauczycielem': bool(getattr(request.user, 'nauczyciel_id', None)),
     })
 
 @login_required
 def kalendarz_lekcji(request, uczen_id):
-    """Kalendarz lekcji ucznia: miesiąc, dni i kafelki godzin do wpisywania lekcji."""
+    """Kalendarz lekcji ucznia: miesiąc, dni i kafelki godzin do wpisywania lekcji.
+    Korepetytor widzi kalendarze swoich uczniów (wg pola korepetytor)."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
-    if not czy_szef(request.user) and not czy_koordynator(request.user) and uczen.umowil_id != request.user.id:
+    nauczyciel_id = getattr(request.user, 'nauczyciel_id', None)
+    if nauczyciel_id:
+        nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
+        nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+        if (uczen.korepetytor or '').strip().lower() != nazwa_nauczyciela:
+            raise PermissionDenied
+    elif not czy_szef(request.user) and not czy_koordynator(request.user) and uczen.umowil_id != request.user.id:
         raise PermissionDenied
     dzisiaj = date.today()
 
@@ -1467,19 +1481,26 @@ def platnosci(request):
 @tylko_szef
 @login_required
 def uzytkownicy(request):
-    """Zakładka użytkownicy: dodawanie kont i nadawanie uprawnień (tylko szef)."""
+    """Zakładka użytkownicy: dodawanie kont i nadawanie uprawnień (tylko szef).
+    Konta podzielone na kategorie: admini, koordynatorzy, osoby umawiające, korepetytorzy."""
     lista = Pracownik.objects.all().order_by('username')
     form = FormularzUzytkownika(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         form.zapisz()
         messages.success(request, 'Użytkownik został dodany.')
         return redirect('uzytkownicy')
+    admini = [u for u in lista if u.is_superuser]
+    koordynatorzy = [u for u in lista if not u.is_superuser and u.username.strip().lower().startswith('koordynator') and not u.nauczyciel]
+    umawiajacy = [u for u in lista if not u.is_superuser and not u.nauczyciel and not u.username.strip().lower().startswith('koordynator')]
+    nauczyciele_konta = [u for u in lista if u.nauczyciel]
     return render(request, 'konta/uzytkownicy.html', {
         'form': form,
         'uzytkownicy': lista,
-        'nauczyciele': [u for u in lista if u.nauczyciel],
+        'admini': admini,
+        'koordynatorzy': koordynatorzy,
+        'umawiajacy': umawiajacy,
+        'nauczyciele': nauczyciele_konta,
     })
-
 
 @tylko_szef
 @login_required

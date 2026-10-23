@@ -12,6 +12,13 @@
     </nav>
   </header>
 
+  {% if user.nauczyciel_id %}
+  <nav class="zakladki">
+    <a href="{% url 'moj_tydzien' %}" class="{% if request.resolver_match.url_name == 'moj_tydzien' %}aktywna{% endif %}">🗓 Mój tydzień</a>
+    <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">📚 Lekcje</a>
+  </nav>
+  {% endif %}
+
   {% if not user.nauczyciel_id %}
   <nav class="zakladki">
     {% if request.user.is_superuser %}

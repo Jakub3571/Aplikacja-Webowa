@@ -418,8 +418,9 @@ class KontoNauczycielaTests(TestCase):
             r = self.client.get(adres)
             self.assertEqual(r.status_code, 403, f'{adres} wpuszcza nauczyciela')
         # nauczyciel nie ma zakladki Lekcje (to kalendarze uczniow pracownika)
+        # nauczyciel MA zakładkę Lekcje — widzi w niej tylko swoich uczniów
         r = self.client.get('/lekcje/')
-        self.assertEqual(r.status_code, 403, 'lekcje wpuszcza nauczyciela')
+        self.assertEqual(r.status_code, 200, 'lekcje nie wpuszcza nauczyciela')
 
     def test_zwykly_pracownik_bez_konta_nauczyciela(self):
         self.client.force_login(self.admin)
