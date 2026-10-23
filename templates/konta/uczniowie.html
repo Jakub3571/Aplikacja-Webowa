@@ -160,9 +160,10 @@ pracowniczy{% endblock %} {% block panel %}
 							</td>
 							<td>{{ termin.nauczyciel.przedmioty_tekst }}</td>
 							<td>
-								{% if termin.dni %}{% for d in termin.dni %}{{ d|date:"d.m.Y"
-								}}{% if not forloop.last %}, {% endif %}{% endfor %}{% else
-								%}—{% endif %}
+                {% if termin.dni_tygodnia %}
+                  {% for nr in termin.dni_tygodnia %}{% if nr == 0 %}pon{% elif nr == 1 %}wt{% elif nr == 2 %}śr{% elif nr == 3 %}czw{% elif nr == 4 %}pt{% elif nr == 5 %}sob{% elif nr == 6 %}nd{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}
+                  ({{ termin.dni|length }} dni)
+                {% else %}—{% endif %}
 							</td>
 							<td>
 								{% if termin.godzina_od %}{{ termin.godzina_od|time:"H:i" }} –

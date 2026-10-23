@@ -279,6 +279,8 @@ def dostepnosci_nauczycieli():
             }
         wpis = zgrupowane[klucz]
         wpis['dni'].add(termin.data_od)
+                # dni tygodnia dla czytelności (np. pon, wt, śr)
+        wpis.setdefault('dni_tygodnia', set()).add(termin.data_od.weekday())
         if termin.godzina_od < wpis['godzina_od']:
             wpis['godzina_od'] = termin.godzina_od
         if termin.godzina_do > wpis['godzina_do']:
@@ -294,6 +296,7 @@ def dostepnosci_nauczycieli():
         wynik.append({
             'nauczyciel': nauczyciel,
             'dni': sorted(wpis['dni']) if wpis else [],
+            'dni_tygodnia': sorted(wpis['dni_tygodnia']) if wpis and 'dni_tygodnia' in wpis else [],
             'godzina_od': wpis['godzina_od'] if wpis else None,
             'godzina_do': wpis['godzina_do'] if wpis else None,
         })
