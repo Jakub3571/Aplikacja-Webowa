@@ -815,3 +815,52 @@ body {
 @media (max-width: 900px) {
   .tydzien-siatka { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* Sloty z plusikiem jak w Calendly */
+.tydzien-slot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+}
+
+.slot-godzina { font-size: 0.85rem; }
+
+.slot-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--akcent);
+  color: var(--akcent);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.tydzien-slot:hover .slot-plus {
+  background: var(--akcent);
+  color: #fff;
+}
+
+.tydzien-slot.kafelek-zaznaczony {
+  background: color-mix(in srgb, #16a34a 12%, var(--tlo));
+}
+
+.tydzien-slot.kafelek-zaznaczony .slot-plus {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: #fff;
+}
+
+.tydzien-slot.kafelek-zaznaczony:hover .slot-plus {
+  border-color: #dc2626;
+  background: #dc2626;
+}

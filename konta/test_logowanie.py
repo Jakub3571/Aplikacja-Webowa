@@ -392,7 +392,7 @@ class KontoNauczycielaTests(TestCase):
         self.client.login(username='j.kowalski', password='M0taneHaslo!')
         r = self.client.get('/pulpit/', follow=True)
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Kowalski')
+        self.assertContains(r, 'Mój tydzień')
 
     def test_nauczyciel_nie_wejdzie_do_cudzego_kalendarza(self):
         user = self.dodaj_konto_nauczyciela()
@@ -455,34 +455,41 @@ class KreatorDyspozycyjnoscTests(TestCase):
         self.client.login(username='j.kowalski', password='M0taneHaslo!')
         r = self.client.get('/pulpit/', follow=True)
         # wlasny kalendarz, bez przymusowego kreatora dyspozycyjnosci
-        self.assertContains(r, 'Kalendarz')
+        self.assertContains(r, 'Mój tydzień')
         self.assertNotContains(r, 'Twoja dyspozycyjność')
 
     def test_kreator_tylko_dla_nauczyciela(self):
+        # stary kreator formularzowy został zastąpiony — przekierowuje na Moj tydzień,
+        # który pracownik (bez konta nauczyciela) nie może otworzyć (403 po redyrekcie)
         pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
         self.client.force_login(pracownik)
-        r = self.client.get('/moja-dyspozycyjnosc/')
+        r = self.client.get('/moja-dyspozycyjnosc/', follow=True)
         self.assertEqual(r.status_code, 403)
 
     def test_kreator_generuje_sloty_z_przerwa(self):
-        # czwartki (weekday=3), 16:00-20:00, przerwa 10 min -> 16:00, 17:10, 18:20, 19:30
+        # kreator formularzowy zastąpiony: godziny dodaje się w "Mój tydzień" (klik/plusik),
+        # przerwę ustawia się przyciskiem tygodnia (AJAX). Sprawdzamy nową drogę:
         self.client.logout()
         self.client.login(username='j.kowalski', password='M0taneHaslo!')
-        dane = {
-            'dni': ['3'],
-            'godzina_od': '16:00',
-            'godzina_do': '20:00',
-            'przerwa': '10',
-            'od_kiedy': '2026-10-01',   # czwartek
-            'do_kiedy': '2026-10-01',
-        }
-        r = self.client.post('/moja-dyspozycyjnosc/', dane, follow=True)
-        self.assertContains(r, 'Dyspozycyjność zapisana')
+        # strona tygodnia działa
+        r = self.client.get('/moj-tydzien/')
+        self.assertContains(r, 'Mój tydzień')
+        # dodanie godziny 16:00 przez AJAX (jak kliknięcie plusika)
+        r = self.client.post(
+            f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/',
+            {'dzien': '2026-10-01', 'akcja': 'przelacz_godzine', 'godzina': '16:00'},
+        )
+        self.assertEqual(r.status_code, 200)
+        dane = r.json()
+        self.assertTrue(any(k['zaznaczony'] for k in dane['kafelki']))
+        # ustawienie przerwy 10 min przez AJAX (przycisk "10 min" w tygodniu)
+        r = self.client.post(
+            f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/',
+            {'dzien': '2026-10-01', 'akcja': 'zapisz_przerwe', 'przerwa': '10'},
+        )
+        self.assertEqual(r.json()['przerwa'], 10)
         godziny = sorted(d.godzina_od.strftime('%H:%M') for d in Dostepnosc.objects.filter(nauczyciel=self.nauczyciel))
-        self.assertEqual(godziny, ['16:00', '17:10', '18:20', '19:30'])
-        self.nauczyciel.refresh_from_db()
-        self.assertTrue(self.nauczyciel.dyspozycyjnosc_uzupełniona)
-        self.assertEqual(self.nauczyciel.przerwa, 10)
+        self.assertEqual(godziny, ['16:00'])
 
     def test_pracownik_widzi_kalendarz_bez_edycji(self):
         Dostepnosc.objects.create(

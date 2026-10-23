@@ -11,8 +11,8 @@
       <a class="strzalka" href="?rok={{ nastepny_tydzien.year }}&miesiac={{ nastepny_tydzien.month }}&dzien={{ nastepny_tydzien.day }}">&rarr;</a>
     </div>
     <p class="podpowiedz">
-      Dodawaj godziny pojedynczo — kliknij slot, żeby go włączyć (＋), kliknij ponownie, żeby wyłączyć.
-      Godziny zapisują się od razu, jak w Calendly. Dni i godziny zmienisz strzałkami u góry.
+      Kliknij plusik obok godziny, żeby dodać ją pojedynczo (jak w Calendly). Plusik zmieni się w ✔.
+      Kliknij dodaną godzinę, żeby ją usunąć. Godziny zapisują się od razu, strzałkami u góry zmieniasz tydzień.
     </p>
 
     <div class="przerwa-form">
@@ -42,7 +42,7 @@
             class="kafelek tydzien-slot"
             data-dzien="{{ dzien.data|date:'Y-m-d' }}"
             data-godzina="{{ godzina }}"
-          >{{ godzina }}</button>
+          ><span class="slot-godzina">{{ godzina }}</span><span class="slot-plus">＋</span></button>
           {% endfor %}
         </div>
       </div>
@@ -78,7 +78,10 @@
     function odswiezWidok() {
       siatka.querySelectorAll('.tydzien-slot').forEach(function (przycisk) {
         var klucz = przycisk.dataset.dzien + '|' + przycisk.dataset.godzina;
-        przycisk.classList.toggle('kafelek-zaznaczony', zaznaczone.indexOf(klucz) !== -1);
+        var zaznaczony = zaznaczone.indexOf(klucz) !== -1;
+        przycisk.classList.toggle('kafelek-zaznaczony', zaznaczony);
+        var plus = przycisk.querySelector('.slot-plus');
+        if (plus) plus.textContent = zaznaczony ? '✓' : '＋';
       });
     }
     odswiezWidok();

@@ -1366,49 +1366,6 @@ def przelacz_szefa(request, user_id):
     return redirect('uzytkownicy')
 
 
-@login_required
-def kreator_dyspozycyjnosc(request):
-    """Kreator dyspozycyjności nauczyciela — widok dla konta nauczyciela."""
-    nauczyciel_id = getattr(request.user, 'nauczyciel_id', None)
-    if not nauczyciel_id:
-        raise PermissionDenied
-    nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
-    form = FormularzDyspozycyjnosc(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        dane = form.cleaned_data
-        godzina_od = datetime.strptime(dane['godzina_od'], '%H:%M').time()
-        godzina_do = datetime.strptime(dane['godzina_do'], '%H:%M').time()
-        przerwa = int(dane['przerwa'])
-        wybrane_dni = {int(d) for d in dane['dni']}
-        krok = timedelta(minutes=60 + przerwa)
-        start = datetime.combine(date(2000, 1, 1), godzina_od)
-        koniec = datetime.combine(date(2000, 1, 1), godzina_do)
-        utworzone = 0
-        dzien = dane['od_kiedy']
-        while dzien <= dane['do_kiedy']:
-            if dzien.weekday() in wybrane_dni:
-                slot = start
-                while slot < koniec:
-                    Dostepnosc.objects.get_or_create(
-                        nauczyciel=nauczyciel,
-                        data_od=dzien,
-                        data_do=dzien,
-                        godzina_od=slot.time(),
-                        godzina_do=(slot + timedelta(minutes=30)).time(),
-                    )
-                    utworzone += 1
-                    slot += krok
-            dzien += timedelta(days=1)
-        nauczyciel.przerwa = przerwa
-        nauczyciel.dyspozycyjnosc_uzupełniona = True
-        nauczyciel.save()
-        messages.success(
-            request,
-            f'Dyspozycyjność zapisana — w kalendarzu pojawiło się {utworzone} terminów. '
-            'Możesz teraz wejść w swój kalendarz i doprecyzować godziny.',
-        )
-        return redirect('kalendarz_nauczyciela', nauczyciel_id=nauczyciel.id)
-    return render(request, 'konta/kreator_dyspozycyjnosc.html', {'form': form})
 
 @login_required
 def moj_tydzien(request):
