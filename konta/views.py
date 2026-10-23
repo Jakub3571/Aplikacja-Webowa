@@ -99,13 +99,20 @@ def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None
 def nauczyciel_wolny_o(nauczyciel, dzien, start_lekcji):
     """Czy nauczyciel może przyjąć lekcję 60 min od start_lekcji:
     cała lekcja mieści się w którymś z jego zaznaczonych zakresów dostępności
-    i nie koliduje z innymi lekcjami ani okienkiem przerwy po nich."""
+    (sąsiednie sloty 30-min sklejane w jeden zakres) i bez kolizji z lekcjami/przerwami."""
     if not nauczyciel:
         return False
     koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
-    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien):
+    # sklejamy sąsiednie sloty w ciągłe zakresy
+    zakresy = []
+    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien).order_by('godzina_od'):
         s = datetime.combine(dzien, termin.godzina_od)
         e = datetime.combine(dzien, termin.godzina_do)
+        if zakresy and zakresy[-1][1] == s:
+            zakresy[-1] = (zakresy[-1][0], e)
+        else:
+            zakresy.append((s, e))
+    for s, e in zakresy:
         if s <= start_lekcji and koniec <= e:
             return not kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji)
     return False
@@ -337,13 +344,16 @@ def korepetytorzy_dane(request):
             )
             if not pasuje_przedmiot:
                 continue
-            # zakresy dostępności nauczyciela w tym dniu (od-do)
+            # zakresy dostępności nauczyciela w tym dniu — sklejanie sąsiednich slotów w jeden zakres
             zakresy = []
             for termin in Dostepnosc.objects.filter(nauczyciel=n, data_od=dzien).order_by('godzina_od'):
-                zakresy.append((
-                    datetime.combine(dzien, termin.godzina_od),
-                    datetime.combine(dzien, termin.godzina_do),
-                ))
+                poczatek = datetime.combine(dzien, termin.godzina_od)
+                koniec_slotu = datetime.combine(dzien, termin.godzina_do)
+                if zakresy and zakresy[-1][1] == poczatek:
+                    # sąsiedni slot — doklejamy do bieżącego zakresu
+                    zakresy[-1] = (zakresy[-1][0], koniec_slotu)
+                else:
+                    zakresy.append((poczatek, koniec_slotu))
             if not zakresy:
                 continue
             # lekcje nauczyciela tego dnia -> wyliczamy godziny wolne w każdym zakresie
