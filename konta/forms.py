@@ -224,9 +224,10 @@ class FormularzUzytkownika(forms.ModelForm):
             except ValidationError as e:
                 raise forms.ValidationError(list(e.messages))
 
-                # nauczyciel: email nie jest potrzebny — utworzy się automatycznie
-        if dane.get('rola') == 'nauczyciel':
-            dane['email'] = dane.get('email') or f"{dane.get('username', '')}@konta.local"
+
+        # e-mail nie jest podawany w formularzu — generowany automatycznie z loginu
+        if not dane.get('email'):
+            dane['email'] = f"{dane.get('username', '')}@konta.local"
         elif not dane.get('email'):
             self.add_error('email', 'Adres e-mail jest wymagany dla osoby umawiającej i admina.')
         # nauczyciel: walidacja wierszy przedmiotow
