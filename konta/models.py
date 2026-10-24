@@ -99,7 +99,13 @@ class Nauczyciel(models.Model):
         default=0,
         help_text='Ile minut przerwy nauczyciel potrzebuje między zajęciami.',
     )
-    dyspozycyjnosc_uzupełniona = models.BooleanField('dyspozycyjność uzupełniona', default=False)
+    dyspozycyjnosc_uzupelniona = models.BooleanField('dyspozycyjność uzupełniona', default=False)
+    link_meet = models.CharField(
+        'stały link Google Meet',
+        max_length=200,
+        blank=True,
+        help_text='Twój osobisty link do spotkań — używany dla wszystkich Twoich uczniów.',
+    )
     dodano = models.DateTimeField('data dodania', auto_now_add=True)
 
     class Meta:
@@ -250,3 +256,16 @@ class Lekcja(models.Model):
 
     def __str__(self):
         return f'{self.uczen}: {self.data:%d.%m.%Y %H:%M}'
+
+
+
+class PrzypomnienieLekcji(models.Model):
+    """Znacznik: dla tej lekcji wysłano już przypomnienie (jedno na lekcję)."""
+
+    lekcja = models.ForeignKey('Lekcja', on_delete=models.CASCADE, related_name='przypomnienia')
+    wyslano = models.DateTimeField('wysłano', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'przypomnienie lekcji'
+        verbose_name_plural = 'przypomnienia lekcji'
+        unique_together = [('lekcja',)]

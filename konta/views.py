@@ -451,9 +451,13 @@ def uczniowie(request):
             })
         uczen.kto_umowil = request.user.get_full_name() or request.user.username
         uczen.umowil = request.user
+        # link Meet nauczyciela zapisujemy przy uczniu (jeśli uczen nie ma własnego)
+        if not uczen.link_meet and nauczyciel and nauczyciel.link_meet:
+            uczen.link_meet = nauczyciel.link_meet
         uczen.save()
         messages.success(request, 'Uczeń został dodany do systemu.')
         wyslij_powiadomienie_o_uczniu(request, uczen)
+        wyslij_link_meet_uczniowi(request, uczen)
         return redirect('uczniowie')
 
     return render(request, 'konta/uczniowie.html', {
@@ -1051,7 +1055,16 @@ def kalendarz_dane(request, nauczyciel_id):
         else:
             PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien_data).delete()
         komunikat = f'Plan dnia {zrodlo:%d.%m.%Y} wklejono na {dzien_data:%d.%m.%Y}.'
+    
+    elif akcja == 'zapisz_link':
+        link = (request.POST.get('link_meet') or '').strip()
+        nauczyciel.link_meet = link
+        nauczyciel.save()
+        komunikat = 'Link Google Meet zapisany.' if link else 'Link Google Meet usunięty.'
+    
     elif akcja == 'usun_zakres':
+
+        
         try:
             start = datetime.strptime(request.POST.get('od', ''), '%H:%M').time()
             koniec_zakresu = datetime.strptime(request.POST.get('do', ''), '%H:%M').time()
@@ -1588,6 +1601,7 @@ def moj_tydzien(request):
 
     return render(request, 'konta/moj_tydzien.html', {
         'nauczyciel': nauczyciel,
+        'link_meet': nauczyciel.link_meet or '',
         'dni': dni,
         'godziny': godziny,
         'poprzedni_tydzien': poprzedni,
@@ -1599,6 +1613,30 @@ def moj_tydzien(request):
 def kreator_dyspozycyjnosc(request):
     """Stary kreator formularzowy — zastąpiony widokiem tygodnia (styl Calendly)."""
     return redirect('moj_tydzien')
+
+def wyslij_link_meet_uczniowi(request, uczen):
+    """Wysyła rodzicowi maila z linkiem Google Meet ucznia (jeśli jest)."""
+    if not uczen.link_meet or not uczen.email_glowny:
+        return
+    tresc = (
+        f'Dzień dobry,\n\n'
+        f'link do zajęć z {uczen.korepetytor} dla {uczen.imie_ucznia} '
+        f'(przedmiot: {uczen.przedmiot}):\n\n'
+        f'{uczen.link_meet}\n\n'
+        f'1. lekcja: {uczen.pierwsza_lekcja:%d.%m.%Y o godz. %H:%M}\n\n'
+        'Link jest stały — używaj go przy każdej lekcji.\n\n'
+        f'Pozdrawiamy,\n{uczen.kto_umowil}\n'
+    )
+    try:
+        send_mail(
+            f'Link do zajęć — {uczen.imie_ucznia} ({uczen.przedmiot})',
+            tresc,
+            None,
+            [uczen.email_glowny],
+        )
+    except Exception:
+        pass
+
 
 def wyslij_zaproszenie_meet(uczen):
     """Wysyła e-mail do rodzica z linkiem do lekcji cyklicznej na Google Meet."""
@@ -1714,6 +1752,9 @@ def umow_lekcje_cykliczna(request, uczen_id):
         if link_meet:
             uczen.link_meet = link_meet
             uczen.save()
+            wyslij_zaproszenie_meet(uczen)
+        elif uczen.link_meet:
+            # link z konta nauczyciela/przy uczniu — wysyłamy bez wpisywania
             wyslij_zaproszenie_meet(uczen)
         return redirect('kalendarz_lekcji', uczen_id=uczen.id)
     return render(request, 'konta/lekcja_cykliczna.html', {

@@ -16,6 +16,16 @@
       Przerwa pojawi się na grafiku automatycznie, gdy ktoś umówi lekcję.
     </p>
 
+    <div class="przerwa-form meet-form">
+      <h3>🖥 Mój link Google Meet</h3>
+      <p class="podpowiedz">Wklej swój stały link do spotkań — zapisze się automatycznie przy każdym Twoim uczniu i poleci rodzicowi e-mailem.</p>
+      <div class="zakres-pola">
+        <input type="text" id="link-meet-pole" class="meet-input" placeholder="https://meet.google.com/abc-defg-hij"
+               value="{{ link_meet }}">
+        <button type="button" class="przycisk-kalendarz" id="link-meet-zapisz">✔ Zapisz link</button>
+      </div>
+    </div>
+
     <div id="tydzien-lista" data-url="{% url 'kalendarz_dane' nauczyciel.id %}">
       {% for dzien in dni %}
       <div class="dzien-wiersz" data-dzien="{{ dzien.data|date:'Y-m-d' }}" data-przerwa="{{ dzien.przerwa }}">
@@ -200,6 +210,27 @@
         anuluj.closest('.zakres-okienko').style.display = 'none';
       }
     });
+
+    var poleMeet = document.getElementById('link-meet-pole');
+    var przyciskMeet = document.getElementById('link-meet-zapisz');
+    if (poleMeet && przyciskMeet) {
+      przyciskMeet.addEventListener('click', function () {
+        var dane = new FormData();
+        dane.append('dzien', new Date().toISOString().slice(0, 10));
+        dane.append('akcja', 'zapisz_link');
+        dane.append('link_meet', poleMeet.value.trim());
+        fetch(url, {
+          method: 'POST',
+          body: dane,
+          headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf() },
+        })
+          .then(function (odp) { return odp.json(); })
+          .then(function (wynik) {
+            komunikat.textContent = wynik.blad || wynik.komunikat || '';
+          });
+      });
+    }
+
 
     var przyciskKopiuj = document.getElementById('kopiuj-link');
     var poleLinku = document.getElementById('link-kalendarza');

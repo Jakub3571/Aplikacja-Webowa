@@ -984,3 +984,15 @@ body {
   font-size: 0.85rem;
   margin-bottom: 1rem;
 }
+
+/* Link Google Meet u nauczyciela */
+.meet-input {
+  flex: 1 1 18rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--ramka);
+  border-radius: 0.5rem;
+  background: var(--tlo);
+  color: var(--tekst);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
