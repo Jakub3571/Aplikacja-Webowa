@@ -635,12 +635,15 @@ def edytuj_uzytkownika(request, user_id):
         uzytkownik.first_name = request.POST.get('first_name', '').strip()
         uzytkownik.last_name = request.POST.get('last_name', '').strip()
         email = request.POST.get('email', '').strip()
-        if not email:
-            messages.error(request, 'Adres e-mail jest wymagany.')
-            return render(request, 'konta/edytuj_uzytkownika.html', {'uzytkownik': uzytkownik})
-        uzytkownik.email = email
+        # e-mail opcjonalny: puste pole = zostaje obecny adres
+        if email:
+            uzytkownik.email = email
         uzytkownik.telefon = request.POST.get('telefon', '').strip()
         uzytkownik.save()
+        # korepetytor: synchronizujemy e-mail na karcie nauczyciela
+        if uzytkownik.nauczyciel:
+            uzytkownik.nauczyciel.email = uzytkownik.email
+            uzytkownik.nauczyciel.save()
         messages.success(request, f'Dane konta {uzytkownik.username} zostały zaktualizowane.')
         return redirect('uzytkownicy')
     return render(request, 'konta/edytuj_uzytkownika.html', {'uzytkownik': uzytkownik})

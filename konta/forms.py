@@ -216,7 +216,7 @@ class FormularzUzytkownika(forms.ModelForm):
         fields = ['username', 'first_name', 'last_name', 'email', 'telefon']
         help_texts = {
             'username': 'Nazwa do logowania, np. j.kowalski',
-            'email': 'Adres e-mail (dla nauczyciela można zostawić puste — utworzy się automatycznie)',
+            'email': 'Podaj prawdziwy adres e-mail — wysyłamy na niego link Meet, przypomnienia i reset hasła. Puste = tymczasowy login@konta.local.',
         }
 
     def clean(self):
@@ -232,11 +232,10 @@ class FormularzUzytkownika(forms.ModelForm):
                 raise forms.ValidationError(list(e.messages))
 
 
-        # e-mail nie jest podawany w formularzu — generowany automatycznie z loginu
+        # e-mail: jeśli podano — zostaje; jeśli nie — automatyczny login@konta.local
+        # (reset hasła i powiadomienia działają tylko z prawdziwym adresem)
         if not dane.get('email'):
             dane['email'] = f"{dane.get('username', '')}@konta.local"
-        elif not dane.get('email'):
-            self.add_error('email', 'Adres e-mail jest wymagany dla osoby umawiającej i admina.')
         # nauczyciel: walidacja wierszy przedmiotow
         if dane.get('rola') == 'nauczyciel':
             pelne = [w for w in self.wiersze_przedmiotow if w['przedmiot']]

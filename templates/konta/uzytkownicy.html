@@ -32,6 +32,9 @@
       <label for="{{ form.last_name.id_for_label }}">Nazwisko</label>
       {{ form.last_name }}
 
+      <label for="{{ form.email.id_for_label }}">Email</label>
+      {{ form.email }}
+      {% if form.email.help_text %}<p class="podpowiedz">{{ form.email.help_text }}</p>{% endif %}
 
 
       <label for="{{ form.telefon.id_for_label }}">Telefon</label>
