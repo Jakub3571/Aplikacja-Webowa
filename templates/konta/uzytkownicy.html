@@ -76,6 +76,7 @@
   </section>
 
   <div class="uczniowie-bok">
+  {% if czy_szef %}
   <section class="karta">
     <h2>🔐 Admini ({{ admini|length }})</h2>
     <p class="podpowiedz">Konta z pełnym dostępem — mogą wszystko, w tym usuwać.</p>
@@ -110,6 +111,7 @@
     <p class="podtytul">Brak kont adminów.</p>
     {% endif %}
   </section>
+  {% endif %}
 
   <section class="karta">
     <h2>🧑‍💼 Koordynatorzy ({{ koordynatorzy|length }})</h2>
@@ -130,10 +132,14 @@
             <td>{{ u.email }}</td>
             <td>{% if u.is_active %}<span class="umowa-tak">✔ aktywne</span>{% else %}<span class="umowa-nie">wyłączone</span>{% endif %}</td>
             <td>
+              {% if czy_szef %}
               <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>
               {% if u.id != request.user.id %}
               <a class="przycisk-umowa umowa-tak" href="{% url 'przelacz_szefa' u.id %}" title="Nadaj uprawnienia admina">nadaj admina</a>
               <a class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}" href="{% url 'przelacz_konto' u.id %}" title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}">{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a>
+              {% endif %}
+              {% else %}
+              —
               {% endif %}
             </td>
           </tr>
@@ -215,11 +221,15 @@
               </td>
               <td><a class="ikona-kalendarza" href="{% url 'kalendarz_nauczyciela' u.nauczyciel_id %}" title="Zobacz kalendarz korepetytora">📅</a></td>
               <td>
+                {% if czy_szef %}
                 <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>
                 {% if u.id != request.user.id %}
                 <a class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}" href="{% url 'przelacz_konto' u.id %}" title="{% if u.is_active %}Wyłącz konto (nie będzie się mogło logować){% else %}Włącz konto{% endif %}">
                   {% if u.is_active %}wyłącz{% else %}włącz{% endif %}
                 </a>
+                {% endif %}
+                {% else %}
+                —
                 {% endif %}
               </td>
             </tr>

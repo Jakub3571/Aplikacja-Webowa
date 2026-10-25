@@ -98,6 +98,23 @@ pracowniczy{% endblock %} {% block panel %}
 			<p class="podpowiedz">{{ form.email_dodatkowy.help_text }}</p>
 			{% endif %}
 
+            <label for="{{ form.adresat_meet.id_for_label }}"
+                >Adresat linku Meet <span class="gwiazdka">*</span></label
+            >
+            {{ form.adresat_meet }} {% if form.adresat_meet.help_text %}
+            <p class="podpowiedz">{{ form.adresat_meet.help_text }}</p>
+            {% endif %}
+
+            <div class="pole-checkbox">
+                {{ form.auto_wyslij_meet }}
+                <label for="{{ form.auto_wyslij_meet.id_for_label }}"
+                    >{{ form.auto_wyslij_meet.label }}</label
+                >
+            </div>
+            {% if form.auto_wyslij_meet.help_text %}
+            <p class="podpowiedz">{{ form.auto_wyslij_meet.help_text }}</p>
+            {% endif %}
+
 			<label for="{{ form.korepetytor.id_for_label }}"
 				>Krok 5 — korepetytor (dostępni o wybranej godzinie)
 				<span class="gwiazdka">*</span></label

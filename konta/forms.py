@@ -72,6 +72,25 @@ class FormularzZmianyHasla(PasswordChangeForm):
 class FormularzUcznia(forms.ModelForm):
     """Formularz dodawania ucznia — pola obowiązkowe z podpowiedziami."""
 
+    ADRESACI_MEET = [
+        ('glowny', 'rodzic główny'),
+        ('dodatkowy', 'rodzic zapasowy'),
+        ('oba', 'główny i zapasowy'),
+    ]
+
+    adresat_meet = forms.ChoiceField(
+        label='adresat linku Meet',
+        choices=ADRESACI_MEET,
+        initial='glowny',
+        help_text='Na ten adres wyślemy link do zajęć (jeśli jest link Meet).',
+    )
+    auto_wyslij_meet = forms.BooleanField(
+        label='wyślij link Meet automatycznie po dodaniu',
+        required=False,
+        initial=True,
+        help_text='Odznacz, jeśli link ma być wysłany później ręcznie.',
+    )
+
     przedmiot = forms.ChoiceField(
         label='przedmiot',
         choices=WYBIERZ_PRZEDMIOT,
@@ -151,6 +170,9 @@ class FormularzUcznia(forms.ModelForm):
         for nazwa, pole in self.fields.items():
             pole.required = True
             pole.widget.attrs['required'] = True
+        # przełącznik automatycznej wysyłki ma zostać opcjonalny (odznaczony = nie wysyłaj)
+        self.fields['auto_wyslij_meet'].required = False
+        self.fields['auto_wyslij_meet'].widget.attrs.pop('required', None)
 
     def clean(self):
         dane = super().clean()
@@ -188,8 +210,15 @@ class FormularzUzytkownika(forms.ModelForm):
         help_text='Powtórz to samo hasło, żeby wykluczyć literówkę.',
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, bez_admina=False, **kwargs):
         super().__init__(*args, **kwargs)
+        # koordynator nie widzi roli admina na liście
+        if bez_admina:
+            self.fields['rola'].choices = [
+                ('pracownik', 'osoba umawiająca'),
+                ('koordynator', 'koordynator (edycja, bez usuwania)'),
+                ('nauczyciel', 'korepetytor'),
+            ]
         # dla nauczyciela: budujemy wiersze przedmiot+poziom+stawka
         self.wiersze_przedmiotow = []
         if self.is_bound and hasattr(self.data, 'getlist'):
@@ -419,5 +448,3 @@ class WierszPrzedmiotu(forms.Form):
 
     przedmiot = forms.ChoiceField(label='przedmiot', choices=WYBIERZ_PRZEDMIOT)
     poziom = forms.ChoiceField(label='poziom', choices=POZIOMY_NAUCZYCIELA)
-
-

@@ -457,7 +457,13 @@ def uczniowie(request):
         uczen.save()
         messages.success(request, 'Uczeń został dodany do systemu.')
         wyslij_powiadomienie_o_uczniu(request, uczen)
-        wyslij_link_meet_uczniowi(request, uczen)
+        if form.cleaned_data.get('auto_wyslij_meet'):
+            wyslij_link_meet_uczniowi(request, uczen, form.cleaned_data.get('adresat_meet'))
+        else:
+            messages.info(
+                request,
+                'Link Meet nie został wysłany — możesz go wysłać później z karty ucznia.',
+            )
         return redirect('uczniowie')
 
     return render(request, 'konta/uczniowie.html', {
@@ -1088,7 +1094,11 @@ def kalendarz_dane(request, nauczyciel_id):
         if not zrodlo_sloty:
             return JsonResponse({'blad': 'Ten dzień nie ma żadnych godzin — najpierw wpisz plan.'}, status=400)
         zrodlo_przerwa = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien_data).first()
-        ostatni_dzien = date(dzien_data.year, dzien_data.month, calendar.monthrange(dzien_data.year, dzien_data.month)[1])
+        # koniec roku szkolnego: 30 czerwca (styczeń–czerwiec = bieżący rok, lipiec–grudzień = następny rok)
+        if dzien_data.month >= 7:
+            ostatni_dzien = date(dzien_data.year + 1, 6, 30)
+        else:
+            ostatni_dzien = date(dzien_data.year, 6, 30)
         docelowy = dzien_data + timedelta(days=7)
         utworzone = 0
         while docelowy <= ostatni_dzien:
@@ -1497,15 +1507,29 @@ def platnosci(request):
         'rozliczenia': rozliczenia,
     })
 
-
-@tylko_szef
 @login_required
 def uzytkownicy(request):
-    """Zakładka użytkownicy: dodawanie kont i nadawanie uprawnień (tylko szef).
+    """Zakładka użytkownicy: dodawanie kont i nadawanie uprawnień.
+    Admin (szef) widzi wszystko i może zarządzać kontami.
+    Koordynator może dodawać konta — ale bez roli admina i bez zarządzania kontami.
     Konta podzielone na kategorie: admini, koordynatorzy, osoby umawiające, korepetytorzy."""
+    if not (czy_szef(request.user) or czy_koordynator(request.user)):
+        raise PermissionDenied
     lista = Pracownik.objects.all().order_by('username')
-    form = FormularzUzytkownika(request.POST or None)
+    form = FormularzUzytkownika(request.POST or None, bez_admina=not czy_szef(request.user))
     if request.method == 'POST' and form.is_valid():
+        # koordynator nie może tworzyć konta admina
+        if not czy_szef(request.user) and form.cleaned_data.get('rola') == 'admin':
+            messages.error(request, 'Koordynator nie może tworzyć kont administratorów.')
+            return render(request, 'konta/uzytkownicy.html', {
+                'form': form,
+                'uzytkownicy': lista,
+                'admini': [],
+                'koordynatorzy': [],
+                'umawiajacy': [],
+                'nauczyciele': [],
+                'czy_szef': False,
+            })
         form.zapisz()
         messages.success(request, 'Użytkownik został dodany.')
         return redirect('uzytkownicy')
@@ -1520,6 +1544,7 @@ def uzytkownicy(request):
         'koordynatorzy': koordynatorzy,
         'umawiajacy': umawiajacy,
         'nauczyciele': nauczyciele_konta,
+        'czy_szef': czy_szef(request.user),
     })
 
 @tylko_szef
@@ -1614,9 +1639,22 @@ def kreator_dyspozycyjnosc(request):
     """Stary kreator formularzowy — zastąpiony widokiem tygodnia (styl Calendly)."""
     return redirect('moj_tydzien')
 
-def wyslij_link_meet_uczniowi(request, uczen):
+def odbiorcy_meet(uczen, adresat='glowny'):
+    """Zwraca listę adresów e-mail rodzica wg wyboru z formularza ucznia.
+    Pomija puste adresy i duplikaty (główny = zapasowy)."""
+    adresy = []
+    if adresat in ('glowny', 'oba') and uczen.email_glowny:
+        adresy.append(uczen.email_glowny)
+    if adresat in ('dodatkowy', 'oba') and uczen.email_dodatkowy:
+        if uczen.email_dodatkowy not in adresy:
+            adresy.append(uczen.email_dodatkowy)
+    return adresy
+
+
+def wyslij_link_meet_uczniowi(request, uczen, adresat='glowny'):
     """Wysyła rodzicowi maila z linkiem Google Meet ucznia (jeśli jest)."""
-    if not uczen.link_meet or not uczen.email_glowny:
+    odbiorcy = odbiorcy_meet(uczen, adresat)
+    if not uczen.link_meet or not odbiorcy:
         return
     tresc = (
         f'Dzień dobry,\n\n'
@@ -1632,15 +1670,16 @@ def wyslij_link_meet_uczniowi(request, uczen):
             f'Link do zajęć — {uczen.imie_ucznia} ({uczen.przedmiot})',
             tresc,
             None,
-            [uczen.email_glowny],
+            odbiorcy,
         )
     except Exception:
         pass
 
 
-def wyslij_zaproszenie_meet(uczen):
+def wyslij_zaproszenie_meet(uczen, adresat='glowny'):
     """Wysyła e-mail do rodzica z linkiem do lekcji cyklicznej na Google Meet."""
-    if not uczen.link_meet or not uczen.email_glowny:
+    odbiorcy = odbiorcy_meet(uczen, adresat)
+    if not uczen.link_meet or not odbiorcy:
         return
     tresc = (
         'Dzień dobry,\n\n'
@@ -1658,7 +1697,7 @@ def wyslij_zaproszenie_meet(uczen):
             f'Zaproszenie na zajęcia — {uczen.imie_ucznia} (stały link Google Meet)',
             tresc,
             None,
-            [uczen.email_glowny],
+            odbiorcy,
         )
     except Exception:
         pass

@@ -131,6 +131,8 @@ class DodawanieUczniaTests(TestCase):
             'email_dodatkowy': 'rezerwacja@f.pl',
             'korepetytor': 'Jan Kowalski',
             'notatka_od_rodzica': 'Uwaga na alergię',
+            'adresat_meet': 'glowny',
+            'auto_wyslij_meet': 'on',
         }
         r = self.client.post('/uczniowie/', dane, follow=True)
         self.assertContains(r, 'został dodany')
@@ -295,6 +297,36 @@ class UzytkownicyTests(TestCase):
         self.client.force_login(pracownik)
         r = self.client.get('/uzytkownicy/')
         self.assertEqual(r.status_code, 403)
+
+    def test_koordynator_moze_dodawac_konta_bez_admina(self):
+        koordynator = Pracownik.objects.create_user('koordynator.ala', 'k@f.pl', 'Sup3rHaslo!')
+        self.client.force_login(koordynator)
+        r = self.client.get('/uzytkownicy/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Dodaj użytkownika')
+        # lista ról bez admina
+        self.assertNotContains(r, 'value="admin"')
+        self.assertNotContains(r, 'Admini')
+        # koordynator nie może utworzyć konta admina (obejście formularza)
+        dane = {
+            'username': 'nowy.admin',
+            'first_name': 'Nowy',
+            'last_name': 'Admin',
+            'email': 'n@f.pl',
+            'telefon': '',
+            'haslo1': 'M0taneHaslo!',
+            'haslo2': 'M0taneHaslo!',
+            'rola': 'admin',
+        }
+        r = self.client.post('/uzytkownicy/', dane, follow=True)
+        self.assertFalse(Pracownik.objects.filter(username='nowy.admin').exists())
+        self.assertContains(r, 'Popraw błędy w formularzu')
+        # koordynator może utworzyć zwykłego pracownika
+        dane['username'] = 'j.kowalska'
+        dane['rola'] = 'pracownik'
+        r = self.client.post('/uzytkownicy/', dane, follow=True)
+        self.assertContains(r, 'został dodany')
+        self.assertTrue(Pracownik.objects.filter(username='j.kowalska').exists())
 
     def test_dodawanie_pracownika(self):
         self.client.force_login(self.user)
