@@ -1253,8 +1253,12 @@ def lekcje(request):
         liczba_lekcji[lekcja.uczen_id] = liczba_lekcji.get(lekcja.uczen_id, 0) + 1
     for u in uczniowie_lista:
         u.liczba_lekcji = liczba_lekcji.get(u.id, 0)
+    uczniowie_cykliczni = [u for u in uczniowie_lista if u.zajecia_cykliczne]
+    uczniowie_pierwsze = [u for u in uczniowie_lista if not u.zajecia_cykliczne]
     return render(request, 'konta/lekcje.html', {
         'uczniowie': uczniowie_lista,
+        'uczniowie_cykliczni': uczniowie_cykliczni,
+        'uczniowie_pierwsze': uczniowie_pierwsze,
         'fraza': (request.GET.get('szukaj') or '').strip(),
         'czy_szef': czy_szef(request.user),
         'jest_nauczycielem': bool(getattr(request.user, 'nauczyciel_id', None)),
@@ -1917,6 +1921,8 @@ def umow_lekcje_cykliczna(request, uczen_id):
                 f'Stałe lekcje umówione — wpisano {utworzone} terminów do {do_dnia:%d.%m.%Y}. '
                 'Korepetytor ma zablokowane godziny w kalendarzu.',
             )
+        if utworzone and not uczen.zajecia_cykliczne:
+            uczen.zajecia_cykliczne = True
         if link_meet:
             uczen.link_meet = link_meet
             uczen.save()
@@ -1924,6 +1930,8 @@ def umow_lekcje_cykliczna(request, uczen_id):
         elif uczen.link_meet:
             # link z konta nauczyciela/przy uczniu — wysyłamy bez wpisywania
             wyslij_zaproszenie_meet(uczen)
+        else:
+            uczen.save(update_fields=['zajecia_cykliczne'])
         return redirect('kalendarz_lekcji', uczen_id=uczen.id)
     return render(request, 'konta/lekcja_cykliczna.html', {
         'uczen': uczen,

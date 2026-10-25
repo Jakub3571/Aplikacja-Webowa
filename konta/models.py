@@ -43,6 +43,7 @@ class Uczen(models.Model):
     """Karta ucznia z danymi lekcji, kontaktu do rodzica i notatkami."""
 
     pierwsza_lekcja = models.DateTimeField('data i godzina 1. lekcji')
+    zajecia_cykliczne = models.BooleanField('zajęcia cykliczne', default=False)
     przedmiot = models.CharField('przedmiot', max_length=100)
     poziom = models.CharField('poziom', max_length=50)
     szkola = models.CharField('szkoła', max_length=150)

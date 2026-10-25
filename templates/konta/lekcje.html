@@ -4,34 +4,92 @@
 <div class="platnosci-uklad">
   <section class="karta">
     <h2>Lekcje</h2>
-        <form method="get" class="pole-szukania" style="margin-bottom: 1rem;">
+
+    <h3>🔄 Zajęcia cykliczne</h3>
+    <div class="pole-szukania" style="margin-bottom: 1rem;">
       <input
         type="text"
-        name="szukaj"
-        value="{{ fraza }}"
-        placeholder="Szukaj ucznia, korepetytora lub przedmiotu..."
+        class="szukaj-tabela"
+        data-tabela="tabela-lekcje-cykliczne"
+        placeholder="Szukaj zajęć cyklicznych (uczeń, korepetytor, przedmiot)..."
       />
-      
-      {% if fraza %}<a href="{% url 'lekcje' %}" class="powrot">wyczyść</a>{% endif %}
-    </form>
-    {% if uczniowie %}
+    </div>
+    {% if uczniowie_cykliczni %}
     <div class="tabela-wrapper">
-      <table class="tabela">
+      <table class="tabela" id="tabela-lekcje-cykliczne">
+        <thead>
+          <tr>
+            <th>Uczeń</th>
+            <th>Korepetytor</th>
+            <th>Przedmiot</th>
+            <th>Lekcje w tym miesiącu</th>
+            <th>Kalendarz</th>
+            {% if not jest_nauczycielem %}
+            <th>Dodaj kolejne</th>
+            <th>Akcje</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for uczen in uczniowie_cykliczni %}
+          <tr>
+            <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
+            <td>{{ uczen.korepetytor }}</td>
+            <td>{{ uczen.przedmiot }}</td>
+            <td>{{ uczen.liczba_lekcji }}</td>
+            <td>
+              <a class="ikona-kalendarza" href="{% url 'kalendarz_lekcji' uczen.id %}" title="Kalendarz lekcji">📅</a>
+            </td>
+            {% if not jest_nauczycielem %}
+            <td>
+              <a class="ikona-kalendarza" href="{% url 'lekcja_cykliczna' uczen.id %}" title="Dodaj kolejne zajęcia cykliczne">🔄</a>
+            </td>
+            <td>
+              <a class="ikona-kalendarza" href="{% url 'edytuj_ucznia' uczen.id %}" title="Edytuj dane ucznia">✏️</a>
+              <a class="ikona-kalendarza" href="{% url 'zakoncz_ucznia' uczen.id %}" title="Zakończ współpracę (uczeń trafi do archiwum)">📦</a>
+              {% if czy_szef %}
+              <a class="ikona-kalendarza" href="{% url 'usun_ucznia' uczen.id %}" title="Usuń ucznia">🗑</a>
+              {% endif %}
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="podtytul">Brak zajęć cyklicznych — umów je ikoną 🔄 przy uczniu poniżej.</p>
+    {% endif %}
+
+    <h3 style="margin-top: 2rem;">📌 Pierwsze lekcje</h3>
+    <div class="pole-szukania" style="margin-bottom: 1rem;">
+      <input
+        type="text"
+        class="szukaj-tabela"
+        data-tabela="tabela-lekcje-pierwsze"
+        placeholder="Szukaj pierwszych lekcji (uczeń, korepetytor, przedmiot)..."
+      />
+    </div>
+    {% if uczniowie_pierwsze %}
+    <div class="tabela-wrapper">
+      <table class="tabela" id="tabela-lekcje-pierwsze">
         <thead>
           <tr>
             <th>Uczeń</th>
             <th>Korepetytor</th>
             <th>Przedmiot</th>
             <th>1. lekcja</th>
-            <th>Lekcje</th>
+            <th>Lekcje w tym miesiącu</th>
             <th>Dodano</th>
             <th>Kalendarz</th>
-            <th>Cykliczna</th>
+            {% if not jest_nauczycielem %}
+            <th>Umów cykliczne</th>
             <th>Akcje</th>
+            {% endif %}
           </tr>
         </thead>
         <tbody>
-          {% for uczen in uczniowie %}
+          {% for uczen in uczniowie_pierwsze %}
           <tr>
             <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
             <td>{{ uczen.korepetytor }}</td>
@@ -42,10 +100,7 @@
             <td>
               <a class="ikona-kalendarza" href="{% url 'kalendarz_lekcji' uczen.id %}" title="Kalendarz lekcji">📅</a>
             </td>
-               {% if jest_nauczycielem %}
-            <td>—</td>
-            <td>—</td>
-            {% else %}
+            {% if not jest_nauczycielem %}
             <td>
               <a class="ikona-kalendarza" href="{% url 'lekcja_cykliczna' uczen.id %}" title="Umów lekcję cykliczną">🔄</a>
             </td>
@@ -57,21 +112,28 @@
               {% endif %}
             </td>
             {% endif %}
-            <td>
-              <a class="ikona-kalendarza" href="{% url 'edytuj_ucznia' uczen.id %}" title="Edytuj dane ucznia">✏️</a>
-              <a class="ikona-kalendarza" href="{% url 'zakoncz_ucznia' uczen.id %}" title="Zakończ współpracę (uczeń trafi do archiwum)">📦</a>
-              {% if czy_szef %}
-              <a class="ikona-kalendarza" href="{% url 'usun_ucznia' uczen.id %}" title="Usuń ucznia">🗑</a>
-              {% endif %}
-            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
     {% else %}
-    <p class="podtytul">Brak uczniów w systemie — dodaj ich w zakładce Uczniowie.</p>
+    <p class="podtytul">Brak pierwszych lekcji — dodaj uczniów w zakładce Uczniowie.</p>
     {% endif %}
   </section>
 </div>
+
+<script>
+  document.querySelectorAll('.szukaj-tabela').forEach(function (pole) {
+    pole.addEventListener('input', function () {
+      var fraza = pole.value.trim().toLowerCase();
+      var tabela = document.getElementById(pole.dataset.tabela);
+      if (!tabela) return;
+      tabela.querySelectorAll('tbody tr').forEach(function (wiersz) {
+        var tekst = wiersz.textContent.toLowerCase();
+        wiersz.style.display = tekst.indexOf(fraza) !== -1 ? '' : 'none';
+      });
+    });
+  });
+</script>
 {% endblock %}
