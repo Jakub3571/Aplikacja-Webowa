@@ -22,7 +22,7 @@ class Command(BaseCommand):
         teraz = timezone.now()
         wyslane = 0
         okno = timedelta(minutes=60)
-        for lekcja in Lekcja.objects.select_related('uczen').filter(data__gte=teraz):
+        for lekcja in Lekcja.objects.select_related('uczen').filter(data__gte=teraz, odwolana=False):
             if PrzypomnienieLekcji.objects.filter(lekcja=lekcja).exists():
                 continue
             start = timezone.localtime(lekcja.data)

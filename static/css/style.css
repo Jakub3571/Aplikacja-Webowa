@@ -1009,3 +1009,61 @@ body {
   font-family: inherit;
   font-size: 0.9rem;
 }
+
+/* Zajęcia odwołane (kalendarz lekcji ucznia) */
+.kafelek-odwolany {
+  background: #fbbf24;
+  border-color: #d97706;
+  color: #7c2d12;
+  text-decoration: line-through;
+}
+
+.lista-lekcji-dnia {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.lista-lekcji-dnia li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: 1px solid var(--ramka);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.7rem;
+}
+
+.lista-lekcji-dnia .lekcja-odwolana span {
+  color: #b45309;
+  text-decoration: line-through;
+}
+
+.przycisk-odwolaj {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.przycisk-odwolaj:hover { background: #b91c1c; }
+
+.przycisk-przywroc {
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.przycisk-przywroc:hover { background: #15803d; }

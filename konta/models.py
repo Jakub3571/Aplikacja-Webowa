@@ -248,6 +248,7 @@ class Lekcja(models.Model):
     )
     data = models.DateTimeField('data i godzina lekcji')
     dodano = models.DateTimeField('data dodania', auto_now_add=True)
+    odwolana = models.BooleanField('zajęcia odwołane', default=False)
 
     class Meta:
         verbose_name = 'lekcja'
