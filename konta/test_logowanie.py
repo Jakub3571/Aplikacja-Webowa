@@ -106,7 +106,7 @@ class DodawanieUczniaTests(TestCase):
             imie='Jan', nazwisko='Kowalski', email='jan@k.pl',
         )
         PrzedmiotNauczyciela.objects.create(
-            nauczyciel=self.nauczyciel, przedmiot='matematyka', poziom='srednia rozszerzenie + studia',
+            nauczyciel=self.nauczyciel, przedmiot='matematyka', poziom='srednia rozszerzenie',
         )
 
     def test_formularz_ucznia_zapisuje_do_bazy(self):
@@ -121,7 +121,7 @@ class DodawanieUczniaTests(TestCase):
             'data_pierwszej_lekcji': '2026-10-05',
             'godzina_pierwszej_lekcji': '17:00',
             'przedmiot': 'matematyka',
-            'poziom': 'srednia rozszerzenie + studia',
+            'poziom': 'srednia rozszerzenie',
             'imie_ucznia': 'Kasia',
             'nazwisko_rodzica': 'Nowak',
             'rodzic': 'Ewa Nowak',
@@ -150,7 +150,7 @@ class DodawanieUczniaTests(TestCase):
         self.client.force_login(self.user)
         r = self.client.post(
             '/uczniowie/',
-            {'przedmiot': 'matematyka', 'poziom': 'srednia rozszerzenie + studia',
+            {'przedmiot': 'matematyka', 'poziom': 'srednia rozszerzenie',
              'wybierz_przedmiot': '1'},
             follow=True,
         )
@@ -169,7 +169,7 @@ class DodawanieUczniaTests(TestCase):
         self.client.force_login(self.user)
         r = self.client.post(
             '/uczniowie/',
-            {'przedmiot': 'matematyka', 'poziom': 'srednia rozszerzenie + studia',
+            {'przedmiot': 'matematyka', 'poziom': 'srednia rozszerzenie',
              'wybierz_przedmiot': '1'},
             follow=True,
         )
@@ -692,7 +692,7 @@ class StawkiPrzedmiotowTests(TestCase):
             'haslo2': 'M0taneHaslo!',
             'rola': 'nauczyciel',
             'w_przedmiot': ['angielski', 'matematyka'],
-            'w_poziom': ['srednia podstawa', 'srednia rozszerzenie + studia'],
+            'w_poziom': ['srednia podstawa', 'srednia rozszerzenie'],
             'w_stawka': ['40', '50'],
         }
         r = self.client.post('/uzytkownicy/', dane, follow=True)
@@ -700,7 +700,7 @@ class StawkiPrzedmiotowTests(TestCase):
         user = Pracownik.objects.get(username='a.nowak')
         wiersze = {(p.przedmiot, p.poziom): p for p in user.nauczyciel.przedmioty.all()}
         self.assertEqual(str(wiersze[('angielski', 'srednia podstawa')].stawka), '40.00')
-        self.assertEqual(str(wiersze[('matematyka', 'srednia rozszerzenie + studia')].stawka), '50.00')
+        self.assertEqual(str(wiersze[('matematyka', 'srednia rozszerzenie')].stawka), '50.00')
 
     def test_nauczyciel_bez_przedmiotu_odrzucony(self):
         self.client.force_login(self.admin)

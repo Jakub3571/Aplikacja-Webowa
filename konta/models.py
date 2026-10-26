@@ -82,6 +82,9 @@ class Uczen(models.Model):
 POZIOMY_NAUCZYCIELA = [
     ('podstawowka', 'podstawówka'),
     ('srednia podstawa', 'średnia podstawa'),
+    ('srednia rozszerzenie', 'średnia rozszerzenie'),
+    ('studia', 'studia'),
+    # starszy zapis z połączonym poziomem — rozpoznawany przy odczycie danych
     ('srednia rozszerzenie + studia', 'srednia rozszerzenie + studia'),
 ]
 
@@ -125,14 +128,14 @@ class Nauczyciel(models.Model):
     def stawka_dla(self, przedmiot, poziom_ucznia):
         """Stawka dla przedmiotu i poziomu ucznia (z kart przedmiotów);
         jeśli nie znajdzie, fallback do ogólnej stawki nauczyciela."""
-        poziom_nauczyciela = {
-            'podstawowka': 'podstawowka',
-            'podstawówka': 'podstawowka',
-            'srednia podstawa': 'srednia podstawa',
-            'srednia rozszerzenie + studia': 'srednia rozszerzenie + studia',
-            'srednia rozszerzenie': 'srednia rozszerzenie + studia',
-            'studia': 'srednia rozszerzenie + studia',
-        }.get(poziom_ucznia, poziom_ucznia)
+        poziom_nauczyciela = [
+            ('podstawowka', 'podstawówka'),
+            ('srednia podstawa', 'średnia podstawa'),
+            ('srednia rozszerzenie', 'średnia rozszerzenie'),
+            ('studia', 'studia'),
+            # starszy zapis z połączonym poziomem — rozpoznawany przy odczycie danych
+            ('srednia rozszerzenie + studia', 'srednia rozszerzenie + studia'),
+        ].get(poziom_ucznia, poziom_ucznia)
         for p in self.przedmioty.all():
             if p.przedmiot == przedmiot and p.poziom == poziom_nauczyciela:
                 return p.stawka

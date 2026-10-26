@@ -348,10 +348,16 @@ def korepetytorzy_dane(request):
         'podstawowka': 'podstawowka',
         'podstawówka': 'podstawowka',
         'srednia podstawa': 'srednia podstawa',
-        'srednia rozszerzenie + studia': 'srednia rozszerzenie + studia',
-        'srednia rozszerzenie': 'srednia rozszerzenie + studia',
-        'studia': 'srednia rozszerzenie + studia',
+        'srednia rozszerzenie': 'srednia rozszerzenie',
+        'studia': 'studia',
+        'srednia rozszerzenie + studia': 'srednia rozszerzenie',
     }.get(poziom, poziom)
+    # starszy zapis z połączonym poziomem: bierzemy nauczycieli od rozszerzenia lub studiów
+    szukane_poziomy = (
+        ('srednia rozszerzenie', 'studia')
+        if poziom_nauczyciela in ('srednia rozszerzenie', 'studia', 'srednia rozszerzenie + studia')
+        else (poziom_nauczyciela,)
+    )
 
     dzien = None
     godzina = None
@@ -373,7 +379,7 @@ def korepetytorzy_dane(request):
         godziny_wynik = []
         for n in Nauczyciel.objects.filter(aktywny=True).prefetch_related('przedmioty').order_by('nazwisko', 'imie'):
             pasuje_przedmiot = any(
-                p.przedmiot == przedmiot and p.poziom == poziom_nauczyciela
+                p.przedmiot == przedmiot and p.poziom in szukane_poziomy
                 for p in n.przedmioty.all()
             )
             if not pasuje_przedmiot:
@@ -419,7 +425,7 @@ def korepetytorzy_dane(request):
         return JsonResponse({'godziny': godziny_wynik})
     for n in Nauczyciel.objects.filter(aktywny=True).prefetch_related('przedmioty').order_by('nazwisko', 'imie'):
         pasuje_przedmiot = any(
-            p.przedmiot == przedmiot and p.poziom == poziom_nauczyciela
+            p.przedmiot == przedmiot and p.poziom in szukane_poziomy
             for p in n.przedmioty.all()
         )
         if not pasuje_przedmiot:
