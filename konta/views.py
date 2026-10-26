@@ -215,8 +215,12 @@ def logowanie(request):
 
 
 def wyslij_powiadomienie_o_uczniu(request, uczen):
-    """Wysyła e-mail z powiadomieniem, że do systemu wpisano nowego ucznia."""
-    odbiorcy = getattr(settings, 'EMAILE_POWIADOMIEN', [])
+    """Wysyła e-mail z powiadomieniem, że do systemu wpisano nowego ucznia.
+    Idzie do biura (EMAILE_POWIADOMIEN) oraz do przypisanego korepetytora."""
+    odbiorcy = list(getattr(settings, 'EMAILE_POWIADOMIEN', []))
+    nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
+    if nauczyciel and nauczyciel.email and nauczyciel.email not in odbiorcy:
+        odbiorcy.append(nauczyciel.email)
     if not odbiorcy:
         return
     tresc = (
@@ -233,7 +237,33 @@ def wyslij_powiadomienie_o_uczniu(request, uczen):
             'Nowy uczeń — Panel pracowniczy',
             tresc,
             None,
-            list(odbiorcy),
+            odbiorcy,
+        )
+    except Exception:
+        pass
+
+
+def wyslij_powiadomienie_nauczycielowi(request, uczen):
+    """Wysyła korepetytorowi e-mail z informacją o nowym uczniu i terminie 1. lekcji."""
+    nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
+    if not nauczyciel or not nauczyciel.email:
+        return
+    tresc = (
+        f'Dzień dobry {nauczyciel.imie},\n\n'
+        f'do Twojego kalendarza wpisano nowego ucznia:\n\n'
+        f'Uczeń: {uczen.imie_ucznia} {uczen.nazwisko_rodzica}\n'
+        f'Przedmiot: {uczen.przedmiot} — poziom: {uczen.poziom}\n'
+        f'Rodzic: {uczen.rodzic} (tel. {uczen.telefon_glowny})\n'
+        f'1. lekcja: {uczen.pierwsza_lekcja:%d.%m.%Y o godz. %H:%M}\n\n'
+        f'Zajęcia pojawią się w Twoim kalendarzu w zakładce „Lekcje”.\n\n'
+        f'Wpisał: {uczen.kto_umowil}\n'
+    )
+    try:
+        send_mail(
+            f'Nowy uczeń: {uczen.imie_ucznia} — 1. lekcja {uczen.pierwsza_lekcja:%d.%m.%Y %H:%M}',
+            tresc,
+            None,
+            [nauczyciel.email],
         )
     except Exception:
         pass
@@ -457,6 +487,7 @@ def uczniowie(request):
         uczen.save()
         messages.success(request, 'Uczeń został dodany do systemu.')
         wyslij_powiadomienie_o_uczniu(request, uczen)
+        wyslij_powiadomienie_nauczycielowi(request, uczen)
         if form.cleaned_data.get('auto_wyslij_meet'):
             wyslij_link_meet_uczniowi(request, uczen, form.cleaned_data.get('adresat_meet'))
         else:
@@ -716,231 +747,84 @@ def reset_hasla(request):
     )(request)
 @login_required
 def kalendarz_nauczyciela(request, nauczyciel_id):
-    """Kalendarz miesiąca z klikalnymi kafelkami godzin (co 30 minut)."""
+    """Podgląd tygodnia nauczyciela w stylu Calendly (nowy kalendarz).
+    Admin widzi wszystko i może edytować, nauczyciel-właściciel jest przekierowany
+    do swojego widoku edycji, pozostali pracownicy widzą tylko podgląd."""
     nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
     edycja = moze_edytowac_kalendarz(request.user, nauczyciel_id)
-    if not czy_szef(request.user) and not edycja:
-        # konto nauczyciela: widzi TYLKO swój kalendarz
-        if getattr(request.user, 'nauczyciel_id', None):
+    nauczyciel_zalogowany = getattr(request.user, 'nauczyciel_id', None)
+    if nauczyciel_zalogowany:
+        if nauczyciel_zalogowany != nauczyciel_id:
             raise PermissionDenied
-        # zwykły pracownik: kalendarz tylko do podglądu
-    dzisiaj = date.today()
+        return redirect('moj_tydzien')
 
-    rok = request.GET.get('rok')
-    miesiac = request.GET.get('miesiac')
-    dzien = request.GET.get('dzien')
+    dzis = date.today()
     try:
-        rok = int(rok) if rok else dzisiaj.year
-        miesiac = int(miesiac) if miesiac else dzisiaj.month
-        if not (1 <= miesiac <= 12):
-            miesiac = dzisiaj.month
-    except ValueError:
-        rok, miesiac = dzisiaj.year, dzisiaj.month
-
-    wybrany_dzien = None
-    if dzien:
-        try:
-            wybrany_dzien = date(rok, miesiac, int(dzien))
-        except ValueError:
-            wybrany_dzien = None
-
-    dostepnosci_miesiaca = Dostepnosc.objects.filter(
-        nauczyciel=nauczyciel,
-        data_od__year=rok,
-        data_od__month=miesiac,
-    )
-    dni_z_godzinami = set(d.data_od for d in dostepnosci_miesiaca)
-    liczba_slotow_dnia = {}
-    for d in dostepnosci_miesiaca:
-        liczba_slotow_dnia[d.data_od] = liczba_slotow_dnia.get(d.data_od, 0) + 1
-    lekcje_miesiaca = {}
-    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
-    for lekcja in Lekcja.objects.select_related('uczen').filter(data__year=rok, data__month=miesiac):
-        if (lekcja.uczen.korepetytor or '').strip().lower() == nazwa_nauczyciela:
-            dzien_lekcji = timezone.localtime(lekcja.data).date()
-            lekcje_miesiaca[dzien_lekcji] = lekcje_miesiaca.get(dzien_lekcji, 0) + 1
-
-    kalendarz_miesiaca = calendar.Calendar(firstweekday=0).monthdatescalendar(rok, miesiac)
-    tygodnie = []
-    for tydzien in kalendarz_miesiaca:
-        dni = []
-        for dzien_miesiaca in tydzien:
-            dni.append({
-                'data': dzien_miesiaca,
-                'w_tym_miesiacu': dzien_miesiaca.month == miesiac,
-                'dostepny': dzien_miesiaca in dni_z_godzinami,
-                'wybrany': wybrany_dzien == dzien_miesiaca,
-                'liczba_godzin': liczba_slotow_dnia.get(dzien_miesiaca, 0),
-                'liczba_lekcji': lekcje_miesiaca.get(dzien_miesiaca, 0),
-            })
-        tygodnie.append(dni)
-
-    poprzedni_miesiac = miesiac - 1 if miesiac > 1 else 12
-    poprzedni_rok = rok if miesiac > 1 else rok - 1
-    nastepny_miesiac = miesiac + 1 if miesiac < 12 else 1
-    nastepny_rok = rok if miesiac < 12 else rok + 1
-
-    godziny_na_dzien = []
-    if wybrany_dzien:
-        godziny_na_dzien = Dostepnosc.objects.filter(
-            nauczyciel=nauczyciel,
-            data_od=wybrany_dzien,
-        ).order_by('godzina_od')
-
-    zaznaczone = set()
-    if wybrany_dzien:
-        for termin in godziny_na_dzien:
-            start = datetime.combine(wybrany_dzien, termin.godzina_od)
-            koniec = datetime.combine(wybrany_dzien, termin.godzina_do)
-            while start < koniec:
-                zaznaczone.add(start.strftime('%H:%M'))
-                start += timedelta(minutes=30)
-
-    przerwa_dnia = 0
-    if wybrany_dzien:
-        wpis = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=wybrany_dzien).first()
-        if wpis:
-            przerwa_dnia = wpis.minuty
-
-    def policz_plan(zaznaczone_godziny, przerwa_min):
-        plan = []
-        sloty_przerwy = set()
-        if not zaznaczone_godziny:
-            return plan, sloty_przerwy
-        sloty = sorted(zaznaczone_godziny)
-        bloki = []
-        i = 0
-        while i < len(sloty):
-            start_bloku = datetime.strptime(sloty[i], '%H:%M')
-            dlugosc = 30
-            while (
-                i + 1 < len(sloty)
-                and (start_bloku + timedelta(minutes=dlugosc)).strftime('%H:%M') == sloty[i + 1]
-                and dlugosc < 60
-            ):
-                dlugosc += 30
-                i += 1
-            bloki.append((start_bloku, dlugosc))
-            i += 1
-        przesuniecie = 0
-        for numer, (start_bloku, dlugosc) in enumerate(bloki, start=1):
-            start = start_bloku + timedelta(minutes=przesuniecie)
-            koniec = start + timedelta(minutes=dlugosc)
-            if numer > 1 and przerwa_min:
-                poczatek_przerwy = start - timedelta(minutes=przerwa_min)
-                plan.append({
-                    'typ': 'przerwa',
-                    'start': poczatek_przerwy.strftime('%H:%M'),
-                    'koniec': start.strftime('%H:%M'),
-                })
-                kursor = poczatek_przerwy.replace(minute=(poczatek_przerwy.minute // 30) * 30)
-                while kursor < start:
-                    sloty_przerwy.add(kursor.strftime('%H:%M'))
-                    kursor += timedelta(minutes=30)
-            plan.append({
-                'typ': 'lekcja',
-                'numer': numer,
-                'start': start.strftime('%H:%M'),
-                'koniec': koniec.strftime('%H:%M'),
-            })
-            przesuniecie += przerwa_min
-        return plan, sloty_przerwy
-
-    plan_dnia, sloty_przerwy = policz_plan(zaznaczone, przerwa_dnia)
-
-    zajete_dnia = set()
-    nazwa_nauczyciela_widok = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
-    if wybrany_dzien:
-        for lekcja in Lekcja.objects.select_related('uczen').filter(data__date=wybrany_dzien, odwolana=False):
-            if (lekcja.uczen.korepetytor or '').strip().lower() != nazwa_nauczyciela_widok:
-                continue
-            start_lekcji = timezone.localtime(lekcja.data).replace(tzinfo=None)
-            for minuty in range(0, GODZINA_LEKCJI, 30):
-                zajete_dnia.add((start_lekcji + timedelta(minutes=minuty)).strftime('%H:%M'))
-    kafelki = []
-    for h in range(6, 21):
-        for m in (0, 30):
-            etykieta = f'{h:02d}:{m:02d}'
-            kafelki.append({
-                'etykieta': etykieta,
-                'zaznaczony': etykieta in zaznaczone,
-                'przerwa': etykieta in sloty_przerwy,
-                'zajety': etykieta in zajete_dnia,
-            })
-
-    if request.method == 'POST' and 'zapisz_przerwe' in request.POST:
-        if not edycja:
-            messages.error(request, 'Ten kalendarz jest tylko do odczytu — nie masz uprawnień do edycji.')
-            return redirect('kalendarz_nauczyciela', nauczyciel_id=nauczyciel.id)
-        try:
-            nowa_przerwa = int(request.POST.get('przerwa', 0))
-        except (TypeError, ValueError):
-            nowa_przerwa = 0
-        if nowa_przerwa not in (0, 5, 10, 15, 30):
-            nowa_przerwa = 0
-        if wybrany_dzien:
-            PrzerwaDnia.objects.update_or_create(
-                nauczyciel=nauczyciel,
-                data=wybrany_dzien,
-                defaults={'minuty': nowa_przerwa},
-            )
-            if nowa_przerwa:
-                messages.success(request, f'Przerwa {wybrany_dzien:%d.%m.%Y}: {nowa_przerwa} min.')
-            else:
-                messages.success(request, f'Przerwa {wybrany_dzien:%d.%m.%Y}: brak.')
-        cel = reverse('kalendarz_nauczyciela', args=[nauczyciel.id])
-        if wybrany_dzien:
-            cel += f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}'
-        return redirect(cel)
-
-    if request.method == 'POST' and 'przelacz_godzine' in request.POST and wybrany_dzien:
-        if not edycja:
-            messages.error(request, 'Ten kalendarz jest tylko do odczytu — nie masz uprawnień do edycji.')
-            return redirect('kalendarz_nauczyciela', nauczyciel_id=nauczyciel.id)
-        etykieta = request.POST['godzina']
-        start = datetime.strptime(etykieta, '%H:%M').time()
-        koniec = (datetime.combine(date.today(), start) + timedelta(minutes=30)).time()
-        slot = Dostepnosc.objects.filter(
-            nauczyciel=nauczyciel,
-            data_od=wybrany_dzien,
-            godzina_od=start,
-            godzina_do=koniec,
-        ).first()
-        if slot:
-            slot.delete()
-            messages.success(request, f'Godzina {etykieta} — odznaczono.')
-        else:
-            Dostepnosc.objects.create(
-                nauczyciel=nauczyciel,
-                data_od=wybrany_dzien,
-                data_do=wybrany_dzien,
-                godzina_od=start,
-                godzina_do=koniec,
-            )
-            messages.success(request, f'Godzina {etykieta} — oznaczono jako dostępna.')
-        return redirect(
-            reverse('kalendarz_nauczyciela', args=[nauczyciel.id])
-            + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}'
+        start = date(
+            int(request.GET.get('rok') or dzis.year),
+            int(request.GET.get('miesiac') or dzis.month),
+            int(request.GET.get('dzien') or dzis.day),
         )
+    except ValueError:
+        start = dzis
+    poniedzialek = start - timedelta(days=start.weekday())
+    dni_tygodnia = [poniedzialek + timedelta(days=i) for i in range(7)]
+    poprzedni = poniedzialek - timedelta(days=7)
+    nastepny = poniedzialek + timedelta(days=7)
+
+    sloty_dnia = {}
+    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__in=dni_tygodnia).order_by('data_od', 'godzina_od'):
+        sloty_dnia.setdefault(termin.data_od, []).append(termin)
+
+    przerwy_dni = {}
+    for wpis in PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data__in=dni_tygodnia):
+        przerwy_dni[wpis.data] = wpis.minuty
+
+    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+    lekcje_dni = {}
+    for lekcja in Lekcja.objects.select_related('uczen').filter(data__gte=poniedzialek, data__lt=nastepny, odwolana=False):
+        if (lekcja.uczen.korepetytor or '').strip().lower() != nazwa_nauczyciela:
+            continue
+        dzien_lekcji = timezone.localtime(lekcja.data).date()
+        lekcje_dni.setdefault(dzien_lekcji, []).append(lekcja)
+
+    dni = []
+    for dzien in dni_tygodnia:
+        zakresy = []
+        aktualny = None
+        for termin in sloty_dnia.get(dzien, []):
+            od = termin.godzina_od.strftime('%H:%M')
+            do_ = termin.godzina_do.strftime('%H:%M')
+            if aktualny and aktualny['do'] == od:
+                aktualny['do'] = do_
+            else:
+                if aktualny:
+                    zakresy.append(aktualny)
+                aktualny = {'od': od, 'do': do_}
+        if aktualny:
+            zakresy.append(aktualny)
+        lekcje_listy = []
+        for lekcja in sorted(lekcje_dni.get(dzien, []), key=lambda l: l.data):
+            lekcje_listy.append({
+                'uczen': f'{lekcja.uczen.imie_ucznia} {lekcja.uczen.nazwisko_rodzica}',
+                'przedmiot': lekcja.uczen.przedmiot,
+                'godzina': timezone.localtime(lekcja.data).strftime('%H:%M'),
+                'koniec': (timezone.localtime(lekcja.data) + timedelta(minutes=GODZINA_LEKCJI)).strftime('%H:%M'),
+            })
+        dni.append({
+            'data': dzien,
+            'zakresy': zakresy,
+            'lekcje': lekcje_listy,
+            'przerwa': przerwy_dni.get(dzien, 0),
+            'dzisiaj': dzien == dzis,
+        })
 
     return render(request, 'konta/kalendarz.html', {
         'nauczyciel': nauczyciel,
-        'tygodnie': tygodnie,
-        'dni_tygodnia': DNI_TYGODNIA,
-        'nazwa_miesiaca': MIESIACE[miesiac - 1],
-        'rok': rok,
-        'miesiac': miesiac,
-        'poprzedni_miesiac': poprzedni_miesiac,
-        'poprzedni_rok': poprzedni_rok,
-        'nastepny_miesiac': nastepny_miesiac,
-        'nastepny_rok': nastepny_rok,
-        'wybrany_dzien': wybrany_dzien,
-        'kafelki': kafelki,
-        'plan_dnia': plan_dnia,
-        'przerwa_dnia': przerwa_dnia,
+        'dni': dni,
+        'poprzedni_tydzien': poprzedni,
+        'nastepny_tydzien': nastepny,
         'edycja': edycja,
-        'liczba_godzin_dnia': len(zaznaczone),
-        'liczba_blokow': sum(1 for w in plan_dnia if w['typ'] == 'lekcja'),
     })
 
 

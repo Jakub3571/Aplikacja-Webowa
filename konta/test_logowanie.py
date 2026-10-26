@@ -189,21 +189,20 @@ class NauczycieleTests(TestCase):
             nauczyciel=self.nauczyciel, przedmiot='matematyka', poziom='srednia podstawa',
         )
 
-    def test_kalendarz_przelnacza_kafelek(self):
+    def test_kalendarz_dane_przelacza_godzine(self):
         self.client.force_login(self.user)
-        adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/?rok=2026&miesiac=10&dzien=5'
-        r = self.client.post(adres, {'przelacz_godzine': '1', 'godzina': '16:00'}, follow=True)
-        self.assertContains(r, 'oznaczono jako dostępna')
+        adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/'
+        r = self.client.post(adres, {'dzien': '2026-10-05', 'akcja': 'przelacz_godzine', 'godzina': '16:00'})
+        self.assertEqual(r.status_code, 200)
         self.assertEqual(Dostepnosc.objects.count(), 1)
         slot = Dostepnosc.objects.first()
         self.assertEqual(slot.data_od, date(2026, 10, 5))
         self.assertEqual(slot.godzina_od.strftime('%H:%M'), '16:00')
         self.assertEqual(slot.godzina_do.strftime('%H:%M'), '16:30')
-        r = self.client.post(adres, {'przelacz_godzine': '1', 'godzina': '16:00'}, follow=True)
-        self.assertContains(r, 'odznaczono')
+        r = self.client.post(adres, {'dzien': '2026-10-05', 'akcja': 'przelacz_godzine', 'godzina': '16:00'})
         self.assertEqual(Dostepnosc.objects.count(), 0)
 
-    def test_kalendarz_pokazuje_siatke_miesiaca(self):
+    def test_kalendarz_pokazuje_tydzien(self):
         self.client.force_login(self.user)
         Dostepnosc.objects.create(
             nauczyciel=self.nauczyciel,
@@ -211,8 +210,8 @@ class NauczycieleTests(TestCase):
             godzina_od='16:00', godzina_do='16:30',
         )
         r = self.client.get(f'/nauczyciele/{self.nauczyciel.id}/kalendarz/', {'rok': 2026, 'miesiac': 10, 'dzien': 5})
-        self.assertContains(r, 'Październik')
-        self.assertContains(r, 'dzien-dostepny')
+        self.assertContains(r, '16:00')
+        self.assertContains(r, '16:30')
 
     def test_uczniowie_pokazuja_dostepnosc(self):
         self.client.force_login(self.user)
@@ -543,10 +542,13 @@ class KreatorDyspozycyjnoscTests(TestCase):
         adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/?rok=2026&miesiac=10&dzien=1'
         r = self.client.get(adres)
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Tryb podglądu')
-        # proba edycji: POST odrzucony, nic sie nie zmienia
-        r = self.client.post(adres, {'przelacz_godzine': '1', 'godzina': '17:00'}, follow=True)
-        self.assertContains(r, 'tylko do odczytu')
+        self.assertContains(r, 'tylko do podglądu')
+        # proba edycji AJAX: POST odrzucony, nic sie nie zmienia
+        r = self.client.post(
+            f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/',
+            {'dzien': '2026-10-01', 'akcja': 'przelacz_godzine', 'godzina': '17:00'},
+        )
+        self.assertEqual(r.status_code, 403)
         self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel).count(), 1)
 
 class LekcjeCykliczneTests(TestCase):

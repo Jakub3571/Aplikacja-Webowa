@@ -458,15 +458,6 @@ body {
   font-weight: 700;
 }
 
-.kafelek-przerwa {
-  background: #9ca3af;
-  color: #ffffff;
-  border-style: dashed;
-  font-style: italic;
-}
-
-.kafelek-przerwa:hover { background: #6b7280; }
-
 .kafelek-zajety {
   background: #fca5a5;
   color: #7f1d1d;
@@ -482,11 +473,6 @@ body {
   height: 0.7rem;
   border-radius: 999px;
   background: #fca5a5;
-}
-
-.kafelek-zaznaczony.kafelek-przerwa {
-  background: linear-gradient(135deg, #2563eb 0%, #2563eb 60%, #9ca3af 60%, #9ca3af 100%);
-  border: 2px dashed #e0e7ff;
 }
 
 .kalendarz-uklad {
@@ -520,24 +506,6 @@ body {
   appearance: textfield;
 }
 
-.suwak-godzin {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.suwak-godzin select {
-    flex: 1;
-    margin-bottom: 0;
-}
-
-.suwak-godzin-strzalka {
-    padding: 0.45rem 0.7rem;
-    font-size: 0.8rem;
-    line-height: 1;
-    cursor: pointer;
-}
-
 .przerwa-form {
   margin-top: 1.5rem;
   padding-top: 1.25rem;
@@ -546,145 +514,6 @@ body {
 
 .przerwa-form h3 {
   margin-bottom: 0.35rem;
-}
-
-.przerwa-opcje {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0.75rem 0;
-}
-
-.przerwa-opcja {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.8rem;
-  border: 1px solid var(--ramka);
-  border-radius: 999px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  background: var(--karta);
-  color: var(--tekst);
-}
-
-.przerwa-opcja input {
-  accent-color: var(--akcent);
-}
-
-.przerwa-opcja.wybrana {
-  border-color: var(--akcent);
-  background: color-mix(in srgb, var(--akcent) 12%, var(--karta));
-  font-weight: 600;
-}
-
-.plan-dnia {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
-.plan-slot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.6rem 0.9rem;
-  border-radius: 0.5rem;
-  font-size: 0.95rem;
-}
-
-.plan-lekcja {
-  background: color-mix(in srgb, var(--akcent) 15%, var(--karta));
-  border-left: 4px solid var(--akcent);
-  font-weight: 600;
-}
-
-.plan-przerwa {
-  background: #9ca3af;
-  color: #ffffff;
-  border-left: 4px solid #6b7280;
-  font-style: italic;
-}
-
-.kalendarz-komunikat {
-  margin-top: 0.75rem;
-  min-height: 1.2rem;
-  font-size: 0.9rem;
-  color: var(--akcent);
-  font-weight: 600;
-}
-
-/* === Kalendarz nauczyciela — oś czasu w stylu Calendly === */
-
-.os-czasu {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.35rem;
-  max-height: 26rem;
-  overflow-y: auto;
-  padding-right: 0.25rem;
-}
-
-.os-czasu .kafelek {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  min-height: 44px;
-  padding: 0.5rem 0.9rem;
-  border: 1px solid var(--ramka);
-  border-radius: 0.5rem;
-  background: var(--tlo);
-  color: var(--tekst);
-  font-size: 0.95rem;
-  font-family: inherit;
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
-}
-
-.os-czasu .kafelek:hover {
-  border-color: var(--akcent);
-  transform: translateX(2px);
-}
-
-.os-czasu .kafelek::after {
-  content: "＋ zaznacz";
-  font-size: 0.75rem;
-  opacity: 0.5;
-}
-
-.os-czasu .kafelek-zaznaczony::after {
-  content: "✓ dostępne";
-  opacity: 0.9;
-}
-
-.os-czasu .kafelek-przerwa::after {
-  content: "przerwa";
-  opacity: 0.9;
-}
-
-.kafelek-w-zakresie {
-  outline: 2px dashed var(--akcent);
-  outline-offset: -2px;
-  background: color-mix(in srgb, var(--akcent) 10%, var(--tlo));
-}
-
-.kalendarz-podsumowanie {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  padding: 0.6rem 0.9rem;
-  margin-bottom: 0.75rem;
-  border: 1px solid var(--ramka);
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--akcent) 8%, var(--karta));
-  font-size: 0.9rem;
-}
-
-.kalendarz-podsumowanie strong {
-  color: var(--akcent);
 }
 
 .pigulka {
@@ -696,25 +525,9 @@ body {
   line-height: 1.4;
 }
 
-.pigulka-lekcje {
-  background: #2563eb;
-  color: #ffffff;
-}
-
 .pigulka-godziny {
   background: #16a34a;
   color: #ffffff;
-}
-
-.dzien-numer {
-  font-weight: 600;
-}
-
-.kalendarz-akcje {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
 }
 
 .przycisk-kalendarz {
@@ -739,28 +552,6 @@ body {
   cursor: not-allowed;
 }
 
-/* Zajete godziny (lekcje uczniow) na osi czasu */
-.os-czasu .kafelek-zajety,
-.os-czasu .kafelek:disabled {
-  background: #f3f4f6;
-  color: #9ca3af;
-  cursor: not-allowed;
-  text-decoration: line-through;
-  border-style: dashed;
-}
-
-.os-czasu .kafelek-zajety::after {
-  content: "zajęte — lekcja";
-  opacity: 0.8;
-  font-size: 0.75rem;
-  text-decoration: none;
-}
-
-.os-czasu .kafelek-zajety:hover {
-  border-color: var(--ramka);
-  transform: none;
-}
-
 /* Przycisk wyczysc dzien — czerwony akcent */
 .przycisk-kalendarz-usun:hover:not(:disabled) {
   border-color: #dc2626;
@@ -768,117 +559,11 @@ body {
   color: #7f1d1d;
 }
 
-@media (max-width: 900px) {
-  .os-czasu .kafelek {
-    min-height: 48px;
-    font-size: 1rem;
-  }
-}
-
-/* === Moj tydzien — 7 dni w stylu Calendly === */
+/* === Moj tydzien — dni w wierszach z plusikiem zakresu (styl Calendly) === */
 
 .tydzien-uklad { max-width: 60rem; margin: 0 auto; }
 
 .tydzien-karta { max-width: none; }
-
-.tydzien-siatka {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-
-.tydzien-naglowek-dnia {
-  margin: 0 0 0.5rem;
-  text-align: center;
-  font-size: 0.9rem;
-}
-
-.tydzien-sloty {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  max-height: 22rem;
-  overflow-y: auto;
-  padding-right: 0.15rem;
-}
-
-.tydzien-slot {
-  width: 100%;
-  padding: 0.4rem 0.2rem;
-  border: 1px solid var(--ramka);
-  border-radius: 0.5rem;
-  background: var(--tlo);
-  color: var(--tekst);
-  font-size: 0.8rem;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.tydzien-slot:hover { border-color: var(--akcent); }
-
-.tydzien-slot.kafelek-zaznaczony {
-  background: #16a34a;
-  color: #fff;
-  border-color: #16a34a;
-  font-weight: 700;
-}
-
-@media (max-width: 900px) {
-  .tydzien-siatka { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-
-/* Sloty z plusikiem jak w Calendly */
-.tydzien-slot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.35rem 0.5rem;
-  border: none;
-  border-radius: 0.5rem;
-  background: transparent;
-}
-
-.slot-godzina { font-size: 0.85rem; }
-
-.slot-plus {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 999px;
-  border: 1.5px solid var(--akcent);
-  color: var(--akcent);
-  font-size: 0.95rem;
-  font-weight: 700;
-  line-height: 1;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.tydzien-slot:hover .slot-plus {
-  background: var(--akcent);
-  color: #fff;
-}
-
-.tydzien-slot.kafelek-zaznaczony {
-  background: color-mix(in srgb, #16a34a 12%, var(--tlo));
-}
-
-.tydzien-slot.kafelek-zaznaczony .slot-plus {
-  border-color: #16a34a;
-  background: #16a34a;
-  color: #fff;
-}
-
-.tydzien-slot.kafelek-zaznaczony:hover .slot-plus {
-  border-color: #dc2626;
-  background: #dc2626;
-}
-
-/* === Moj tydzien — dni w wierszach z plusikiem zakresu (styl Calendly) === */
 
 .dzien-wiersz {
   display: flex;
@@ -889,6 +574,7 @@ body {
   border-radius: 0.6rem;
   margin-bottom: 0.5rem;
   background: var(--tlo);
+  flex-wrap: wrap;
 }
 
 .dzien-wiersz:has(.zakres-pigulka) {
@@ -947,7 +633,7 @@ body {
 }
 
 .zakres-okienko {
-  margin-top: 1rem;
+  margin-top: 0.75rem;
   padding: 1rem 1.1rem;
   border: 2px solid var(--akcent);
   border-radius: 0.75rem;
@@ -981,13 +667,8 @@ body {
 .zakres-myslnik { font-weight: 700; opacity: 0.6; }
 
 @media (max-width: 900px) {
-  .dzien-wiersz { flex-wrap: wrap; }
   .dzien-nazwa { flex: 1 1 100%; }
 }
-
-/* Okienko zakresu wewnatrz wiersza dnia */
-.dzien-wiersz { flex-wrap: wrap; }
-.zakres-okienko { margin-top: 0.75rem; }
 
 .krok-info {
   background: color-mix(in srgb, var(--akcent) 8%, var(--karta));
@@ -1067,3 +748,15 @@ body {
 }
 
 .przycisk-przywroc:hover { background: #15803d; }
+
+/* Pigułka lekcji w podglądzie kalendarza nauczyciela */
+.pigulka-lekcja {
+  background: color-mix(in srgb, var(--akcent) 15%, var(--karta));
+  border: 1px solid var(--akcent);
+  color: var(--tekst);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  margin-left: 0.25rem;
+  display: inline-block;
+}
