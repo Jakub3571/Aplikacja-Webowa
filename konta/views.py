@@ -352,12 +352,7 @@ def korepetytorzy_dane(request):
         'studia': 'studia',
         'srednia rozszerzenie + studia': 'srednia rozszerzenie',
     }.get(poziom, poziom)
-    # starszy zapis z połączonym poziomem: bierzemy nauczycieli od rozszerzenia lub studiów
-    szukane_poziomy = (
-        ('srednia rozszerzenie', 'studia')
-        if poziom_nauczyciela in ('srednia rozszerzenie', 'studia', 'srednia rozszerzenie + studia')
-        else (poziom_nauczyciela,)
-    )
+    szukane_poziomy = (poziom_nauczyciela,)
 
     dzien = None
     godzina = None
@@ -494,12 +489,11 @@ def uczniowie(request):
         messages.success(request, 'Uczeń został dodany do systemu.')
         wyslij_powiadomienie_o_uczniu(request, uczen)
         wyslij_powiadomienie_nauczycielowi(request, uczen)
-        if form.cleaned_data.get('auto_wyslij_meet'):
-            wyslij_link_meet_uczniowi(request, uczen, form.cleaned_data.get('adresat_meet'))
-        else:
+        if uczen.link_meet:
             messages.info(
                 request,
-                'Link Meet nie został wysłany — możesz go wysłać później z karty ucznia.',
+                'Link Meet zapisany — rodzic dostanie go automatycznie w przypomnieniu '
+                '60 minut przed każdą lekcją.',
             )
         return redirect('uczniowie')
 
@@ -528,9 +522,26 @@ def edytuj_ucznia(request, uczen_id):
         if uczen.korepetytor and uczen.korepetytor not in [w for w, _ in form.fields['korepetytor'].choices]:
             form.fields['korepetytor'].choices += [(uczen.korepetytor, uczen.korepetytor)]
         if form.is_valid():
+            stary_korepetytor = uczen.korepetytor
             zapisany = form.save(commit=False)
             zapisany.pierwsza_lekcja = form.cleaned_data.get('pierwsza_lekcja') or uczen.pierwsza_lekcja
             zapisany.save()
+            # zmiana korepetytora: zwalniamy blokady godzin u poprzedniego
+            if stary_korepetytor and stary_korepetytor.strip().lower() != (zapisany.korepetytor or '').strip().lower():
+                stary = nauczyciel_z_korepetytora(stary_korepetytor)
+                if stary:
+                    for lekcja in Lekcja.objects.filter(uczen=uczen):
+                        start = timezone.localtime(lekcja.data)
+                        Dostepnosc.objects.filter(
+                            nauczyciel=stary,
+                            data_od=start.date(),
+                            godzina_od=start.time(),
+                        ).delete()
+                    messages.info(
+                        request,
+                        f'Zmieniono korepetytora — zwolniono zablokowane godziny u {stary_korepetytor}. '
+                        'Umów lekcje ponownie w kalendarzu ucznia, aby zablokować godziny u nowego korepetytora.',
+                    )
             messages.success(request, f'Dane ucznia {uczen.imie_ucznia} zostały zaktualizowane.')
             return redirect('lekcje')
     else:
@@ -645,7 +656,35 @@ def przywroc_ucznia(request, uczen_id):
     uczen.zakonczona = False
     uczen.save(update_fields=['zakonczona'])
     imie = f'{uczen.imie_ucznia} {uczen.nazwisko_rodzica}'
-    messages.success(request, f'Uczeń {imie} przywrócony z archiwum.')
+    # odtwarzamy blokady godzin u korepetytora — pomijamy terminy, które ktoś zajął w międzyczasie
+    nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
+    odtworzone = 0
+    pominięte_kolizje = 0
+    if nauczyciel:
+        przyszle = Lekcja.objects.filter(uczen=uczen, data__gte=timezone.now())
+        for lekcja in przyszle:
+            start = timezone.localtime(lekcja.data)
+            # kolizja liczy tylko cudze lekcje — lekcje tego ucznia nie przeszkadzają
+            if inne_lekcje_nauczyciela(nauczyciel, uczen, start.date(), start.time()):
+                pominięte_kolizje += 1
+                continue
+            Dostepnosc.objects.get_or_create(
+                nauczyciel=nauczyciel,
+                data_od=start.date(),
+                data_do=start.date(),
+                godzina_od=start.time(),
+                godzina_do=(datetime.combine(date(2000, 1, 1), start.time()) + timedelta(minutes=GODZINA_LEKCJI)).time(),
+            )
+            odtworzone += 1
+    komunikat = f'Uczeń {imie} przywrócony z archiwum.'
+    if odtworzone:
+        komunikat += f' Odtworzono {odtworzone} blokad godzin u korepetytora.'
+    if pominięte_kolizje:
+        komunikat += (
+            f' UWAGA: {pominięte_kolizje} terminów pominięto — korepetytor ma już wtedy '
+            'inną lekcję (sprawdź kalendarz ucznia i umów nowe godziny).'
+        )
+    messages.success(request, komunikat)
     return redirect('archiwum')
 
 @tylko_szef
@@ -1502,8 +1541,12 @@ def platnosci(request):
             email_odbiorcy=email_odbiorcy,
             wyslal=request.user.get_full_name() or request.user.username,
         )
-        Uczen.objects.filter(zaplacone=True).delete()
-        messages.success(request, f'Raport wysłano na {email_odbiorcy}. Zapłacone pozycje usunięto z listy.')
+        Uczen.objects.filter(zaplacone=True).update(zaplacone=False)
+        messages.success(
+            request,
+            f'Raport wysłano na {email_odbiorcy}. Rozliczone pozycje wyczyszczono z listy — '
+            'uczniowie zostają w aplikacji (bez zmiany zajęć).',
+        )
         return redirect('platnosci')
 
     rozliczenia = []
@@ -1816,12 +1859,17 @@ def umow_lekcje_cykliczna(request, uczen_id):
         if link_meet:
             uczen.link_meet = link_meet
             uczen.save()
-            wyslij_zaproszenie_meet(uczen)
         elif uczen.link_meet:
-            # link z konta nauczyciela/przy uczniu — wysyłamy bez wpisywania
-            wyslij_zaproszenie_meet(uczen)
+            # link z konta nauczyciela/przy uczniu — tylko zapisujemy
+            uczen.save(update_fields=['zajecia_cykliczne'])
         else:
             uczen.save(update_fields=['zajecia_cykliczne'])
+        if uczen.link_meet:
+            messages.info(
+                request,
+                'Link Meet zapisany — rodzic dostanie go automatycznie w przypomnieniu '
+                '60 minut przed każdą lekcją.',
+            )
         return redirect('kalendarz_lekcji', uczen_id=uczen.id)
     return render(request, 'konta/lekcja_cykliczna.html', {
         'uczen': uczen,

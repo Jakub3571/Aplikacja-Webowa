@@ -26,31 +26,23 @@ POZIOMY = [
     ('srednia podstawa', 'średnia podstawa'),
     ('srednia rozszerzenie', 'średnia rozszerzenie'),
     ('studia', 'studia'),
-    # starszy zapis z połączonym poziomem — rozpoznawany przy odczycie starszych danych
-    ('srednia rozszerzenie + studia', 'średnia rozszerzenie + studia'),
 ]
 
 # Mapowanie poziomu ucznia na poziom nauczyciela: 1:1 — te same klucze.
 # 'podstawówka' (z ogonkiem) też rozpoznawana — bezpiecznik dla starszych danych.
 # Poziomy 'srednia rozszerzenie' i 'studia' są teraz osobne; starszy zapis
-# 'srednia rozszerzenie + studia' mapowany jest na rozszerzenie.
+
 POZIOM_UCZEN_NA_NAUCZYCIELA = {
     'podstawowka': 'podstawowka',
     'podstawówka': 'podstawowka',
     'srednia podstawa': 'srednia podstawa',
     'srednia rozszerzenie': 'srednia rozszerzenie',
     'studia': 'studia',
-    'srednia rozszerzenie + studia': 'srednia rozszerzenie',
 }
 
 # Mapowanie poziomu ucznia na poziom nauczyciela: 1:1 — te same klucze.
 # 'podstawówka' (z ogonkiem) też rozpoznawana — bezpiecznik dla starszych danych.
-POZIOM_UCZEN_NA_NAUCZYCIELA = {
-    'podstawowka': 'podstawowka',
-    'podstawówka': 'podstawowka',
-    'srednia podstawa': 'srednia podstawa',
-    'srednia rozszerzenie + studia': 'srednia rozszerzenie + studia',
-}
+
 
 GODZINY_LEKCJI = [
     (f'{h:02d}:{m:02d}', f'{h:02d}:{m:02d}') for h in range(6, 21) for m in range(0, 60, 5)

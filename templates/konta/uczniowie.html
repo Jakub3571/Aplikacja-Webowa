@@ -104,16 +104,8 @@ pracowniczy{% endblock %} {% block panel %}
             {{ form.adresat_meet }} {% if form.adresat_meet.help_text %}
             <p class="podpowiedz">{{ form.adresat_meet.help_text }}</p>
             {% endif %}
-
-            <div class="pole-checkbox">
-                {{ form.auto_wyslij_meet }}
-                <label for="{{ form.auto_wyslij_meet.id_for_label }}"
-                    >{{ form.auto_wyslij_meet.label }}</label
-                >
-            </div>
-            {% if form.auto_wyslij_meet.help_text %}
-            <p class="podpowiedz">{{ form.auto_wyslij_meet.help_text }}</p>
-            {% endif %}
+			
+<p class="podpowiedz">Link Meet zapisuje się automatycznie — rodzic dostanie go w przypomnieniu 60 minut przed każdą lekcją.</p>
 
 			<label for="{{ form.korepetytor.id_for_label }}"
 				>Krok 5 — korepetytor (dostępni o wybranej godzinie)

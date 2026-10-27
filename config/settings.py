@@ -98,7 +98,18 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 AUTH_USER_MODEL = 'konta.Pracownik'
+AUTH_USER_MODEL = 'konta.Pracownik'
 
+# Bezpieczeństwo na produkcji (https):
+# CSRF_COOKIE_SECURE — ciasteczko CSRF wysyłane tylko po HTTPS.
+# SESSION_COOKIE_SECURE — to samo dla ciasteczka sesji (klucz logowania).
+# CSRF_COOKIE_HTTPONLY — JavaScript nie ma dostępu do tokena CSRF.
+if not DEBUG:
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Dokąd przekierowuje po udanym logowaniu i skąd wymusza logowanie

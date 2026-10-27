@@ -28,6 +28,10 @@ class Command(BaseCommand):
             start = timezone.localtime(lekcja.data)
             if start - teraz <= okno:
                 uczen = lekcja.uczen
+                # pomijamy uczniów z archiwum (zakończona współpraca) i bez adresu
+                if uczen.zakonczona:
+                    PrzypomnienieLekcji.objects.create(lekcja=lekcja)
+                    continue
                 if not uczen.email_glowny:
                     continue
                 tresc = (

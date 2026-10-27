@@ -1,24 +1,26 @@
 """Testy przepływu logowania pracownika."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from django.core.management import call_command
 
 from django.core import mail
 from django.test import TestCase
 from django.utils import timezone
 from datetime import date
 from konta.models import Dostepnosc
-
 from konta.models import (
     Dostepnosc,
     Lekcja,
     Nauczyciel,
     Pracownik,
     PrzedmiotNauczyciela,
+    PrzypomnienieLekcji,
     RaportPlatnosci,
     Uczen,
    
 )
 
+from konta.views import kolizja_lekcji_nauczyciela
 
 class PrzeplywLogowaniaTests(TestCase):
     def setUp(self):
@@ -280,7 +282,9 @@ class PlatnosciTests(TestCase):
         self.dodaj_ucznia('Ola', zaplacone=True)
         r = self.client.post('/platnosci/', {'wyslij_raport': '1', 'email_raportu': 'szef@f.pl'}, follow=True)
         self.assertContains(r, 'Raport wysłano')
-        self.assertEqual(Uczen.objects.count(), 0)
+        # uczniowie zostają w aplikacji (zajęcia bez zmian) — czyścimy tylko znacznik zapłaty
+        self.assertEqual(Uczen.objects.count(), 2)
+        self.assertEqual(Uczen.objects.filter(zaplacone=True).count(), 0)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ['szef@f.pl'])
         self.assertEqual(RaportPlatnosci.objects.count(), 1)
@@ -606,10 +610,18 @@ class LekcjeCykliczneTests(TestCase):
             dz = lekcja.data.date()
             self.assertEqual(dz.month, dzis.month)
             self.assertEqual(dz.weekday(), 1)  # 1 = wtorek
-        # mail do rodzica z linkiem Meet
+        # link Meet zapisany przy uczniu, ale mail nie idzie od razu —
+        # rodzic dostanie go w przypomnieniu 60 min przed lekcją
+        self.assertEqual(len(mail.outbox), 0)
+        self.uczen.refresh_from_db()
+        self.assertEqual(self.uczen.link_meet, 'https://meet.google.com/abc-defg-hij')
+        # przypomnienie 60 min przed lekcją zawiera link Meet
+        pierwsza = Lekcja.objects.filter(uczen=self.uczen).order_by('data').first()
+        pierwsza.data = timezone.now() + timedelta(minutes=30)
+        pierwsza.save()
+        call_command('wyslij_przypomnienia')
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn('https://meet.google.com/abc-defg-hij', mail.outbox[0].body)
-        self.assertIn('STAŁY', mail.outbox[0].body)
         # blokady u korepetytora: tyle samo co lekcji
         blokady = Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='17:00')
         self.assertEqual(blokady.count(), lekcje.count())
@@ -784,3 +796,86 @@ class StaleLekcjeMultiSlotTests(TestCase):
         while koniec.weekday() != 1:
             koniec -= _td(days=1)
         self.assertEqual(lok, koniec)
+
+class NoweFunkcjeTests(TestCase):
+    """Testy nowych funkcji: odwołane zajęcia, rozdzielone poziomy, odnawianie cyklicznych."""
+
+    def setUp(self):
+        self.user = Pracownik.objects.create_superuser('szef', 's@f.pl', 'Sup3rHaslo!')
+        self.nauczyciel = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='j@k.pl')
+        self.uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.now() + timedelta(days=1),
+            przedmiot='matematyka', poziom='studia', szkola='X',
+            imie_ucznia='Ala', nazwisko_rodzica='Testowa', rodzic='Ewa',
+            telefon_glowny='123', email_glowny='a@b.pl',
+            korepetytor='Jan Kowalski', umowil=self.user,
+        )
+
+    def test_odwolana_lekcja_nie_blokuje_kafelek(self):
+        data_lekcji = timezone.now() + timedelta(days=2)
+        lekcja = Lekcja.objects.create(uczen=self.uczen, data=data_lekcji)
+        lekcja.odwolana = True
+        lekcja.save(update_fields=['odwolana'])
+        po = kolizja_lekcji_nauczyciela(
+            self.nauczyciel,
+            timezone.localtime(data_lekcji).date(),
+            timezone.localtime(data_lekcji).replace(tzinfo=None),
+        )
+        self.assertFalse(po, 'odwołana lekcja nie może blokować terminu nauczyciela')
+
+    def test_przypomnienie_nie_idzie_do_archiwum(self):
+        lekcja = Lekcja.objects.create(
+            uczen=self.uczen,
+            data=timezone.now() + timedelta(minutes=30),
+        )
+        self.uczen.zakonczona = True
+        self.uczen.save(update_fields=['zakonczona'])
+        call_command('wyslij_przypomnienia')
+        self.assertEqual(len(mail.outbox), 0, 'uczeń z archiwum nie może dostać przypomnienia')
+        self.assertTrue(PrzypomnienieLekcji.objects.filter(lekcja=lekcja).exists())
+
+    def test_poziomy_rozszerzenie_i_studia_osobno(self):
+        from konta.forms import POZIOMY, POZIOM_UCZEN_NA_NAUCZYCIELA
+        klucze = [k for k, _ in POZIOMY]
+        self.assertIn('srednia rozszerzenie', klucze)
+        self.assertIn('studia', klucze)
+        self.assertEqual(POZIOM_UCZEN_NA_NAUCZYCIELA['studia'], 'studia')
+        self.assertEqual(POZIOM_UCZEN_NA_NAUCZYCIELA['srednia rozszerzenie'], 'srednia rozszerzenie')
+        self.assertNotIn('srednia rozszerzenie + studia', POZIOM_UCZEN_NA_NAUCZYCIELA)
+        
+
+    def test_odnowienie_cyklicznych_dopisuje_lekcje(self):
+        self.uczen.zajecia_cykliczne = True
+        self.uczen.save(update_fields=['zajecia_cykliczne'])
+        d = timezone.now().replace(hour=17, minute=0, second=0, microsecond=0)
+        while d.weekday() != 4:
+            d -= timedelta(days=1)
+        for i in range(3):
+            Lekcja.objects.create(uczen=self.uczen, data=timezone.make_aware(d.replace(tzinfo=None) - timedelta(weeks=i)))
+        przed = Lekcja.objects.filter(uczen=self.uczen, data__gte=timezone.now()).count()
+        call_command('odnow_cykliczne')
+        po = Lekcja.objects.filter(uczen=self.uczen, data__gte=timezone.now()).count()
+        self.assertGreater(po, przed, 'komenda powinna dopisać przyszłe cykliczne lekcje')
+        for lekcja in Lekcja.objects.filter(uczen=self.uczen, data__gte=timezone.now()):
+            self.assertEqual(timezone.localtime(lekcja.data).weekday(), 4)
+
+    def test_przywrocenie_z_archiwum_odtwarza_blokady(self):
+        lekcja = Lekcja.objects.create(
+            uczen=self.uczen,
+            data=timezone.make_aware(
+                (timezone.now() + timedelta(days=7)).replace(hour=17, minute=0, second=0, microsecond=0, tzinfo=None)
+            ),
+        )
+        self.client.force_login(self.user)
+        self.client.post(f'/uczniowie/{self.uczen.id}/zakoncz/', follow=True)
+        self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel).count(), 0)
+        self.client.post(f'/uczniowie/{self.uczen.id}/przywroc/', follow=True)
+        self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel).count(), 1)
+
+    def test_raport_nie_usuwa_uczniow(self):
+        self.uczen.zaplacone = True
+        self.uczen.save(update_fields=['zaplacone'])
+        self.client.force_login(self.user)
+        self.client.post('/platnosci/', {'wyslij_raport': '1', 'email_raportu': 'szef@f.pl'}, follow=True)
+        self.assertTrue(Uczen.objects.filter(id=self.uczen.id).exists(), 'uczeń musi zostać w bazie po raporcie')
+        self.assertFalse(Uczen.objects.get(id=self.uczen.id).zaplacone)
