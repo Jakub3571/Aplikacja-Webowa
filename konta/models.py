@@ -130,6 +130,17 @@ class Nauczyciel(models.Model):
         jeśli nie znajdzie, fallback do ogólnej stawki nauczyciela."""
         poziom_nauczyciela = [
             ('podstawowka', 'podstawówka'),
+
+
+
+
+
+
+
+
+
+
+            
             ('srednia podstawa', 'średnia podstawa'),
             ('srednia rozszerzenie', 'średnia rozszerzenie'),
             ('studia', 'studia'),
