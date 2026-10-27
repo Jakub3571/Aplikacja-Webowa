@@ -350,7 +350,6 @@ def korepetytorzy_dane(request):
         'srednia podstawa': 'srednia podstawa',
         'srednia rozszerzenie': 'srednia rozszerzenie',
         'studia': 'studia',
-        'srednia rozszerzenie + studia': 'srednia rozszerzenie',
     }.get(poziom, poziom)
     szukane_poziomy = (poziom_nauczyciela,)
 
