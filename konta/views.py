@@ -1817,11 +1817,6 @@ def umow_lekcje_cykliczna(request, uczen_id):
         except ValueError:
             data_poczatkowa = date.today()
         od_dnia, do_dnia = okres_dat(okres, data_poczatkowa)
-        try:
-            data_poczatkowa = date.fromisoformat(request.POST.get('data_poczatkowa', ''))
-        except ValueError:
-            data_poczatkowa = date.today()
-        od_dnia, do_dnia = okres_dat(okres, data_poczatkowa)
         sloty_raw = request.POST.getlist('slot_dzien')
         godziny_raw = request.POST.getlist('slot_godzina')
         sloty = []
