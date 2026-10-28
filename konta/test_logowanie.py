@@ -211,7 +211,11 @@ class NauczycieleTests(TestCase):
             data_od='2026-10-05', data_do='2026-10-05',
             godzina_od='16:00', godzina_do='16:30',
         )
-        r = self.client.get(f'/nauczyciele/{self.nauczyciel.id}/kalendarz/', {'rok': 2026, 'miesiac': 10, 'dzien': 5})
+        r = self.client.get(
+            f'/nauczyciele/{self.nauczyciel.id}/kalendarz/',
+            {'rok': 2026, 'miesiac': 10, 'dzien': 5},
+            follow=True,
+        )
         self.assertContains(r, '16:00')
         self.assertContains(r, '16:30')
 
@@ -544,9 +548,9 @@ class KreatorDyspozycyjnoscTests(TestCase):
         pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
         self.client.force_login(pracownik)
         adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/?rok=2026&miesiac=10&dzien=1'
-        r = self.client.get(adres)
+        r = self.client.get(adres, follow=True)
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'tylko do podglądu')
+        self.assertContains(r, '16:00')
         # proba edycji AJAX: POST odrzucony, nic sie nie zmienia
         r = self.client.post(
             f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/',

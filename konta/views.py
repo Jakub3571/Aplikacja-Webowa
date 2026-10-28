@@ -49,7 +49,7 @@ from .forms import (
     FormularzZmianyHasla,
     FormularzLekcjiCyklicznej,
 )
-from .models import Dostepnosc, Lekcja, Nauczyciel, Pracownik, PrzerwaDnia, RaportPlatnosci, Uczen
+from .models import Dostepnosc, Lekcja, Nauczyciel, Pracownik, PrzerwaDnia, PrzypomnienieLekcji, RaportPlatnosci, Uczen
 
 MIESIACE = [
     'styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec',
@@ -485,14 +485,27 @@ def uczniowie(request):
         if not uczen.link_meet and nauczyciel and nauczyciel.link_meet:
             uczen.link_meet = nauczyciel.link_meet
         uczen.save()
+        # 1. lekcja dostaje rekord i blokade u korepetytora — inaczej kolejny uczen
+        # moglby zostac umowiony na ta sama godzine (karta ucznia sama w sobie nie blokuje terminu)
+        Lekcja.objects.get_or_create(uczen=uczen, data=uczen.pierwsza_lekcja)
+        if nauczyciel:
+            start_czas = timezone.localtime(uczen.pierwsza_lekcja).time()
+            Dostepnosc.objects.get_or_create(
+                nauczyciel=nauczyciel,
+                data_od=start_dt.date(),
+                data_do=start_dt.date(),
+                godzina_od=start_czas,
+                godzina_do=(datetime.combine(date(2000, 1, 1), start_czas) + timedelta(minutes=GODZINA_LEKCJI)).time(),
+            )
         messages.success(request, 'Uczeń został dodany do systemu.')
         wyslij_powiadomienie_o_uczniu(request, uczen)
         wyslij_powiadomienie_nauczycielowi(request, uczen)
         if uczen.link_meet:
+            wyslij_link_meet_uczniowi(request, uczen, adresat='glowny')
             messages.info(
                 request,
-                'Link Meet zapisany — rodzic dostanie go automatycznie w przypomnieniu '
-                '60 minut przed każdą lekcją.',
+                'Link Meet nauczyciela wysłany do rodzica na adres główny — '
+                'dostanie go też w przypomnieniu 60 minut przed każdą lekcją.',
             )
         return redirect('uczniowie')
 
@@ -655,6 +668,12 @@ def przywroc_ucznia(request, uczen_id):
     uczen.zakonczona = False
     uczen.save(update_fields=['zakonczona'])
     imie = f'{uczen.imie_ucznia} {uczen.nazwisko_rodzica}'
+        # czyscimy znaczniki "przypomnienie wyslane" z czasow archiwum — inaczej
+    # przypomnienia dla przyszlych lekcji nigdy by nie poszly
+    PrzypomnienieLekcji.objects.filter(
+        lekcja__uczen=uczen,
+        lekcja__data__gte=timezone.now(),
+    ).delete()
     # odtwarzamy blokady godzin u korepetytora — pomijamy terminy, które ktoś zajął w międzyczasie
     nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
     odtworzone = 0
@@ -791,85 +810,12 @@ def reset_hasla(request):
     )(request)
 @login_required
 def kalendarz_nauczyciela(request, nauczyciel_id):
-    """Podgląd tygodnia nauczyciela w stylu Calendly (nowy kalendarz).
-    Admin widzi wszystko i może edytować, nauczyciel-właściciel jest przekierowany
-    do swojego widoku edycji, pozostali pracownicy widzą tylko podgląd."""
-    nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
-    edycja = moze_edytowac_kalendarz(request.user, nauczyciel_id)
+    """Stary widok podgladu — przekierowanie do widoku tygodnia (styl Calendly).
+    Admin/pracownik widzi dokladnie ten sam kalendarz co nauczyciel."""
     nauczyciel_zalogowany = getattr(request.user, 'nauczyciel_id', None)
-    if nauczyciel_zalogowany:
-        if nauczyciel_zalogowany != nauczyciel_id:
-            raise PermissionDenied
-        return redirect('moj_tydzien')
-
-    dzis = date.today()
-    try:
-        start = date(
-            int(request.GET.get('rok') or dzis.year),
-            int(request.GET.get('miesiac') or dzis.month),
-            int(request.GET.get('dzien') or dzis.day),
-        )
-    except ValueError:
-        start = dzis
-    poniedzialek = start - timedelta(days=start.weekday())
-    dni_tygodnia = [poniedzialek + timedelta(days=i) for i in range(7)]
-    poprzedni = poniedzialek - timedelta(days=7)
-    nastepny = poniedzialek + timedelta(days=7)
-
-    sloty_dnia = {}
-    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__in=dni_tygodnia).order_by('data_od', 'godzina_od'):
-        sloty_dnia.setdefault(termin.data_od, []).append(termin)
-
-    przerwy_dni = {}
-    for wpis in PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data__in=dni_tygodnia):
-        przerwy_dni[wpis.data] = wpis.minuty
-
-    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
-    lekcje_dni = {}
-    for lekcja in Lekcja.objects.select_related('uczen').filter(data__gte=poniedzialek, data__lt=nastepny, odwolana=False):
-        if (lekcja.uczen.korepetytor or '').strip().lower() != nazwa_nauczyciela:
-            continue
-        dzien_lekcji = timezone.localtime(lekcja.data).date()
-        lekcje_dni.setdefault(dzien_lekcji, []).append(lekcja)
-
-    dni = []
-    for dzien in dni_tygodnia:
-        zakresy = []
-        aktualny = None
-        for termin in sloty_dnia.get(dzien, []):
-            od = termin.godzina_od.strftime('%H:%M')
-            do_ = termin.godzina_do.strftime('%H:%M')
-            if aktualny and aktualny['do'] == od:
-                aktualny['do'] = do_
-            else:
-                if aktualny:
-                    zakresy.append(aktualny)
-                aktualny = {'od': od, 'do': do_}
-        if aktualny:
-            zakresy.append(aktualny)
-        lekcje_listy = []
-        for lekcja in sorted(lekcje_dni.get(dzien, []), key=lambda l: l.data):
-            lekcje_listy.append({
-                'uczen': f'{lekcja.uczen.imie_ucznia} {lekcja.uczen.nazwisko_rodzica}',
-                'przedmiot': lekcja.uczen.przedmiot,
-                'godzina': timezone.localtime(lekcja.data).strftime('%H:%M'),
-                'koniec': (timezone.localtime(lekcja.data) + timedelta(minutes=GODZINA_LEKCJI)).strftime('%H:%M'),
-            })
-        dni.append({
-            'data': dzien,
-            'zakresy': zakresy,
-            'lekcje': lekcje_listy,
-            'przerwa': przerwy_dni.get(dzien, 0),
-            'dzisiaj': dzien == dzis,
-        })
-
-    return render(request, 'konta/kalendarz.html', {
-        'nauczyciel': nauczyciel,
-        'dni': dni,
-        'poprzedni_tydzien': poprzedni,
-        'nastepny_tydzien': nastepny,
-        'edycja': edycja,
-    })
+    if nauczyciel_zalogowany and nauczyciel_zalogowany != nauczyciel_id:
+        raise PermissionDenied
+    return redirect('moj_tydzien_nauczyciela', nauczyciel_id=nauczyciel_id)
 
 
 @login_required
@@ -1140,7 +1086,7 @@ def usun_termin(request, termin_id):
     termin.delete()
     messages.success(request, 'Godziny zostały usunięte.')
     return redirect(
-        reverse('kalendarz_nauczyciela', args=[nauczyciel_id])
+        reverse('moj_tydzien_nauczyciela', args=[nauczyciel_id])
         + f'?rok={rok}&miesiac={miesiac}&dzien={dzien}'
     )
 
@@ -1395,7 +1341,13 @@ def kalendarz_lekcji(request, uczen_id):
             + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}'
         )
     if request.method == 'POST' and 'przelacz_godzine' in request.POST and wybrany_dzien:
-        etykieta = request.POST['godzina']
+        etykieta = request.POST.get('godzina', '')
+        if not etykieta:
+            messages.error(request, 'Nie wybrano godziny — kliknij kafelek z godziną.')
+            return redirect(
+                reverse('kalendarz_lekcji', args=[uczen.id])
+                + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}'
+            )
         start_czas = datetime.strptime(etykieta, '%H:%M').time()
         data_lekcji = timezone.make_aware(datetime.combine(wybrany_dzien, start_czas))
         istniejaca = Lekcja.objects.filter(uczen=uczen, data=data_lekcji).first()
@@ -1632,11 +1584,16 @@ def przelacz_szefa(request, user_id):
 
 
 @login_required
-def moj_tydzien(request):
+def moj_tydzien(request, nauczyciel_id=None):
     """Widok tygodnia nauczyciela w stylu Calendly: 7 dni obok siebie,
-    godziny dodaje się pojedynczym kliknięciem, przerwa 5/10/15/30 min pigułkami."""
-    nauczyciel_id = getattr(request.user, 'nauczyciel_id', None)
+    godziny dodaje się pojedynczym kliknięciem, przerwa 5/10/15/30 min pigułkami.
+    Admin/pracownik może otworzyć kalendarz dowolnego nauczyciela podając jego id
+    (link z zakładki Użytkownicy/Uczniowie) — widzi wtedy dokładnie to samo co nauczyciel."""
+    if nauczyciel_id is None:
+        nauczyciel_id = getattr(request.user, 'nauczyciel_id', None)
     if not nauczyciel_id:
+        raise PermissionDenied
+    if getattr(request.user, 'nauczyciel_id', None) and request.user.nauczyciel_id != nauczyciel_id:
         raise PermissionDenied
     nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
 

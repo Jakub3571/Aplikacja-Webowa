@@ -220,7 +220,7 @@
                   <span class="umowa-nie">wyłączone</span>
                 {% endif %}
               </td>
-              <td><a class="ikona-kalendarza" href="{% url 'kalendarz_nauczyciela' u.nauczyciel_id %}" title="Zobacz kalendarz korepetytora">📅</a></td>
+              <td><a class="ikona-kalendarza" href="{% url 'moj_tydzien_nauczyciela' u.nauczyciel_id %}" title="Zobacz kalendarz korepetytora">📅</a></td>
               <td>
                 {% if czy_szef %}
                 <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>

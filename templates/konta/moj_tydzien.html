@@ -91,7 +91,7 @@
       <p class="podpowiedz">Skopiuj link i wyślij na grupę na WhatsApp — jak „Copy link” w Calendly.</p>
       <div class="pole-linku">
         <input type="text" id="link-kalendarza" readonly
-               value="{{ request.scheme }}://{{ request.get_host }}{% url 'kalendarz_nauczyciela' nauczyciel.id %}" />
+               value="{{ request.scheme }}://{{ request.get_host }}{% url 'moj_tydzien_nauczyciela' nauczyciel.id %}" />
         <button type="button" class="przycisk-kalendarz" id="kopiuj-link">📋 Skopiuj link</button>
       </div>
     </div>

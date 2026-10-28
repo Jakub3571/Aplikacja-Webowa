@@ -82,7 +82,6 @@ class FormularzUcznia(forms.ModelForm):
 
     ADRESACI_MEET = [
         ('glowny', 'rodzic główny'),
-        ('dodatkowy', 'rodzic zapasowy'),
         ('oba', 'główny i zapasowy'),
     ]
 
@@ -178,6 +177,11 @@ class FormularzUcznia(forms.ModelForm):
         for nazwa, pole in self.fields.items():
             pole.required = True
             pole.widget.attrs['required'] = True
+        # pola "na zapas" i notatka są opcjonalne — bez nich też można dodać ucznia
+        for opcjonalne in ('telefon_dodatkowy', 'email_dodatkowy', 'notatka_od_rodzica'):
+            if opcjonalne in self.fields:
+                self.fields[opcjonalne].required = False
+                self.fields[opcjonalne].widget.attrs.pop('required', None)
         # przełącznik automatycznej wysyłki ma zostać opcjonalny (odznaczony = nie wysyłaj)
         self.fields['auto_wyslij_meet'].required = False
         self.fields['auto_wyslij_meet'].widget.attrs.pop('required', None)

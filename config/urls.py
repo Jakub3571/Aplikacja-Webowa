@@ -34,6 +34,7 @@ urlpatterns = [
     path('nauczyciele/<int:nauczyciel_id>/kalendarz/dane/', views.kalendarz_dane, name='kalendarz_dane'),
     path('moja-dyspozycyjnosc/', views.kreator_dyspozycyjnosc, name='kreator_dyspozycyjnosc'),
     path('moj-tydzien/', views.moj_tydzien, name='moj_tydzien'),
+    path('moj-tydzien/<int:nauczyciel_id>/', views.moj_tydzien, name='moj_tydzien_nauczyciela'),
     path('terminy/<int:termin_id>/usun/', views.usun_termin, name='usun_termin'),
     path('lekcje/', views.lekcje, name='lekcje'),
     path('uczniowie/<int:uczen_id>/lekcja-cykliczna/', views.umow_lekcje_cykliczna, name='lekcja_cykliczna'),
