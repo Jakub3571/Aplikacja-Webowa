@@ -597,7 +597,7 @@ class LekcjeCykliczneTests(TestCase):
         dane = {
             'slot_dzien': ['1'],
             'slot_godzina': ['17:00'],
-            'okres': 'miesiac',
+            'okres': 'rok',
             'link_meet': 'https://meet.google.com/abc-defg-hij',
         }
         r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', dane, follow=True)
@@ -608,7 +608,9 @@ class LekcjeCykliczneTests(TestCase):
         dzis = date.today()
         for lekcja in lekcje:
             dz = lekcja.data.date()
-            self.assertEqual(dz.month, dzis.month)
+            koniec_roku = date(dzis.year + 1, 6, 30) if dzis.month >= 7 else date(dzis.year, 6, 30)
+            self.assertLessEqual(dz, koniec_roku)
+            self.assertGreaterEqual(dz, dzis)
             self.assertEqual(dz.weekday(), 1)  # 1 = wtorek
         # link Meet zapisany przy uczniu, ale mail nie idzie od razu —
         # rodzic dostanie go w przypomnieniu 60 min przed lekcją
@@ -749,7 +751,7 @@ class StaleLekcjeMultiSlotTests(TestCase):
         dane = {
             'slot_dzien': ['1', '3'],      # wtorek + czwartek
             'slot_godzina': ['17:20', '19:15'],
-            'okres': 'miesiac',
+            'okres': 'rok',
         }
         r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', dane, follow=True)
         self.assertContains(r, 'Stałe lekcje umówione')
@@ -759,7 +761,9 @@ class StaleLekcjeMultiSlotTests(TestCase):
         dzis = date.today()
         for lekcja in lekcje:
             dz = lekcja.data.date()
-            self.assertEqual(dz.month, dzis.month)
+            koniec_roku = date(dzis.year + 1, 6, 30) if dzis.month >= 7 else date(dzis.year, 6, 30)
+            self.assertLessEqual(dz, koniec_roku)
+            self.assertGreaterEqual(dz, dzis)
             self.assertIn(dz.weekday(), [1, 3])  # wtorek (1) albo czwartek (3)
         # godziny: obie obecne
         from django.utils import timezone as _tz
@@ -796,6 +800,30 @@ class StaleLekcjeMultiSlotTests(TestCase):
         while koniec.weekday() != 1:
             koniec -= _td(days=1)
         self.assertEqual(lok, koniec)
+    def test_zawsze_i_data_z_przeszlosci(self):
+        self.client.force_login(self.pracownik)
+        dzis = date.today()
+        stara = dzis - timedelta(days=21)
+        dane = {
+            'slot_dzien': ['1'],
+            'slot_godzina': ['17:20'],
+            'okres': 'zawsze',
+            'data_poczatkowa': stara.isoformat(),
+        }
+        r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', dane, follow=True)
+        self.assertContains(r, 'Stałe lekcje umówione')
+        lekcje = Lekcja.objects.filter(uczen=self.uczen).order_by('data')
+        self.assertTrue(lekcje.exists())
+        pierwsza = timezone.localtime(lekcje.first().data).date()
+        ostatnia = timezone.localtime(lekcje.last().data).date()
+        # pierwsza lekcja wpada w przeszlosc (dokladnie pierwszy wtorek od podanej daty)
+        self.assertLess(pierwsza, dzis)
+        self.assertEqual(pierwsza.weekday(), 1)
+        # horyzont "zawsze": ok. 90 dni od daty poczatkowej
+        self.assertGreater(ostatnia, dzis + timedelta(days=60))
+        # po odswiezeniu (symulacja nocy z CRON) lekcje dalej sa przedluzane
+        call_command('odnow_cykliczne')
+        self.assertTrue(Lekcja.objects.filter(uczen=self.uczen).exists())
 
 class NoweFunkcjeTests(TestCase):
     """Testy nowych funkcji: odwołane zajęcia, rozdzielone poziomy, odnawianie cyklicznych."""

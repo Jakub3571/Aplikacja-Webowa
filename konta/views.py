@@ -1665,7 +1665,13 @@ def moj_tydzien(request):
     przerwy_dni = {}
     for wpis in PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data__in=dni_tygodnia):
         przerwy_dni[wpis.data] = wpis.minuty
-
+    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+    lekcje_dni = {}
+    for lekcja in Lekcja.objects.select_related('uczen').filter(data__gte=poniedzialek, data__lt=nastepny, odwolana=False):
+        if (lekcja.uczen.korepetytor or '').strip().lower() != nazwa_nauczyciela:
+            continue
+        dzien_lekcji = timezone.localtime(lekcja.data).date()
+        lekcje_dni.setdefault(dzien_lekcji, []).append(lekcja)
     dni = []
     for dzien in dni_tygodnia:
         zakresy = []
@@ -1681,9 +1687,19 @@ def moj_tydzien(request):
                 aktualny = {'od': od, 'do': do_}
         if aktualny:
             zakresy.append(aktualny)
+        lekcje_listy = []
+        for lekcja in sorted(lekcje_dni.get(dzien, []), key=lambda l: l.data):
+            lekcje_listy.append({
+                'uczen': f'{lekcja.uczen.imie_ucznia} {lekcja.uczen.nazwisko_rodzica}',
+                'przedmiot': lekcja.uczen.przedmiot,
+                'godzina': timezone.localtime(lekcja.data).strftime('%H:%M'),
+                'koniec': (timezone.localtime(lekcja.data) + timedelta(minutes=GODZINA_LEKCJI)).strftime('%H:%M'),
+            })
         dni.append({
             'data': dzien,
             'zakresy': zakresy,
+            'lekcje': lekcje_listy,
+            'przerwa': przerwy_dni.get(dzien, 0),
             'dzisiaj': dzien == dzisiaj,
         })
 
@@ -1778,6 +1794,8 @@ def umow_lekcje_cykliczna(request, uczen_id):
 
     def okres_dat(okres, od_dnia):
         """Zwraca (od, do) wg wybranego presetu."""
+        if okres == 'zawsze':
+            return od_dnia, od_dnia + timedelta(days=90)
         if okres == 'miesiac':
             if od_dnia.month == 12:
                 do = date(od_dnia.year, 12, 31)
@@ -1794,7 +1812,16 @@ def umow_lekcje_cykliczna(request, uczen_id):
     if request.method == 'POST':
         okres = request.POST.get('okres', 'miesiac')
         link_meet = request.POST.get('link_meet', '').strip()
-        od_dnia, do_dnia = okres_dat(okres, date.today())
+        try:
+            data_poczatkowa = date.fromisoformat(request.POST.get('data_poczatkowa', ''))
+        except ValueError:
+            data_poczatkowa = date.today()
+        od_dnia, do_dnia = okres_dat(okres, data_poczatkowa)
+        try:
+            data_poczatkowa = date.fromisoformat(request.POST.get('data_poczatkowa', ''))
+        except ValueError:
+            data_poczatkowa = date.today()
+        od_dnia, do_dnia = okres_dat(okres, data_poczatkowa)
         sloty_raw = request.POST.getlist('slot_dzien')
         godziny_raw = request.POST.getlist('slot_godzina')
         sloty = []
@@ -1873,6 +1900,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
     return render(request, 'konta/lekcja_cykliczna.html', {
         'uczen': uczen,
         'godziny': [f'{h:02d}:{m:02d}' for h in range(6, 24) for m in (0, 30)],
+        'dzisiaj': date.today().isoformat(),
     })
 
 
