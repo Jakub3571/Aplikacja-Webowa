@@ -739,10 +739,15 @@ def przywroc_wspolprace(request, nauczyciel_id):
 
 
 @login_required
-@tylko_szef
 def edytuj_uzytkownika(request, user_id):
-    """Edycja konta: imię, nazwisko, email, telefon (bez hasła i roli)."""
+    """Edycja konta: imię, nazwisko, email, telefon (bez hasła i roli).
+    Szef i koordynator (edycja danych), ale bez zmiany roli/uprawnień."""
+    if not (czy_szef(request.user) or czy_koordynator(request.user)):
+        raise PermissionDenied
+    # koordynator nie edytuje kont adminów
     uzytkownik = get_object_or_404(Pracownik, pk=user_id)
+    if not czy_szef(request.user) and uzytkownik.is_superuser:
+        raise PermissionDenied
     if request.method == 'POST':
         uzytkownik.first_name = request.POST.get('first_name', '').strip()
         uzytkownik.last_name = request.POST.get('last_name', '').strip()
@@ -1509,6 +1514,7 @@ def uzytkownicy(request):
                 'umawiajacy': [],
                 'nauczyciele': [],
                 'czy_szef': False,
+                'czy_koordynator': czy_koordynator(request.user),
             })
         form.zapisz()
         messages.success(request, 'Użytkownik został dodany.')
@@ -1525,6 +1531,7 @@ def uzytkownicy(request):
         'umawiajacy': umawiajacy,
         'nauczyciele': nauczyciele_konta,
         'czy_szef': czy_szef(request.user),
+        'czy_koordynator': czy_koordynator(request.user),
     })
 
 

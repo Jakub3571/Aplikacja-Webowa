@@ -314,7 +314,9 @@ class UzytkownicyTests(TestCase):
         self.assertContains(r, 'Dodaj użytkownika')
         # lista ról bez admina
         self.assertNotContains(r, 'value="admin"')
-        self.assertNotContains(r, 'Admini')
+        # ale sekcję Admini widzi jako podgląd (bez przycisków zarządzania)
+        self.assertContains(r, 'Admini')
+        self.assertContains(r, 'tylko szef')
         # koordynator nie może utworzyć konta admina (obejście formularza)
         dane = {
             'username': 'nowy.admin',

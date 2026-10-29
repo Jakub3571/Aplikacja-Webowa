@@ -77,7 +77,7 @@
   </section>
 
   <div class="uczniowie-bok">
-  {% if czy_szef %}
+{% if czy_szef or czy_koordynator %}
   <section class="karta">
     <h2>🔐 Admini ({{ admini|length }})</h2>
     <p class="podpowiedz">Konta z pełnym dostępem — mogą wszystko, w tym usuwać.</p>
@@ -133,14 +133,16 @@
             <td>{{ u.email }}</td>
             <td>{% if u.is_active %}<span class="umowa-tak">✔ aktywne</span>{% else %}<span class="umowa-nie">wyłączone</span>{% endif %}</td>
             <td>
-              {% if czy_szef %}
+              {% if czy_szef or czy_koordynator %}
               <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>
+              {% endif %}
+              {% if czy_szef %}
               {% if u.id != request.user.id %}
               <a class="przycisk-umowa umowa-tak" href="{% url 'przelacz_szefa' u.id %}" title="Nadaj uprawnienia admina">nadaj admina</a>
               <a class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}" href="{% url 'przelacz_konto' u.id %}" title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}">{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a>
               {% endif %}
-              {% else %}
-              —
+              {% elif czy_koordynator %}
+              <span class="podpowiedz">nadawanie admina: tylko szef</span>
               {% endif %}
             </td>
           </tr>
@@ -172,10 +174,16 @@
             <td>{{ u.email }}</td>
             <td>{% if u.is_active %}<span class="umowa-tak">✔ aktywne</span>{% else %}<span class="umowa-nie">wyłączone</span>{% endif %}</td>
             <td>
+              {% if czy_szef or czy_koordynator %}
               <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>
+              {% endif %}
+              {% if czy_szef %}
               {% if u.id != request.user.id %}
               <a class="przycisk-umowa umowa-tak" href="{% url 'przelacz_szefa' u.id %}" title="Nadaj uprawnienia admina">nadaj admina</a>
               <a class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}" href="{% url 'przelacz_konto' u.id %}" title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}">{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a>
+              {% endif %}
+              {% elif czy_koordynator %}
+              <span class="podpowiedz">nadawanie admina: tylko szef</span>
               {% endif %}
             </td>
           </tr>
@@ -221,18 +229,19 @@
                 {% endif %}
               </td>
               <td><a class="ikona-kalendarza" href="{% url 'moj_tydzien_nauczyciela' u.nauczyciel_id %}" title="Zobacz kalendarz korepetytora">📅</a></td>
-              <td>
-                {% if czy_szef %}
-                <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>
-                {% if u.id != request.user.id %}
-                <a class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}" href="{% url 'przelacz_konto' u.id %}" title="{% if u.is_active %}Wyłącz konto (nie będzie się mogło logować){% else %}Włącz konto{% endif %}">
-                  {% if u.is_active %}wyłącz{% else %}włącz{% endif %}
-                </a>
-                {% endif %}
-                {% else %}
-                —
-                {% endif %}
-              </td>
+            <td>
+              {% if czy_szef or czy_koordynator %}
+              <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>
+              {% endif %}
+              {% if czy_szef %}
+              {% if u.id != request.user.id %}
+              <a class="przycisk-umowa umowa-tak" href="{% url 'przelacz_szefa' u.id %}" title="Nadaj uprawnienia admina">nadaj admina</a>
+              <a class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}" href="{% url 'przelacz_konto' u.id %}" title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}">{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a>
+              {% endif %}
+              {% elif czy_koordynator %}
+              <span class="podpowiedz">nadawanie admina: tylko szef</span>
+              {% endif %}
+            </td>
             </tr>
           {% endfor %}
         </tbody>
