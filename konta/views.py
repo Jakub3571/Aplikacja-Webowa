@@ -1490,21 +1490,31 @@ def platnosci(request):
             'uczniowie zostają w aplikacji (bez zmiany zajęć).',
         )
         return redirect('platnosci')
-
+    teraz = timezone.now()
     rozliczenia = []
     for nauczyciel in Nauczyciel.objects.filter(aktywny=True).order_by('nazwisko', 'imie'):
         nazwa = f'{nauczyciel.imie} {nauczyciel.nazwisko}'
         jego_uczniowie = [u for u in wszyscy_uczniowie if (u.korepetytor or '').strip() == nazwa]
         if jego_uczniowie:
-            zaplacone_lekcje = [u for u in jego_uczniowie if u.zaplacone]
-            kwota = sum(
-                nauczyciel.stawka_dla(u.przedmiot, u.poziom)
-                for u in zaplacone_lekcje
-            )
+            zaplacone_uczniowie = [u for u in jego_uczniowie if u.zaplacone]
+            # kwota = suma stawek za kazda ODBYTA lekcje oplaconych uczniow:
+            # liczemy lekcje od dnia dodania ucznia do teraz, pomijamy odwolane
+            kwota = 0
+            liczba_odbytych = 0
+            for u in zaplacone_uczniowie:
+                stawka = nauczyciel.stawka_dla(u.przedmiot, u.poziom)
+                odbyte = Lekcja.objects.filter(
+                    uczen=u,
+                    odwolana=False,
+                    data__lte=teraz,
+                ).count()
+                liczba_odbytych += odbyte
+                kwota += stawka * odbyte
             rozliczenia.append({
                 'nauczyciel': nauczyciel,
                 'liczba_uczniow': len(jego_uczniowie),
-                'liczba_zaplaconych': len(zaplacone_lekcje),
+                'liczba_zaplaconych': len(zaplacone_uczniowie),
+                'liczba_odbytych': liczba_odbytych,
                 'kwota': kwota,
             })
 

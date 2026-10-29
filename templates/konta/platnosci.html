@@ -83,6 +83,7 @@ pracowniczy{% endblock %} {% block panel %}
 						<th>Nauczyciel</th>
 						<th>Uczniowie</th>
 						<th>Zapłacone zajęcia</th>
+						<th>Odbytych lekcji</th>
 						<th>Stawka</th>
 						<th>Do wypłaty</th>
 					</tr>
@@ -95,6 +96,7 @@ pracowniczy{% endblock %} {% block panel %}
 						</td>
 						<td>{{ pozycja.liczba_uczniow }}</td>
 						<td>{{ pozycja.liczba_zaplaconych }}</td>
+						<td>{{ pozycja.liczba_odbytych }}</td>
 						<td>
 							{% for p in pozycja.nauczyciel.przedmioty.all %}{{ p.przedmiot }}:
 							{{ p.stawka }} zł{% if not forloop.last %}, {% endif %}{% empty

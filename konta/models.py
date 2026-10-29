@@ -126,15 +126,13 @@ class Nauczyciel(models.Model):
         
     def stawka_dla(self, przedmiot, poziom_ucznia):
         """Stawka dla przedmiotu i poziomu ucznia (z kart przedmiotów);
-        jeśli nie znajdzie, fallback do ogólnej stawki nauczyciela."""
-        poziom_nauczyciela = {
-            'podstawowka': 'podstawówka',
-            'srednia podstawa': 'średnia podstawa',
-            'srednia rozszerzenie': 'średnia rozszerzenie',
-            'studia': 'studia',
-        }.get(poziom_ucznia, poziom_ucznia)
+        jeśli nie znajdzie, fallback do ogólnej stawki nauczyciela.
+        Porównujemy poziomy bez polskich znaków (karty zapisywane są bez nich)."""
+        def bez_polskich(tekst):
+            return (tekst or '').strip().lower().replace('ś', 's').replace('ż', 'z').replace('ź', 'z').replace('ć', 'c').replace('ń', 'n').replace('ó', 'o').replace('ł', 'l').replace('ą', 'a').replace('ę', 'e')
+        szukany = bez_polskich(poziom_ucznia)
         for p in self.przedmioty.all():
-            if p.przedmiot == przedmiot and p.poziom == poziom_nauczyciela:
+            if p.przedmiot == przedmiot and bez_polskich(p.poziom) == szukany:
                 return p.stawka
         return self.stawka
 
