@@ -645,12 +645,11 @@ def archiwum_uczniow(request):
     pracownicy_lista = [
         u for u in Pracownik.objects.order_by('username')
         if not u.nauczyciel
-        and u.id != request.user.id
         and (u.stanowisko or '').strip().lower() != 'koordynator'
     ]
     koordynatorzy_lista = [
         u for u in Pracownik.objects.order_by('username')
-        if not u.nauczyciel and u.id != request.user.id
+        if not u.nauczyciel
         and (u.stanowisko or '').strip().lower() == 'koordynator'
     ]
     return render(request, 'konta/archiwum.html', {
