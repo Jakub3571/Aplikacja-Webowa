@@ -14,16 +14,31 @@ def moze_edytowac_kalendarz(user, nauczyciel_id):
         return True
     return getattr(user, 'nauczyciel_id', None) == nauczyciel_id
 
+def rola_context(request):
+    """Oddaje role zalogowanego uzytkownika do KAZDEGO szablonu (menu itd.)."""
+    u = getattr(request, 'user', None)
+    if not u or not u.is_authenticated:
+        return {'czy_szef_ctx': False, 'czy_koordynator_ctx': False}
+    return {
+        'czy_szef_ctx': czy_szef(u),
+        'czy_koordynator_ctx': czy_koordynator(u),
+    }
+
+
+
 
 def czy_szef(u):
     """Prawdziwy szef: superuser LUB konto o nazwie 'Admin'."""
     return bool(u.is_authenticated and (u.is_superuser or u.username.strip().lower() == 'admin'))
 
 def czy_koordynator(u):
-    """Koordynator: konto o nazwie zaczynającej się od 'koordynator'.
-    Widzi wszystkich uczniów, może edytować, ale nie może usuwać."""
+    """Koordynator: konto z rola 'koordynator' (pole stanowisko) LUB loginem
+    zaczynajacym sie od 'koordynator' (starsze konta).
+    Widzi wszystkich uczniow, moze edytowac, ale nie moze usuwac."""
     if not u.is_authenticated:
         return False
+    if (getattr(u, 'stanowisko', '') or '').strip().lower() == 'koordynator':
+        return True
     return u.username.strip().lower().startswith('koordynator')
 
 def tylko_szef(widok):
@@ -629,14 +644,23 @@ def archiwum_uczniow(request):
     korepetytorzy_lista = list(Nauczyciel.objects.order_by('nazwisko', 'imie'))
     pracownicy_lista = [
         u for u in Pracownik.objects.order_by('username')
+        if not u.nauczyciel
+        and u.id != request.user.id
+        and (u.stanowisko or '').strip().lower() != 'koordynator'
+    ]
+    koordynatorzy_lista = [
+        u for u in Pracownik.objects.order_by('username')
         if not u.nauczyciel and u.id != request.user.id
+        and (u.stanowisko or '').strip().lower() == 'koordynator'
     ]
     return render(request, 'konta/archiwum.html', {
         'uczniowie': uczniowie_lista,
         'korepetytorzy': korepetytorzy_lista,
         'pracownicy': pracownicy_lista,
+        'koordynatorzy': koordynatorzy_lista,
         'fraza': (request.GET.get('szukaj') or '').strip(),
         'czy_szef': czy_szef(request.user),
+        'czy_koordynator': czy_koordynator(request.user),
     })
 
 
@@ -1520,8 +1544,8 @@ def uzytkownicy(request):
         messages.success(request, 'Użytkownik został dodany.')
         return redirect('uzytkownicy')
     admini = [u for u in lista if u.is_superuser]
-    koordynatorzy = [u for u in lista if not u.is_superuser and u.username.strip().lower().startswith('koordynator') and not u.nauczyciel]
-    umawiajacy = [u for u in lista if not u.is_superuser and not u.nauczyciel and not u.username.strip().lower().startswith('koordynator')]
+    koordynatorzy = [u for u in lista if not u.is_superuser and not u.nauczyciel and (u.stanowisko or '').strip().lower() == 'koordynator']
+    umawiajacy = [u for u in lista if not u.is_superuser and not u.nauczyciel and (u.stanowisko or '').strip().lower() != 'koordynator']
     nauczyciele_konta = [u for u in lista if u.nauczyciel]
     return render(request, 'konta/uzytkownicy.html', {
         'form': form,

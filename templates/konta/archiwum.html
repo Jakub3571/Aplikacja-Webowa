@@ -166,6 +166,50 @@
     <p class="podtytul">Brak kont pracowników.</p>
     {% endif %}
   </section>
+    <section class="karta">
+    <h2>Koordynatorzy ({{ koordynatorzy|length }})</h2>
+    <p class="podpowiedz">Konta z rolą koordynatora — widzą wszystko, edytują, ale nie usuwają. Wyłączone konto nie może się logować, ale dane zostają w bazie.</p>
+    <div class="pole-szukania" style="margin-bottom: 1rem;">
+      <input
+        type="text"
+        class="szukaj-tabela"
+        data-tabela="tabela-archiwum-koordynatorzy"
+        placeholder="Szukaj koordynatora..."
+      />
+    </div>
+    {% if koordynatorzy %}
+    <div class="tabela-wrapper">
+      <table class="tabela" id="tabela-archiwum-koordynatorzy">
+        <thead>
+          <tr>
+            <th>Użytkownik</th>
+            <th>Imię i nazwisko</th>
+            <th>Email</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in koordynatorzy %}
+          <tr>
+            <td>{{ u.username }}</td>
+            <td>{{ u.first_name }} {{ u.last_name }}</td>
+            <td>{{ u.email }}</td>
+            <td>
+              {% if u.is_active %}
+                <span class="umowa-tak">✔ aktywne</span>
+              {% else %}
+                <span class="umowa-nie">wyłączone</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="podtytul">Brak kont koordynatorów.</p>
+    {% endif %}
+  </section>
   {% endif %}
 </div>
 {% endblock %}

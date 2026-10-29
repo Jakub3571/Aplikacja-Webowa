@@ -307,7 +307,10 @@ class UzytkownicyTests(TestCase):
         self.assertEqual(r.status_code, 403)
 
     def test_koordynator_moze_dodawac_konta_bez_admina(self):
-        koordynator = Pracownik.objects.create_user('koordynator.ala', 'k@f.pl', 'Sup3rHaslo!')
+        # rola koordynatora zapisana na koncie — login moze byc dowolny
+        koordynator = Pracownik.objects.create_user('ala', 'k@f.pl', 'Sup3rHaslo!')
+        koordynator.stanowisko = 'koordynator'
+        koordynator.save()
         self.client.force_login(koordynator)
         r = self.client.get('/uzytkownicy/')
         self.assertEqual(r.status_code, 200)

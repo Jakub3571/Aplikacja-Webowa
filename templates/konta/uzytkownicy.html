@@ -1,159 +1,242 @@
-{% extends 'konta/panel.html' %}
-
-{% block tytul %}Użytkownicy — Panel pracowniczy{% endblock %}
-
-{% block panel %}
+{% extends 'konta/panel.html' %} {% block tytul %}Użytkownicy — Panel
+pracowniczy{% endblock %} {% block panel %}
 <div class="uczniowie-uklad">
-  <section class="karta">
-    <h2>Dodaj użytkownika</h2>
-    {% if form.errors %}
-      <div class="komunikat error">
-        Popraw błędy w formularzu:
-        <ul>
-          {% for pole, bledy in form.errors.items %}
-            {% for blad in bledy %}<li>{{ blad }}</li>{% endfor %}
-          {% endfor %}
-        </ul>
-      </div>
-    {% endif %}
-    <form method="post" class="formularz">
-      {% csrf_token %}
-      <label for="{{ form.rola.id_for_label }}">Kto to będzie? <span class="gwiazdka">*</span></label>
-      {{ form.rola }}
-      {% if form.rola.help_text %}<p class="podpowiedz">{{ form.rola.help_text }}</p>{% endif %}
+	<section class="karta">
+		<h2>Dodaj użytkownika</h2>
+		{% if form.errors %}
+		<div class="komunikat error">
+			Popraw błędy w formularzu:
+			<ul>
+				{% for pole, bledy in form.errors.items %} {% for blad in bledy %}
+				<li>{{ blad }}</li>
+				{% endfor %} {% endfor %}
+			</ul>
+		</div>
+		{% endif %}
+		<form method="post" class="formularz">
+			{% csrf_token %}
+			<label for="{{ form.rola.id_for_label }}"
+				>Kto to będzie? <span class="gwiazdka">*</span></label
+			>
+			{{ form.rola }} {% if form.rola.help_text %}
+			<p class="podpowiedz">{{ form.rola.help_text }}</p>
+			{% endif %}
 
-      <label for="{{ form.username.id_for_label }}">Nazwa użytkownika <span class="gwiazdka">*</span></label>
-      {{ form.username }}
-      {% if form.username.help_text %}<p class="podpowiedz">{{ form.username.help_text }}</p>{% endif %}
+			<label for="{{ form.username.id_for_label }}"
+				>Nazwa użytkownika <span class="gwiazdka">*</span></label
+			>
+			{{ form.username }} {% if form.username.help_text %}
+			<p class="podpowiedz">{{ form.username.help_text }}</p>
+			{% endif %}
 
-      <label for="{{ form.first_name.id_for_label }}">Imię</label>
-      {{ form.first_name }}
+			<label for="{{ form.first_name.id_for_label }}">Imię</label>
+			{{ form.first_name }}
 
-      <label for="{{ form.last_name.id_for_label }}">Nazwisko</label>
-      {{ form.last_name }}
+			<label for="{{ form.last_name.id_for_label }}">Nazwisko</label>
+			{{ form.last_name }}
 
-      <label for="{{ form.email.id_for_label }}">Email</label>
-      {{ form.email }}
-      {% if form.email.help_text %}<p class="podpowiedz">{{ form.email.help_text }}</p>{% endif %}
+			<label for="{{ form.email.id_for_label }}">Email</label>
+			{{ form.email }} {% if form.email.help_text %}
+			<p class="podpowiedz">{{ form.email.help_text }}</p>
+			{% endif %}
 
+			<label for="{{ form.telefon.id_for_label }}">Telefon</label>
+			{{ form.telefon }}
 
-      <label for="{{ form.telefon.id_for_label }}">Telefon</label>
-      {{ form.telefon }}
+			<div
+				id="sekcja-nauczyciel"
+				style="
+					display: none;
+					margin-top: 1rem;
+					padding-top: 0.5rem;
+					border-top: 1px solid #ddd;
+				"
+			>
+				<h3>Przedmioty i stawki nauczyciela</h3>
+				<p class="podpowiedz">
+					Każdy przedmiot ma własny poziom i stawkę. Kliknij „+ Dodaj
+					przedmiot”, aby dodać kolejny.
+				</p>
+				<div id="wiersze-przedmiotow-konto">
+					<div class="wiersz-przedmiotu">
+						<select name="w_przedmiot">
+							<option value="">— wybierz przedmiot —</option>
+							{% for wartosc, etykieta in form.fields_przedmioty %}
+							<option value="{{ wartosc }}">{{ etykieta }}</option>
+							{% endfor %}
+						</select>
+						<select name="w_poziom">
+							<option value="podstawowka" selected>podstawówka</option>
+							<option value="srednia podstawa">średnia podstawa</option>
+							<option value="srednia rozszerzenie">średnia rozszerzenie</option>
+							<option value="studia">studia</option>
+						</select>
+						<input
+							type="number"
+							name="w_stawka"
+							min="0"
+							step="0.01"
+							placeholder="stawka (zł)"
+						/>
+						<button
+							type="button"
+							class="przycisk-usun-wiersz-konto"
+							title="Usuń ten przedmiot"
+						>
+							✘
+						</button>
+					</div>
+				</div>
+				<button type="button" id="dodaj-przedmiot-konto">
+					+ Dodaj przedmiot
+				</button>
+			</div>
 
-      <div id="sekcja-nauczyciel" style="display: none; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #ddd;">
-        <h3>Przedmioty i stawki nauczyciela</h3>
-        <p class="podpowiedz">Każdy przedmiot ma własny poziom i stawkę. Kliknij „+ Dodaj przedmiot”, aby dodać kolejny.</p>
-        <div id="wiersze-przedmiotow-konto">
-          <div class="wiersz-przedmiotu">
-            <select name="w_przedmiot">
-              <option value="">— wybierz przedmiot —</option>
-              {% for wartosc, etykieta in form.fields_przedmioty %}
-              <option value="{{ wartosc }}">{{ etykieta }}</option>
-              {% endfor %}
-            </select>
-            <select name="w_poziom">
-              <option value="podstawowka" selected>podstawówka</option>
-              <option value="srednia podstawa">średnia podstawa</option>
-              <option value="srednia rozszerzenie">średnia rozszerzenie</option>
-              <option value="studia">studia</option>
-            </select>
-            <input type="number" name="w_stawka" min="0" step="0.01" placeholder="stawka (zł)">
-            <button type="button" class="przycisk-usun-wiersz-konto" title="Usuń ten przedmiot">✘</button>
-          </div>
-        </div>
-        <button type="button" id="dodaj-przedmiot-konto">+ Dodaj przedmiot</button>
-      </div>
+			<label for="{{ form.haslo1.id_for_label }}"
+				>Hasło <span class="gwiazdka">*</span></label
+			>
+			{{ form.haslo1 }} {% if form.haslo1.help_text %}
+			<p class="podpowiedz">{{ form.haslo1.help_text }}</p>
+			{% endif %}
 
-      <label for="{{ form.haslo1.id_for_label }}">Hasło <span class="gwiazdka">*</span></label>
-      {{ form.haslo1 }}
-      {% if form.haslo1.help_text %}<p class="podpowiedz">{{ form.haslo1.help_text }}</p>{% endif %}
+			<label for="{{ form.haslo2.id_for_label }}"
+				>Powtórz hasło <span class="gwiazdka">*</span></label
+			>
+			{{ form.haslo2 }} {% if form.haslo2.help_text %}
+			<p class="podpowiedz">{{ form.haslo2.help_text }}</p>
+			{% endif %}
 
-      <label for="{{ form.haslo2.id_for_label }}">Powtórz hasło <span class="gwiazdka">*</span></label>
-      {{ form.haslo2 }}
-      {% if form.haslo2.help_text %}<p class="podpowiedz">{{ form.haslo2.help_text }}</p>{% endif %}
+			<button type="submit">Dodaj użytkownika</button>
+		</form>
+	</section>
 
-      <button type="submit">Dodaj użytkownika</button>
-    </form>
-  </section>
+	<div class="uczniowie-bok">
+		{% if czy_szef or czy_koordynator %}
+		<section class="karta">
+			<h2>🔐 Admini ({{ admini|length }})</h2>
+			<p class="podpowiedz">
+				Konta z pełnym dostępem — mogą wszystko, w tym usuwać.
+			</p>
+			{% if admini %}
+			<div class="tabela-wrapper">
+				<table class="tabela" id="tabela-admini">
+					<thead>
+						<tr>
+							<th>Użytkownik</th>
+							<th>Imię i nazwisko</th>
+							<th>Email</th>
+							<th>Status</th>
+							<th>Akcje</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for u in admini %}
+						<tr>
+							<td>{{ u.username }}</td>
+							<td>{{ u.first_name }} {{ u.last_name }}</td>
+							<td>{{ u.email }}</td>
+							<td>
+								{% if u.is_active %}<span class="umowa-tak">✔ aktywne</span>{%
+								else %}<span class="umowa-nie">wyłączone</span>{% endif %}
+							</td>
+							<td>
+								<a
+									class="ikona-kalendarza"
+									href="{% url 'edytuj_uzytkownika' u.id %}"
+									title="Edytuj dane konta"
+									>✏️</a
+								>
+								{% if u.id != request.user.id %}
+								<a
+									class="przycisk-umowa umowa-nie"
+									href="{% url 'przelacz_szefa' u.id %}"
+									title="Odbierz uprawnienia admina"
+									>odebrać admina</a
+								>
+								<a
+									class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}"
+									href="{% url 'przelacz_konto' u.id %}"
+									title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}"
+									>{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a
+								>
+								{% endif %}
+							</td>
+						</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+			{% else %}
+			<p class="podtytul">Brak kont adminów.</p>
+			{% endif %}
+		</section>
+		{% endif %}
 
-  <div class="uczniowie-bok">
-{% if czy_szef or czy_koordynator %}
-  <section class="karta">
-    <h2>🔐 Admini ({{ admini|length }})</h2>
-    <p class="podpowiedz">Konta z pełnym dostępem — mogą wszystko, w tym usuwać.</p>
-    {% if admini %}
-    <div class="tabela-wrapper">
-      <table class="tabela" id="tabela-admini">
-        <thead>
-          <tr>
-            <th>Użytkownik</th><th>Imię i nazwisko</th><th>Email</th><th>Status</th><th>Akcje</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in admini %}
-          <tr>
-            <td>{{ u.username }}</td>
-            <td>{{ u.first_name }} {{ u.last_name }}</td>
-            <td>{{ u.email }}</td>
-            <td>{% if u.is_active %}<span class="umowa-tak">✔ aktywne</span>{% else %}<span class="umowa-nie">wyłączone</span>{% endif %}</td>
-            <td>
-              <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>
-              {% if u.id != request.user.id %}
-              <a class="przycisk-umowa umowa-nie" href="{% url 'przelacz_szefa' u.id %}" title="Odbierz uprawnienia admina">odebrać admina</a>
-              <a class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}" href="{% url 'przelacz_konto' u.id %}" title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}">{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <p class="podtytul">Brak kont adminów.</p>
-    {% endif %}
-  </section>
-  {% endif %}
-
-  <section class="karta">
-    <h2>🧑‍💼 Koordynatorzy ({{ koordynatorzy|length }})</h2>
-    <p class="podpowiedz">Widzą wszystkich uczniów, mogą edytować — nie mogą usuwać. Login zaczyna się od „koordynator”.</p>
-    {% if koordynatorzy %}
-    <div class="tabela-wrapper">
-      <table class="tabela" id="tabela-koordynatorzy">
-        <thead>
-          <tr>
-            <th>Użytkownik</th><th>Imię i nazwisko</th><th>Email</th><th>Status</th><th>Akcje</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in koordynatorzy %}
-          <tr>
-            <td>{{ u.username }}</td>
-            <td>{{ u.first_name }} {{ u.last_name }}</td>
-            <td>{{ u.email }}</td>
-            <td>{% if u.is_active %}<span class="umowa-tak">✔ aktywne</span>{% else %}<span class="umowa-nie">wyłączone</span>{% endif %}</td>
-            <td>
-              {% if czy_szef or czy_koordynator %}
-              <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>
-              {% endif %}
-              {% if czy_szef %}
-              {% if u.id != request.user.id %}
-              <a class="przycisk-umowa umowa-tak" href="{% url 'przelacz_szefa' u.id %}" title="Nadaj uprawnienia admina">nadaj admina</a>
-              <a class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}" href="{% url 'przelacz_konto' u.id %}" title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}">{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a>
-              {% endif %}
-              {% elif czy_koordynator %}
-              <span class="podpowiedz">nadawanie admina: tylko szef</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <p class="podtytul">Brak kont koordynatorów — dodaj konto z rolą „koordynator” i loginem np. koordynator.imie.</p>
-    {% endif %}
-  </section>
+		<section class="karta">
+			<h2>🧑‍💼 Koordynatorzy ({{ koordynatorzy|length }})</h2>
+			<p class="podpowiedz">
+				Widzą wszystkich uczniów, mogą edytować — nie mogą usuwać. Login zaczyna
+				się od „koordynator”.
+			</p>
+			{% if koordynatorzy %}
+			<div class="tabela-wrapper">
+				<table class="tabela" id="tabela-koordynatorzy">
+					<thead>
+						<tr>
+							<th>Użytkownik</th>
+							<th>Imię i nazwisko</th>
+							<th>Email</th>
+							<th>Status</th>
+							<th>Akcje</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for u in koordynatorzy %}
+						<tr>
+							<td>{{ u.username }}</td>
+							<td>{{ u.first_name }} {{ u.last_name }}</td>
+							<td>{{ u.email }}</td>
+							<td>
+								{% if u.is_active %}<span class="umowa-tak">✔ aktywne</span>{%
+								else %}<span class="umowa-nie">wyłączone</span>{% endif %}
+							</td>
+							<td>
+								{% if czy_szef or czy_koordynator %}
+								<a
+									class="ikona-kalendarza"
+									href="{% url 'edytuj_uzytkownika' u.id %}"
+									title="Edytuj dane konta"
+									>✏️</a
+								>
+								{% endif %} {% if czy_szef %} {% if u.id != request.user.id %}
+								<a
+									class="przycisk-umowa umowa-tak"
+									href="{% url 'przelacz_szefa' u.id %}"
+									title="Nadaj uprawnienia admina"
+									>nadaj admina</a
+								>
+								<a
+									class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}"
+									href="{% url 'przelacz_konto' u.id %}"
+									title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}"
+									>{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a
+								>
+								{% endif %} {% elif czy_koordynator %}
+								<span class="podpowiedz">nadawanie admina: tylko szef</span>
+								{% endif %}
+							</td>
+						</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+			{% else %}
+			<p class="podtytul">
+				Brak kont koordynatorów — dodaj konto z rolą „koordynator” i loginem np.
+				koordynator.imie.
+			</p>
+			{% endif %}
+		</section>
 
   <section class="karta">
     <h2>📋 Osoby umawiające ({{ umawiajacy|length }})</h2>
@@ -195,107 +278,138 @@
     <p class="podtytul">Brak kont osób umawiających.</p>
     {% endif %}
   </section>
-    <section class="karta">
-    <h2>Korepetytorzy ({{ nauczyciele|length }})</h2>
-    <p class="podpowiedz">Konta korepetytorów z ich przedmiotami i stawkami.</p>
-    {% if nauczyciele %}
-    <div class="tabela-wrapper">
-      <table class="tabela" id="tabela-nauczyciele-konta">
-        <thead>
-          <tr>
-            <th>Korepetytor</th>
-            <th>Email</th>
-            <th>Przedmioty i stawki</th>
-            <th>Status</th>
-            <th>Kalendarz</th>
-            <th>Akcje</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in nauczyciele %}
-            <tr>
-              <td>{{ u.first_name }} {{ u.last_name }}</td>
-              <td>{{ u.email }}</td>
-              <td>
-                {% for p in u.nauczyciel.przedmioty.all %}
-                  {{ p.przedmiot }} {{ p.poziom }} — {{ p.stawka }} zł{% if not forloop.last %}, {% endif %}
-                {% endfor %}
-              </td>
-              <td>
-                {% if u.is_active %}
-                  <span class="umowa-tak">✔ aktywne</span>
-                {% else %}
-                  <span class="umowa-nie">wyłączone</span>
-                {% endif %}
-              </td>
-              <td><a class="ikona-kalendarza" href="{% url 'moj_tydzien_nauczyciela' u.nauczyciel_id %}" title="Zobacz kalendarz korepetytora">📅</a></td>
-            <td>
-              {% if czy_szef or czy_koordynator %}
-              <a class="ikona-kalendarza" href="{% url 'edytuj_uzytkownika' u.id %}" title="Edytuj dane konta">✏️</a>
-              {% endif %}
-              {% if czy_szef %}
-              {% if u.id != request.user.id %}
-              <a class="przycisk-umowa umowa-tak" href="{% url 'przelacz_szefa' u.id %}" title="Nadaj uprawnienia admina">nadaj admina</a>
-              <a class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}" href="{% url 'przelacz_konto' u.id %}" title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}">{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a>
-              {% endif %}
-              {% elif czy_koordynator %}
-              <span class="podpowiedz">nadawanie admina: tylko szef</span>
-              {% endif %}
-            </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <p class="podtytul">Brak kont korepetytorów.</p>
-    {% endif %}
-  </section>
-  </div>
+		<section class="karta">
+			<h2>Korepetytorzy ({{ nauczyciele|length }})</h2>
+			<p class="podpowiedz">
+				Konta korepetytorów z ich przedmiotami i stawkami.
+			</p>
+			{% if nauczyciele %}
+			<div class="tabela-wrapper">
+				<table class="tabela" id="tabela-nauczyciele-konta">
+					<thead>
+						<tr>
+							<th>Korepetytor</th>
+							<th>Email</th>
+							<th>Przedmioty i stawki</th>
+							<th>Status</th>
+							<th>Kalendarz</th>
+							<th>Akcje</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for u in nauczyciele %}
+						<tr>
+							<td>{{ u.first_name }} {{ u.last_name }}</td>
+							<td>{{ u.email }}</td>
+							<td>
+								{% for p in u.nauczyciel.przedmioty.all %} {{ p.przedmiot }} {{
+								p.poziom }} — {{ p.stawka }} zł{% if not forloop.last %}, 
+								{%endif %} {% endfor %}
+							</td>
+							<td>
+								{% if u.is_active %}
+								<span class="umowa-tak">✔ aktywne</span>
+								{% else %}
+								<span class="umowa-nie">wyłączone</span>
+								{% endif %}
+							</td>
+							<td>
+								<a
+									class="ikona-kalendarza"
+									href="{% url 'moj_tydzien_nauczyciela' u.nauczyciel_id %}"
+									title="Zobacz kalendarz korepetytora"
+									>📅</a
+								>
+							</td>
+							<td>
+								{% if czy_szef or czy_koordynator %}
+								<a
+									class="ikona-kalendarza"
+									href="{% url 'edytuj_uzytkownika' u.id %}"
+									title="Edytuj dane konta"
+									>✏️</a
+								>
+								{% endif %} {% if czy_szef %} {% if u.id != request.user.id %}
+								<a
+									class="przycisk-umowa umowa-tak"
+									href="{% url 'przelacz_szefa' u.id %}"
+									title="Nadaj uprawnienia admina"
+									>nadaj admina</a
+								>
+								<a
+									class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}"
+									href="{% url 'przelacz_konto' u.id %}"
+									title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}"
+									>{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a
+								>
+								{% endif %} {% elif czy_koordynator %}
+								<span class="podpowiedz">nadawanie admina: tylko szef</span>
+								{% endif %}
+							</td>
+						</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+			{% else %}
+			<p class="podtytul">Brak kont korepetytorów.</p>
+			{% endif %}
+		</section>
+	</div>
 </div>
 
 <script>
-  var rola = document.getElementById('id_rola');
-  var sekcjaNauczyciel = document.getElementById('sekcja-nauczyciel');
+	var rola = document.getElementById('id_rola');
+	var sekcjaNauczyciel = document.getElementById('sekcja-nauczyciel');
 
+	function ustawWymaganePrzedmiotow(wymagane) {
+		sekcjaNauczyciel
+			.querySelectorAll(
+				'select[name="w_przedmiot"], select[name="w_poziom"], input[name="w_stawka"]',
+			)
+			.forEach(function (pole) {
+				pole.required = wymagane;
+			});
+	}
 
-  function ustawWymaganePrzedmiotow(wymagane) {
-    sekcjaNauczyciel.querySelectorAll('select[name="w_przedmiot"], select[name="w_poziom"], input[name="w_stawka"]').forEach(function (pole) {
-      pole.required = wymagane;
-    });
-  }
+	if (rola && sekcjaNauczyciel) {
+		var odswiezRole = function () {
+			var czyNauczyciel = rola.value === 'nauczyciel';
+			sekcjaNauczyciel.style.display = czyNauczyciel ? '' : 'none';
+			ustawWymaganePrzedmiotow(czyNauczyciel);
+		};
+		rola.addEventListener('change', odswiezRole);
+		odswiezRole();
+	}
 
-  if (rola && sekcjaNauczyciel) {
-    var odswiezRole = function () {
-      var czyNauczyciel = rola.value === 'nauczyciel';
-      sekcjaNauczyciel.style.display = czyNauczyciel ? '' : 'none';
-      ustawWymaganePrzedmiotow(czyNauczyciel);
-
-    };
-    rola.addEventListener('change', odswiezRole);
-    odswiezRole();
-  }
-
-  var kontenerWierszy = document.getElementById('wiersze-przedmiotow-konto');
-  var przyciskDodaj = document.getElementById('dodaj-przedmiot-konto');
-  if (kontenerWierszy && przyciskDodaj) {
-    przyciskDodaj.addEventListener('click', function () {
-      var wzor = kontenerWierszy.querySelector('.wiersz-przedmiotu');
-      var klon = wzor.cloneNode(true);
-      klon.querySelectorAll('select').forEach(function (sel) { sel.selectedIndex = 0; });
-      klon.querySelector('input[name="w_stawka"]').value = '';
-      klon.querySelector('.przycisk-usun-wiersz-konto').addEventListener('click', function () {
-        klon.remove();
-      });
-      kontenerWierszy.appendChild(klon);
-    });
-    kontenerWierszy.querySelectorAll('.przycisk-usun-wiersz-konto').forEach(function (prz) {
-      prz.addEventListener('click', function () {
-        if (kontenerWierszy.querySelectorAll('.wiersz-przedmiotu').length > 1) {
-          prz.closest('.wiersz-przedmiotu').remove();
-        }
-      });
-    });
-  }
+	var kontenerWierszy = document.getElementById('wiersze-przedmiotow-konto');
+	var przyciskDodaj = document.getElementById('dodaj-przedmiot-konto');
+	if (kontenerWierszy && przyciskDodaj) {
+		przyciskDodaj.addEventListener('click', function () {
+			var wzor = kontenerWierszy.querySelector('.wiersz-przedmiotu');
+			var klon = wzor.cloneNode(true);
+			klon.querySelectorAll('select').forEach(function (sel) {
+				sel.selectedIndex = 0;
+			});
+			klon.querySelector('input[name="w_stawka"]').value = '';
+			klon
+				.querySelector('.przycisk-usun-wiersz-konto')
+				.addEventListener('click', function () {
+					klon.remove();
+				});
+			kontenerWierszy.appendChild(klon);
+		});
+		kontenerWierszy
+			.querySelectorAll('.przycisk-usun-wiersz-konto')
+			.forEach(function (prz) {
+				prz.addEventListener('click', function () {
+					if (
+						kontenerWierszy.querySelectorAll('.wiersz-przedmiotu').length > 1
+					) {
+						prz.closest('.wiersz-przedmiotu').remove();
+					}
+				});
+			});
+	}
 </script>
 {% endblock %}

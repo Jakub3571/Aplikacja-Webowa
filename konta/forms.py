@@ -307,6 +307,9 @@ class FormularzUzytkownika(forms.ModelForm):
         user.set_password(self.cleaned_data['haslo1'])
         user.is_superuser = rola == 'admin'
         user.is_staff = rola == 'admin'
+        # rola koordynatora zapisana na koncie (pole stanowisko) — dzieki temu
+        # dziala niezaleznie od loginu, a koordynator nie moze byc adminem
+        user.stanowisko = 'koordynator' if rola == 'koordynator' else ''
         user.save()
         if rola == 'nauczyciel':
             nauczyciel = Nauczyciel.objects.create(
