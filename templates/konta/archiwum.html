@@ -53,7 +53,7 @@
     {% endif %}
   </section>
 
-  {% if request.user.is_superuser %}
+{% if czy_szef or czy_koordynator %}
   <section class="karta">
     <h2>Korepetytorzy ({{ korepetytorzy|length }})</h2>
     <p class="podpowiedz">Wszyscy korepetytorzy. Zakończona współpraca = nieaktywny: znika z list bieżących, ale dane, godziny i konto zostają.</p>
