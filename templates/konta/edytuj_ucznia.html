@@ -50,9 +50,6 @@
     <label for="{{ form.email_dodatkowy.id_for_label }}">Email dodatkowy (opcjonalnie)</label>
     {{ form.email_dodatkowy }}
 
-    <label for="{{ form.adresat_meet.id_for_label }}">Adresat linku Meet <span class="gwiazdka">*</span></label>
-    {{ form.adresat_meet }}
-    {% if form.adresat_meet.help_text %}<p class="podpowiedz">{{ form.adresat_meet.help_text }}</p>{% endif %}
 
     <div class="pole-checkbox">
       {{ form.auto_wyslij_meet }}

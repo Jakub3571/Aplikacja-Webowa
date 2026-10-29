@@ -32,8 +32,10 @@ class Command(BaseCommand):
                 if uczen.zakonczona:
                     PrzypomnienieLekcji.objects.create(lekcja=lekcja)
                     continue
-                if not uczen.email_glowny:
-                    continue
+              # przypomnienie idzie na oba maile rodzica (główny + dodatkowy)
+                adresy = [a for a in (uczen.email_glowny, uczen.email_dodatkowy) if a]
+                if not adresy:
+                  continue
                 tresc = (
                     'Dzień dobry,\n\n'
                     f'przypomnienie o zajęciach {uczen.przedmiot} dla {uczen.imie_ucznia}:\n\n'
@@ -48,7 +50,7 @@ class Command(BaseCommand):
                         f'Przypomnienie: zajęcia {uczen.przedmiot} — {start:%d.%m.%Y %H:%M}',
                         tresc,
                         None,
-                        [uczen.email_glowny],
+                        adresy,
                     )
                 except Exception:
                     continue

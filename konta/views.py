@@ -521,10 +521,10 @@ def uczniowie(request):
         wyslij_powiadomienie_o_uczniu(request, uczen)
         wyslij_powiadomienie_nauczycielowi(request, uczen)
         if uczen.link_meet:
-            wyslij_link_meet_uczniowi(request, uczen, adresat='glowny')
+            wyslij_link_meet_uczniowi(request, uczen)
             messages.info(
                 request,
-                'Link Meet nauczyciela wysłany do rodzica na adres główny — '
+                'Link Meet nauczyciela wysłany do rodzica na oba adresy e-mail — '
                 'dostanie go też w przypomnieniu 60 minut przed każdą lekcją.',
             )
         return redirect('uczniowie')
@@ -1671,21 +1671,20 @@ def kreator_dyspozycyjnosc(request):
     """Stary kreator formularzowy — zastąpiony widokiem tygodnia (styl Calendly)."""
     return redirect('moj_tydzien')
 
-def odbiorcy_meet(uczen, adresat='glowny'):
-    """Zwraca listę adresów e-mail rodzica wg wyboru z formularza ucznia.
-    Pomija puste adresy i duplikaty (główny = zapasowy)."""
+def odbiorcy_meet(uczen, adresat='oba'):
+    """Zwraca adresy e-mail rodzica — ZAWSZE oba (główny i dodatkowy),
+    pomija puste adresy i duplikaty. Adresat z formularza nie jest już wybierany."""
     adresy = []
-    if adresat in ('glowny', 'oba') and uczen.email_glowny:
+    if uczen.email_glowny:
         adresy.append(uczen.email_glowny)
-    if adresat in ('dodatkowy', 'oba') and uczen.email_dodatkowy:
-        if uczen.email_dodatkowy not in adresy:
-            adresy.append(uczen.email_dodatkowy)
+    if uczen.email_dodatkowy and uczen.email_dodatkowy not in adresy:
+        adresy.append(uczen.email_dodatkowy)
     return adresy
 
 
-def wyslij_link_meet_uczniowi(request, uczen, adresat='glowny'):
+def wyslij_link_meet_uczniowi(request, uczen):
     """Wysyła rodzicowi maila z linkiem Google Meet ucznia (jeśli jest)."""
-    odbiorcy = odbiorcy_meet(uczen, adresat)
+    odbiorcy = odbiorcy_meet(uczen)
     if not uczen.link_meet or not odbiorcy:
         return
     tresc = (

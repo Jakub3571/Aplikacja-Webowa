@@ -80,17 +80,8 @@ class FormularzZmianyHasla(PasswordChangeForm):
 class FormularzUcznia(forms.ModelForm):
     """Formularz dodawania ucznia — pola obowiązkowe z podpowiedziami."""
 
-    ADRESACI_MEET = [
-        ('glowny', 'rodzic główny'),
-        ('oba', 'główny i zapasowy'),
-    ]
 
-    adresat_meet = forms.ChoiceField(
-        label='adresat linku Meet',
-        choices=ADRESACI_MEET,
-        initial='glowny',
-        help_text='Na ten adres wyślemy link do zajęć (jeśli jest link Meet).',
-    )
+
     auto_wyslij_meet = forms.BooleanField(
         label='wyślij link Meet automatycznie po dodaniu',
         required=False,

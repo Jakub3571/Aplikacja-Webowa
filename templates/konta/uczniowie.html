@@ -98,9 +98,7 @@ pracowniczy{% endblock %} {% block panel %}
 			<p class="podpowiedz">{{ form.email_dodatkowy.help_text }}</p>
 			{% endif %}
 
-            <label for="{{ form.adresat_meet.id_for_label }}"
-                >Adresat linku Meet <span class="gwiazdka">*</span></label
-            >
+
             {{ form.adresat_meet }} {% if form.adresat_meet.help_text %}
             <p class="podpowiedz">{{ form.adresat_meet.help_text }}</p>
             {% endif %}
