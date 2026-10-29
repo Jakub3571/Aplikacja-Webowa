@@ -83,7 +83,7 @@ class ZakladkiTests(TestCase):
             self.assertEqual(r.status_code, 200, f'{adres} nie dziala')
 
     def test_zakladki_blokowane_bez_zalogowania(self):
-        oczekiwane = {'/pulpit/': 302, '/uczniowie/': 302, '/platnosci/': 403}
+        oczekiwane = {'/pulpit/': 302, '/uczniowie/': 302, '/platnosci/': 302}
         for adres, kod in oczekiwane.items():
             r = self.client.get(adres)
             self.assertEqual(r.status_code, kod, f'{adres} wpuszcza bez logowania')
@@ -256,7 +256,8 @@ class PlatnosciTests(TestCase):
 
     def test_platnosci_blokowane_bez_zalogowania(self):
         r = self.client.get('/platnosci/')
-        self.assertEqual(r.status_code, 403)
+        # niezalogowany dostaje przekierowanie na logowanie (nie wie, ze strona istnieje)
+        self.assertEqual(r.status_code, 302)
 
     def test_przycisk_zaplacone_zmienia_status(self):
         self.client.force_login(self.user)

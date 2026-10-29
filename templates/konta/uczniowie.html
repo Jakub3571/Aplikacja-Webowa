@@ -84,16 +84,16 @@ pracowniczy{% endblock %} {% block panel %}
 			<p class="podpowiedz">{{ form.email_glowny.help_text }}</p>
 			{% endif %}
 
-			<label for="{{ form.telefon_dodatkowy.id_for_label }}"
-				>Telefon dodatkowy <span class="gwiazdka">*</span></label
-			>
+            <label for="{{ form.telefon_dodatkowy.id_for_label }}"
+                >Telefon dodatkowy (opcjonalnie)</label
+            >
 			{{ form.telefon_dodatkowy }} {% if form.telefon_dodatkowy.help_text %}
 			<p class="podpowiedz">{{ form.telefon_dodatkowy.help_text }}</p>
 			{% endif %}
 
-			<label for="{{ form.email_dodatkowy.id_for_label }}"
-				>Email dodatkowy <span class="gwiazdka">*</span></label
-			>
+            <label for="{{ form.email_dodatkowy.id_for_label }}"
+                >Email dodatkowy (opcjonalnie)</label
+            >
 			{{ form.email_dodatkowy }} {% if form.email_dodatkowy.help_text %}
 			<p class="podpowiedz">{{ form.email_dodatkowy.help_text }}</p>
 			{% endif %}
@@ -115,9 +115,9 @@ pracowniczy{% endblock %} {% block panel %}
 			<p class="podpowiedz">{{ form.korepetytor.help_text }}</p>
 			{% endif %}
 
-			<label for="{{ form.notatka_od_rodzica.id_for_label }}"
-				>Notatka od rodzica <span class="gwiazdka">*</span></label
-			>
+            <label for="{{ form.notatka_od_rodzica.id_for_label }}"
+                >Notatka od rodzica (opcjonalnie)</label
+            >
 			{{ form.notatka_od_rodzica }} {% if form.notatka_od_rodzica.help_text %}
 			<p class="podpowiedz">{{ form.notatka_od_rodzica.help_text }}</p>
 			{% endif %}
