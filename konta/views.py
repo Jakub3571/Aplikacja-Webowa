@@ -1516,8 +1516,39 @@ def platnosci(request):
                 'liczba_zaplaconych': len(zaplacone_uczniowie),
                 'liczba_odbytych': liczba_odbytych,
                 'kwota': kwota,
+                'rozliczenia_pracownikow': rozliczenia_pracownikow,
             })
-
+    # rozliczenie pracownikow (osob wpisujacych uczniow): licznik odbytych lekcji
+    # uczniow, ktorych dany pracownik wpisal — tylko lekcje ODBYTE (nie odwolane, nie przyszle)
+    rozliczenia_pracownikow = []
+    pracownicy_z_uczniami = {}
+    for u in wszyscy_uczniowie:
+        klucz = u.umowil_id
+        if klucz:
+            pracownicy_z_uczniami.setdefault(klucz, []).append(u)
+    for pracownik_id, uczniowie_prac in pracownicy_z_uczniami.items():
+        pracownik = Pracownik.objects.filter(pk=pracownik_id).first()
+        if not pracownik:
+            continue
+        # zliczamy ODBYTE lekcje wszystkich uczniow tego pracownika + ich nauczyciele
+        liczba_odbytych_prac = 0
+        nauczyciele_set = set()
+        for u in uczniowie_prac:
+            liczba_odbytych_prac += Lekcja.objects.filter(
+                uczen=u,
+                odwolana=False,
+                data__lte=teraz,
+            ).count()
+            if u.korepetytor:
+                nauczyciele_set.add(u.korepetytor.strip())
+        rozliczenia_pracownikow.append({
+            'pracownik': pracownik,
+            'liczba_uczniow': len(uczniowie_prac),
+            'liczba_zaplaconych': len([u for u in uczniowie_prac if u.zaplacone]),
+            'liczba_odbytych': liczba_odbytych_prac,
+            'nauczyciele': sorted(nauczyciele_set),
+        })
+    rozliczenia_pracownikow.sort(key=lambda p: p['pracownik'].username)
     return render(request, 'konta/platnosci.html', {
         'uczniowie': uczniowie_lista,
         'zaplaconi': zaplaconi,
@@ -1549,8 +1580,39 @@ def uzytkownicy(request):
                 'czy_szef': False,
                 'czy_koordynator': czy_koordynator(request.user),
             })
-        form.zapisz()
+        nowy_uzytkownik = form.zapisz()
         messages.success(request, 'Użytkownik został dodany.')
+        # e-mail powitalny na konto nowego użytkownika — z linkiem do strony logowania
+        if nowy_uzytkownik.email:
+            link_logowania = request.build_absolute_uri(reverse('logowanie'))
+            if nowy_uzytkownik.is_superuser:
+                role_tekst = 'administrator (pełny dostęp)'
+            elif nowy_uzytkownik.stanowisko == 'koordynator':
+                role_tekst = 'koordynator'
+            elif nowy_uzytkownik.nauczyciel:
+                role_tekst = 'korepetytor'
+            else:
+                role_tekst = 'osoba umawiająca'
+            try:
+                send_mail(
+                    f'Witamy w zespole, {nowy_uzytkownik.first_name or nowy_uzytkownik.username}!',
+                    (
+                        f'Dzień dobry {nowy_uzytkownik.first_name or nowy_uzytkownik.username},\n\n'
+                        'dziękujemy za dołączenie do naszego zespołu!\n\n'
+                        f'Twoje konto w Panelu pracowniczym zostało utworzone.\n'
+                        f'Login: {nowy_uzytkownik.username}\n'
+                        f'Rola: {role_tekst}\n\n'
+                        f'Zaloguj się tutaj:\n{link_logowania}\n\n'
+                        'Jeśli hasło podał Ci administrator — użyj go przy pierwszym logowaniu\n'
+                        'i zmień je w zakładce „Zmień hasło".\n\n'
+                        'Pozdrawiamy,\nZespół'
+                    ),
+                    None,
+                    [nowy_uzytkownik.email],
+                )
+                messages.info(request, f'Powitalny e-mail wysłany na adres {nowy_uzytkownik.email}.')
+            except Exception:
+                pass
         return redirect('uzytkownicy')
     admini = [u for u in lista if u.is_superuser]
     koordynatorzy = [u for u in lista if not u.is_superuser and not u.nauczyciel and (u.stanowisko or '').strip().lower() == 'koordynator']
