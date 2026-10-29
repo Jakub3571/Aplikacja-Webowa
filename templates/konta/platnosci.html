@@ -41,14 +41,18 @@ pracowniczy{% endblock %} {% block panel %}
 						<td>{{ uczen.kto_umowil }}</td>
 						<td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
 						<td><span class="status-niezaplacone">❌ niezapłacone</span></td>
-						<td>
-							<form method="post">
-								{% csrf_token %}
-								<input type="hidden" name="uczen_id" value="{{ uczen.id }}" />
-								<input type="hidden" name="usun_ucznia" value="1" />
-								<button type="submit" class="przycisk-usun">Usuń</button>
-							</form>
-						</td>
+					    <td>
+                            {% if czy_szef %}
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="uczen_id" value="{{ uczen.id }}" />
+                                <input type="hidden" name="usun_ucznia" value="1" />
+                                <button type="submit" class="przycisk-usun">Usuń</button>
+                            </form>
+                            {% else %}
+                            <span class="podpowiedz">tylko szef</span>
+                            {% endif %}
+                        </td>
 					</tr>
 					{% endfor %}
 				</tbody>

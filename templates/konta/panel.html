@@ -32,7 +32,9 @@
     <a href="{% url 'uczniowie' %}" class="{% if request.resolver_match.url_name == 'uczniowie' %}aktywna{% endif %}">Uczniowie</a>
     <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">Lekcje</a>
     <a href="{% url 'archiwum' %}" class="{% if request.resolver_match.url_name == 'archiwum' %}aktywna{% endif %}">Archiwum</a>
-    {% if request.user.username|lower|slice:":12" == "koordynator" %}
+    {% if request.user.username|lower|slice:":11" == "koordynator" %}
+    <a href="{% url 'pulpit' %}" class="{% if request.resolver_match.url_name == 'pulpit' %}aktywna{% endif %}">Start</a>
+    <a href="{% url 'platnosci' %}" class="{% if request.resolver_match.url_name == 'platnosci' %}aktywna{% endif %}">Płatności</a>
     <a href="{% url 'uzytkownicy' %}" class="{% if request.resolver_match.url_name == 'uzytkownicy' %}aktywna{% endif %}">Użytkownicy</a>
     {% endif %}
     {% endif %}

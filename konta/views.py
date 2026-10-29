@@ -114,7 +114,12 @@ def nauczyciel_wolny_o(nauczyciel, dzien, start_lekcji):
             zakresy.append((s, e))
     for s, e in zakresy:
         if s <= start_lekcji and koniec <= e:
-            return not kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji)
+            if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji):
+                return False
+            # przerwa dnia: lekcja nie moze zaczac sie w okienku przerwy po innej lekcji
+            if godzina_w_przerwie(nauczyciel, dzien, start_lekcji.time()):
+                return False
+            return True
     return False
 
 def inne_lekcje_nauczyciela(nauczyciel, uczen, dzien, godzina_start):
@@ -279,8 +284,8 @@ def wyloguj(request):
 
 @login_required
 def pulpit(request):
-    """Strona startowa: szef widzi pulpit, pracownik od razu formularz ucznia."""
-    if not czy_szef(request.user):
+    """Strona startowa: szef i koordynator widza pulpit, pracownik od razu formularz ucznia."""
+    if not czy_szef(request.user) and not czy_koordynator(request.user):
         if getattr(request.user, 'nauczyciel_id', None):
             # nauczyciel: od razu swój tydzień w stylu Calendly (godziny dodaje plusikiem)
             return redirect('moj_tydzien')
@@ -776,9 +781,11 @@ def przelacz_konto(request, user_id):
 
 
 @login_required
-@tylko_szef
 def pobierz_raport(request):
-    """Raport zapłaconych płatności jako plik tekstowy do pobrania (zamiast e-maila)."""
+    """Raport zapłaconych płatności jako plik tekstowy do pobrania (zamiast e-maila).
+    Szef i koordynator."""
+    if not (czy_szef(request.user) or czy_koordynator(request.user)):
+        raise PermissionDenied
     zaplaconi = Uczen.objects.filter(zaplacone=True, zakonczona=False)
     linie = ['Raport zapłaconych płatności', '=' * 40, '']
     for u in zaplaconi:
@@ -1380,9 +1387,11 @@ def kalendarz_lekcji(request, uczen_id):
 
 
 @login_required
-@tylko_szef
 def platnosci(request):
-    """Zakładka płatności: lista uczniów, statusy zapłacone i wysyłka raportu."""
+    """Zakładka płatności: lista uczniów, statusy zapłacone i wysyłka raportu.
+    Szef i koordynator (edycja i raporty, bez usuwania uczniów)."""
+    if not (czy_szef(request.user) or czy_koordynator(request.user)):
+        raise PermissionDenied
     uczniowie_lista = Uczen.objects.filter(zaplacone=False, zakonczona=False)
     zaplaconi = Uczen.objects.filter(zaplacone=True, zakonczona=False)
     wszyscy_uczniowie = list(Uczen.objects.filter(zakonczona=False))
@@ -1403,6 +1412,9 @@ def platnosci(request):
         return redirect('platnosci')
 
     if request.method == 'POST' and 'usun_ucznia' in request.POST:
+        # usuwanie uczniów (na zawsze) — tylko szef; koordynator edytuje, ale nie usuwa
+        if not czy_szef(request.user):
+            raise PermissionDenied
         uczen = get_object_or_404(Uczen, pk=request.POST['uczen_id'])
         imie = f'{uczen.imie_ucznia} {uczen.nazwisko_rodzica}'
         uczen.delete()
