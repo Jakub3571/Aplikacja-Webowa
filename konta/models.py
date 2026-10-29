@@ -127,13 +127,12 @@ class Nauczyciel(models.Model):
     def stawka_dla(self, przedmiot, poziom_ucznia):
         """Stawka dla przedmiotu i poziomu ucznia (z kart przedmiotów);
         jeśli nie znajdzie, fallback do ogólnej stawki nauczyciela."""
-        poziom_nauczyciela = [
-            ('podstawowka', 'podstawówka'),           
-            ('srednia podstawa', 'średnia podstawa'),
-            ('srednia rozszerzenie', 'średnia rozszerzenie'),
-            ('studia', 'studia'),
-
-        ].get(poziom_ucznia, poziom_ucznia)
+        poziom_nauczyciela = {
+            'podstawowka': 'podstawówka',
+            'srednia podstawa': 'średnia podstawa',
+            'srednia rozszerzenie': 'średnia rozszerzenie',
+            'studia': 'studia',
+        }.get(poziom_ucznia, poziom_ucznia)
         for p in self.przedmioty.all():
             if p.przedmiot == przedmiot and p.poziom == poziom_nauczyciela:
                 return p.stawka

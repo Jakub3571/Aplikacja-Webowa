@@ -705,8 +705,9 @@ def przywroc_ucznia(request, uczen_id):
     messages.success(request, komunikat)
     return redirect('archiwum')
 
-@tylko_szef
+
 @login_required
+@tylko_szef
 def zakoncz_wspolprace(request, nauczyciel_id):
     """Kończy współpracę z korepetytorem: staje się nieaktywny, znika z list bieżących (dane zostają)."""
     nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
@@ -719,8 +720,9 @@ def zakoncz_wspolprace(request, nauczyciel_id):
     return render(request, 'konta/zakoncz_wspolprace.html', {'nauczyciel': nauczyciel})
 
 
-@tylko_szef
+
 @login_required
+@tylko_szef
 def przywroc_wspolprace(request, nauczyciel_id):
     """Przywraca korepetytora do współpracy."""
     nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
@@ -730,8 +732,9 @@ def przywroc_wspolprace(request, nauczyciel_id):
     messages.success(request, f'Wznowiono współpracę z {imie}.')
     return redirect('archiwum')
 
-@tylko_szef
+
 @login_required
+@tylko_szef
 def edytuj_uzytkownika(request, user_id):
     """Edycja konta: imię, nazwisko, email, telefon (bez hasła i roli)."""
     uzytkownik = get_object_or_404(Pracownik, pk=user_id)
@@ -753,8 +756,9 @@ def edytuj_uzytkownika(request, user_id):
     return render(request, 'konta/edytuj_uzytkownika.html', {'uzytkownik': uzytkownik})
 
 
-@tylko_szef
+
 @login_required
+@tylko_szef
 def przelacz_konto(request, user_id):
     """Włącza/wyłącza konto: wyłączone konto nie może się logować (dane zostają w bazie)."""
     uzytkownik = get_object_or_404(Pracownik, pk=user_id)
@@ -770,8 +774,9 @@ def przelacz_konto(request, user_id):
     return redirect('uzytkownicy')
 
 
-@tylko_szef
+
 @login_required
+@tylko_szef
 def pobierz_raport(request):
     """Raport zapłaconych płatności jako plik tekstowy do pobrania (zamiast e-maila)."""
     zaplaconi = Uczen.objects.filter(zaplacone=True, zakonczona=False)
@@ -1284,62 +1289,7 @@ def kalendarz_lekcji(request, uczen_id):
                 'odwolany': etykieta in odwolane,
                 'zajety': etykieta in zajete_przez_innych,
             })
-    if request.method == 'POST' and 'odwolaj_lekcje' in request.POST and wybrany_dzien:
-        lekcja_id = request.POST.get('lekcja_id')
-        lekcja = Lekcja.objects.filter(pk=lekcja_id, uczen=uczen, data__date=wybrany_dzien).first()
-        if lekcja:
-            lekcja.odwolana = True
-            lekcja.save(update_fields=['odwolana'])
-            if nauczyciel:
-                start_czas = timezone.localtime(lekcja.data).time()
-                Dostepnosc.objects.filter(
-                    nauczyciel=nauczyciel,
-                    data_od=wybrany_dzien,
-                    godzina_od=start_czas,
-                ).delete()
-            messages.success(
-                request,
-                f'Zajęcia {lekcja.data:%H:%M} {wybrany_dzien:%d.%m.%Y} zostały odwołane.',
-            )
-        return redirect(
-            reverse('kalendarz_lekcji', args=[uczen.id])
-            + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}'
-        )
 
-    if request.method == 'POST' and 'przywroc_lekcje' in request.POST and wybrany_dzien:
-        lekcja_id = request.POST.get('lekcja_id')
-        lekcja = Lekcja.objects.filter(pk=lekcja_id, uczen=uczen, data__date=wybrany_dzien).first()
-        if lekcja:
-            start_czas = timezone.localtime(lekcja.data).time()
-            kolidujace = inne_lekcje_nauczyciela(nauczyciel, uczen, wybrany_dzien, start_czas)
-            if kolidujace:
-                messages.error(
-                    request,
-                    f'Nie można przywrócić zajęć {lekcja.data:%H:%M} — korepetytor ma już wtedy '
-                    f'inną lekcję (uczeń {kolidujace[0].uczen.imie_ucznia}).',
-                )
-            else:
-                lekcja.odwolana = False
-                lekcja.save(update_fields=['odwolana'])
-                if nauczyciel:
-                    Dostepnosc.objects.get_or_create(
-                        nauczyciel=nauczyciel,
-                        data_od=wybrany_dzien,
-                        data_do=wybrany_dzien,
-                        godzina_od=start_czas,
-                        godzina_do=(
-                            datetime.combine(date(2000, 1, 1), start_czas)
-                            + timedelta(minutes=GODZINA_LEKCJI)
-                        ).time(),
-                    )
-                messages.success(
-                    request,
-                    f'Zajęcia {lekcja.data:%H:%M} {wybrany_dzien:%d.%m.%Y} zostały przywrócone.',
-                )
-        return redirect(
-            reverse('kalendarz_lekcji', args=[uczen.id])
-            + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}'
-        )
     if request.method == 'POST' and 'przelacz_godzine' in request.POST and wybrany_dzien:
         etykieta = request.POST.get('godzina', '')
         if not etykieta:
@@ -1428,8 +1378,9 @@ def kalendarz_lekcji(request, uczen_id):
     })
 
 
-@tylko_szef
+
 @login_required
+@tylko_szef
 def platnosci(request):
     """Zakładka płatności: lista uczniów, statusy zapłacone i wysyłka raportu."""
     uczniowie_lista = Uczen.objects.filter(zaplacone=False, zakonczona=False)
@@ -1564,8 +1515,9 @@ def uzytkownicy(request):
         'czy_szef': czy_szef(request.user),
     })
 
-@tylko_szef
+
 @login_required
+@tylko_szef
 def przelacz_szefa(request, user_id):
     """Włącza/wyłącza uprawnienia szefa dla użytkownika."""
     uzytkownik = get_object_or_404(Pracownik, pk=user_id)
