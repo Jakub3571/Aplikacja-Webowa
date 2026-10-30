@@ -74,14 +74,7 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-# --- Bezpieczeństwo na produkcji (HTTPS) ---
-# Aktywne tylko gdy DJANGO_DEBUG=0: wymusza HTTPS i bezpieczne ciasteczka.
-if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = 3600
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -99,18 +92,7 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 AUTH_USER_MODEL = 'konta.Pracownik'
-AUTH_USER_MODEL = 'konta.Pracownik'
 
-# Bezpieczeństwo na produkcji (https):
-# CSRF_COOKIE_SECURE — ciasteczko CSRF wysyłane tylko po HTTPS.
-# SESSION_COOKIE_SECURE — to samo dla ciasteczka sesji (klucz logowania).
-# CSRF_COOKIE_HTTPONLY — JavaScript nie ma dostępu do tokena CSRF.
-if not DEBUG:
-    CSRF_COOKIE_SECURE = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_HTTPONLY = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Dokąd przekierowuje po udanym logowaniu i skąd wymusza logowanie
@@ -118,9 +100,26 @@ LOGIN_REDIRECT_URL = 'pulpit'
 LOGIN_URL = 'logowanie'
 LOGOUT_REDIRECT_URL = 'logowanie'
 
+# --- Bezpieczeństwo na produkcji (HTTPS) ---
+# Aktywne tylko gdy DJANGO_DEBUG=0.
+# SECURE_SSL_REDIRECT — wymusza przejście z http:// na https://.
+# SECURE_HSTS_* — informuje przeglądarki, że strona jest zawsze po HTTPS.
+# CSRF_COOKIE_SECURE — ciasteczko CSRF wysyłane tylko po HTTPS.
+# SESSION_COOKIE_SECURE — to samo dla ciasteczka sesji (klucz logowania).
+# CSRF_COOKIE_HTTPONLY — JavaScript nie ma dostępu do tokena CSRF.
+# SECURE_CONTENT_TYPE_NOSNIFF — przeglądarka nie zgaduje typu zawartości.
+# X_FRAME_OPTIONS — strona nie może być osadzona w cudzej ramce (clickjacking).
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 3600
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
+
 # Poczta: na czas developmentu maile wypisywane są w terminalu (backend konsolowy).
-# Na produkcji zmień EMAIL_BACKEND na 'django.core.mail.backends.smtp.EmailBackend'
-# i uzupełnij EMAIL_HOST, EMAIL_PORT, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD.
 # Na produkcji wystarczy ustawić zmienną środowiskową DJANGO_EMAIL=smtp
 # oraz EMAIL_HOST_USER / EMAIL_HOST_PASSWORD (np. Gmail z hasłem aplikacji).
 if os.environ.get('DJANGO_EMAIL') == 'smtp':

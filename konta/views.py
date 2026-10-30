@@ -1,64 +1,13 @@
 import calendar
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import PermissionDenied
-
-
-def moze_edytowac_kalendarz(user, nauczyciel_id):
-    """Kalendarz edytuje: admin/szef albo nauczyciel-właściciel konta."""
-    if czy_szef(user):
-        return True
-    return getattr(user, 'nauczyciel_id', None) == nauczyciel_id
-
-def rola_context(request):
-    """Oddaje role zalogowanego uzytkownika do KAZDEGO szablonu (menu itd.)."""
-    u = getattr(request, 'user', None)
-    if not u or not u.is_authenticated:
-        return {'czy_szef_ctx': False, 'czy_koordynator_ctx': False}
-    return {
-        'czy_szef_ctx': czy_szef(u),
-        'czy_koordynator_ctx': czy_koordynator(u),
-    }
-
-
-
-
-def czy_szef(u):
-    """Prawdziwy szef: superuser LUB konto o nazwie 'Admin'."""
-    return bool(u.is_authenticated and (u.is_superuser or u.username.strip().lower() == 'admin'))
-
-def czy_koordynator(u):
-    """Koordynator: konto z rola 'koordynator' (pole stanowisko) LUB loginem
-    zaczynajacym sie od 'koordynator' (starsze konta).
-    Widzi wszystkich uczniow, moze edytowac, ale nie moze usuwac."""
-    if not u.is_authenticated:
-        return False
-    if (getattr(u, 'stanowisko', '') or '').strip().lower() == 'koordynator':
-        return True
-    return u.username.strip().lower().startswith('koordynator')
-
-def tylko_szef(widok):
-    """Puszcza dalej tylko superusera (szefa); reszta dostaje stronę „brak dostępu"."""
-    def sprawdz(u):
-        if czy_szef(u):
-            return True
-        raise PermissionDenied
-    return user_passes_test(sprawdz, login_url='logowanie')(widok)
-
-
 from django.core.mail import send_mail
-def zapisz_blad_maila(gdzie, blad):
-    """Zapisuje nieudana wysylke maila do pliku logi_maili.txt w katalogu projektu."""
-    from django.conf import settings
-    from pathlib import Path
-    import datetime
-    plik = Path(settings.BASE_DIR) / 'logi_maili.txt'
-    with open(plik, 'a', encoding='utf-8') as f:
-        f.write(f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S} | {gdzie} | {blad}\n')
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -83,6 +32,58 @@ DNI_TYGODNIA = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd']
 
 GODZINA_LEKCJI = 60
 
+MAX_PROB_LOGOWANIA = 5
+
+
+def moze_edytowac_kalendarz(user, nauczyciel_id):
+    """Kalendarz edytuje: admin/szef albo nauczyciel-właściciel konta."""
+    if czy_szef(user):
+        return True
+    return getattr(user, 'nauczyciel_id', None) == nauczyciel_id
+
+
+def rola_context(request):
+    """Oddaje role zalogowanego uzytkownika do KAZDEGO szablonu (menu itd.)."""
+    u = getattr(request, 'user', None)
+    if not u or not u.is_authenticated:
+        return {'czy_szef_ctx': False, 'czy_koordynator_ctx': False}
+    return {
+        'czy_szef_ctx': czy_szef(u),
+        'czy_koordynator_ctx': czy_koordynator(u),
+    }
+
+
+def czy_szef(u):
+    """Prawdziwy szef: superuser LUB konto o nazwie 'Admin'."""
+    return bool(u.is_authenticated and (u.is_superuser or u.username.strip().lower() == 'admin'))
+
+
+def czy_koordynator(u):
+    """Koordynator: konto z rola 'koordynator' (pole stanowisko) LUB loginem
+    zaczynajacym sie od 'koordynator' (starsze konta).
+    Widzi wszystkich uczniow, moze edytowac, ale nie moze usuwac."""
+    if not u.is_authenticated:
+        return False
+    if (getattr(u, 'stanowisko', '') or '').strip().lower() == 'koordynator':
+        return True
+    return u.username.strip().lower().startswith('koordynator')
+
+
+def tylko_szef(widok):
+    """Puszcza dalej tylko superusera (szefa); reszta dostaje stronę „brak dostępu"."""
+    def sprawdz(u):
+        if czy_szef(u):
+            return True
+        raise PermissionDenied
+    return user_passes_test(sprawdz, login_url='logowanie')(widok)
+
+
+def zapisz_blad_maila(gdzie, blad):
+    """Zapisuje nieudana wysylke maila do pliku logi_maili.txt w katalogu projektu."""
+    plik = Path(settings.BASE_DIR) / 'logi_maili.txt'
+    with open(plik, 'a', encoding='utf-8') as f:
+        f.write(f'{datetime.now():%Y-%m-%d %H:%M:%S} | {gdzie} | {blad}\n')
+
 
 def nauczyciel_z_korepetytora(korepetytor):
     """Znajduje kartę nauczyciela po polu 'korepetytor' ucznia (np. 'Anna Kowalska')."""
@@ -90,6 +91,7 @@ def nauczyciel_z_korepetytora(korepetytor):
         return None
     imie, nazwisko = korepetytor.split(' ', 1)
     return Nauczyciel.objects.filter(imie__iexact=imie.strip(), nazwisko__iexact=nazwisko.strip()).first()
+
 
 def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None):
     """Czy lekcja (60 min od start_lekcji) koliduje z istniejącą lekcją nauczyciela
@@ -144,6 +146,7 @@ def nauczyciel_wolny_o(nauczyciel, dzien, start_lekcji):
                 return False
             return True
     return False
+
 
 def inne_lekcje_nauczyciela(nauczyciel, uczen, dzien, godzina_start):
     """Lekcje innych uczniów tego nauczyciela nachodzące na slot (60 min od godzina_start)."""
@@ -213,9 +216,6 @@ def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
         if poczatek <= start_slotu < koniec:
             return True
     return False
-
-
-MAX_PROB_LOGOWANIA = 5
 
 
 def logowanie(request):
@@ -337,7 +337,7 @@ def dostepnosci_nauczycieli():
             }
         wpis = zgrupowane[klucz]
         wpis['dni'].add(termin.data_od)
-                # dni tygodnia dla czytelności (np. pon, wt, śr)
+        # dni tygodnia dla czytelności (np. pon, wt, śr)
         wpis.setdefault('dni_tygodnia', set()).add(termin.data_od.weekday())
         if termin.godzina_od < wpis['godzina_od']:
             wpis['godzina_od'] = termin.godzina_od
@@ -359,6 +359,7 @@ def dostepnosci_nauczycieli():
             'godzina_do': wpis['godzina_do'] if wpis else None,
         })
     return wynik
+
 
 @login_required
 def korepetytorzy_dane(request):
@@ -395,7 +396,7 @@ def korepetytorzy_dane(request):
             godzina = None
 
     korepetytorzy = []
-        # tryb GODZINY: dla przedmiotu/poziomu/daty zwracamy dostępne godziny lekcji (z przerwami)
+    # tryb GODZINY: dla przedmiotu/poziomu/daty zwracamy dostępne godziny lekcji (z przerwami)
     tryb = request.GET.get('tryb', '')
     if tryb == 'godziny' and dzien:
         godziny_wynik = []
@@ -460,6 +461,7 @@ def korepetytorzy_dane(request):
                 continue
         korepetytorzy.append({'nazwa': f'{n.imie} {n.nazwisko}'})
     return JsonResponse({'korepetytorzy': korepetytorzy})
+
 
 @login_required
 def uczniowie(request):
@@ -704,7 +706,7 @@ def przywroc_ucznia(request, uczen_id):
     uczen.zakonczona = False
     uczen.save(update_fields=['zakonczona'])
     imie = f'{uczen.imie_ucznia} {uczen.nazwisko_rodzica}'
-        # czyscimy znaczniki "przypomnienie wyslane" z czasow archiwum — inaczej
+    # czyscimy znaczniki "przypomnienie wyslane" z czasow archiwum — inaczej
     # przypomnienia dla przyszlych lekcji nigdy by nie poszly
     PrzypomnienieLekcji.objects.filter(
         lekcja__uczen=uczen,
@@ -756,7 +758,6 @@ def zakoncz_wspolprace(request, nauczyciel_id):
     return render(request, 'konta/zakoncz_wspolprace.html', {'nauczyciel': nauczyciel})
 
 
-
 @login_required
 @tylko_szef
 def przywroc_wspolprace(request, nauczyciel_id):
@@ -797,7 +798,6 @@ def edytuj_uzytkownika(request, user_id):
     return render(request, 'konta/edytuj_uzytkownika.html', {'uzytkownik': uzytkownik})
 
 
-
 @login_required
 @tylko_szef
 def przelacz_konto(request, user_id):
@@ -813,7 +813,6 @@ def przelacz_konto(request, user_id):
     else:
         messages.info(request, f'Konto {uzytkownik.username} zostało wyłączone — nie może się logować.')
     return redirect('uzytkownicy')
-
 
 
 @login_required
@@ -856,6 +855,8 @@ def reset_hasla(request):
         email_template_name='konta/mail_reset_tresc.txt',
         success_url='/reset-hasla/wyslane/',
     )(request)
+
+
 @login_required
 def kalendarz_nauczyciela(request, nauczyciel_id):
     """Stary widok podgladu — przekierowanie do widoku tygodnia (styl Calendly).
@@ -983,16 +984,12 @@ def kalendarz_dane(request, nauczyciel_id):
         else:
             PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien_data).delete()
         komunikat = f'Plan dnia {zrodlo:%d.%m.%Y} wklejono na {dzien_data:%d.%m.%Y}.'
-    
     elif akcja == 'zapisz_link':
         link = (request.POST.get('link_meet') or '').strip()
         nauczyciel.link_meet = link
         nauczyciel.save()
         komunikat = 'Link Google Meet zapisany.' if link else 'Link Google Meet usunięty.'
-    
     elif akcja == 'usun_zakres':
-
-        
         try:
             start = datetime.strptime(request.POST.get('od', ''), '%H:%M').time()
             koniec_zakresu = datetime.strptime(request.POST.get('do', ''), '%H:%M').time()
@@ -1008,7 +1005,7 @@ def kalendarz_dane(request, nauczyciel_id):
     elif akcja == 'wyczysc_dzien':
         usuniete = Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).count()
         Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).delete()
-        komunikat = f'Wyczyszczono cały dzień {dzien_data:%d.%m.%Y} — usunięto {usuniete} terminów.'        
+        komunikat = f'Wyczyszczono cały dzień {dzien_data:%d.%m.%Y} — usunięto {usuniete} terminów.'
     elif akcja == 'powtorz_tygodniowo':
         zrodlo_sloty = list(
             Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data)
@@ -1185,6 +1182,7 @@ def lekcje(request):
         'czy_szef': czy_szef(request.user),
         'jest_nauczycielem': bool(getattr(request.user, 'nauczyciel_id', None)),
     })
+
 
 @login_required
 def kalendarz_lekcji(request, uczen_id):
@@ -1421,7 +1419,6 @@ def kalendarz_lekcji(request, uczen_id):
     })
 
 
-
 @login_required
 def platnosci(request):
     """Zakładka płatności: lista uczniów, statusy zapłacone i wysyłka raportu.
@@ -1561,8 +1558,9 @@ def platnosci(request):
         'zaplaconi': zaplaconi,
         'email_raportu': email_odbiorcy,
         'rozliczenia': rozliczenia,
-         'rozliczenia_pracownikow': rozliczenia_pracownikow,
+        'rozliczenia_pracownikow': rozliczenia_pracownikow,
     })
+
 
 @login_required
 def uzytkownicy(request):
@@ -1654,7 +1652,6 @@ def przelacz_szefa(request, user_id):
     else:
         messages.info(request, f'{uzytkownik.username} — odebrano uprawnienia admina.')
     return redirect('uzytkownicy')
-
 
 
 @login_required
@@ -1750,6 +1747,7 @@ def moj_tydzien(request, nauczyciel_id=None):
 def kreator_dyspozycyjnosc(request):
     """Stary kreator formularzowy — zastąpiony widokiem tygodnia (styl Calendly)."""
     return redirect('moj_tydzien')
+
 
 def odbiorcy_meet(uczen, adresat='oba'):
     """Zwraca adresy e-mail rodzica — ZAWSZE oba (główny i dodatkowy),
@@ -1931,7 +1929,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
 
 @login_required
 def zmiana_hasla(request):
-    """Pozwala zalogowanemu pracownikowi zmienić własne hasło."""
+    """Pozwola zalogowanemu pracownikowi zmienić własne hasło."""
     form = FormularzZmianyHasla(request.user, data=request.POST or None)
     if request.method == 'POST' and form.is_valid():
         form.save()

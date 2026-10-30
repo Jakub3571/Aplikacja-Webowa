@@ -40,10 +40,6 @@ POZIOM_UCZEN_NA_NAUCZYCIELA = {
     'studia': 'studia',
 }
 
-# Mapowanie poziomu ucznia na poziom nauczyciela: 1:1 — te same klucze.
-# 'podstawówka' (z ogonkiem) też rozpoznawana — bezpiecznik dla starszych danych.
-
-
 GODZINY_LEKCJI = [
     (f'{h:02d}:{m:02d}', f'{h:02d}:{m:02d}') for h in range(6, 21) for m in range(0, 60, 5)
 ]
@@ -79,8 +75,6 @@ class FormularzZmianyHasla(PasswordChangeForm):
 
 class FormularzUcznia(forms.ModelForm):
     """Formularz dodawania ucznia — pola obowiązkowe z podpowiedziami."""
-
-
 
     auto_wyslij_meet = forms.BooleanField(
         label='wyślij link Meet automatycznie po dodaniu',
@@ -187,6 +181,7 @@ class FormularzUcznia(forms.ModelForm):
             dane['pierwsza_lekcja'] = timezone.make_aware(datetime.combine(data, czas))
         return dane
 
+
 class FormularzUzytkownika(forms.ModelForm):
     """Formularz dodawania nowego użytkownika panelu — rola wybierana na górze.
     Dla nauczyciela: wiersze przedmiot + poziom + stawka."""
@@ -263,7 +258,6 @@ class FormularzUzytkownika(forms.ModelForm):
             except ValidationError as e:
                 raise forms.ValidationError(list(e.messages))
 
-
         # e-mail: jeśli podano — zostaje; jeśli nie — automatyczny login@konta.local
         # (reset hasła i powiadomienia działają tylko z prawdziwym adresem)
         if not dane.get('email'):
@@ -321,32 +315,8 @@ class FormularzUzytkownika(forms.ModelForm):
                     defaults={'stawka': stawka},
                 )
         return user
-class FormularzLekcjiCyklicznej(forms.Form):
-    """Umawianie lekcji cyklicznej ucznia: dzień tygodnia, godzina i okres."""
 
-    dzien_tygodnia = forms.ChoiceField(
-        label='dzień tygodnia',
-        choices=[
-            (0, 'poniedziałek'), (1, 'wtorek'), (2, 'środa'), (3, 'czwartek'),
-            (4, 'piątek'), (5, 'sobota'), (6, 'niedziela'),
-        ],
-    )
-    godzina = forms.ChoiceField(
-        label='godzina lekcji',
-        choices=[(f'{h:02d}:{m:02d}', f'{h:02d}:{m:02d}') for h in range(6, 24) for m in (0, 30)],
-    )
-    od_kiedy = forms.DateField(
-        label='od dnia',
-        widget=forms.DateInput(attrs={'type': 'date'}),
-    )
-    do_kiedy = forms.DateField(
-        label='do dnia (np. koniec roku szkolnego)',
-        widget=forms.DateInput(attrs={'type': 'date'}),
-    )
-    link_meet = forms.CharField(
-        label='link Google Meet',
-        help_text='Stały link do spotkań Google Meet (meet.google.com/...). Wpisz raz — będzie ten sam przy każdej lekcji.',
-    )
+
 class FormularzDyspozycyjnosc(forms.Form):
     """Kreator dyspozycyjności nauczyciela: dzień, przedział godzin i przerwa."""
 
@@ -395,32 +365,7 @@ class FormularzDyspozycyjnosc(forms.Form):
             raise forms.ValidationError('Godzina „od” musi być wcześniejsza niż „do”.')
         return dane
 
-class FormularzLekcjiCyklicznej(forms.Form):
-    """Umawianie lekcji cyklicznej ucznia: dzień tygodnia, godzina i okres."""
 
-    dzien_tygodnia = forms.ChoiceField(
-        label='dzień tygodnia',
-        choices=[
-            (0, 'poniedziałek'), (1, 'wtorek'), (2, 'środa'), (3, 'czwartek'),
-            (4, 'piątek'), (5, 'sobota'), (6, 'niedziela'),
-        ],
-    )
-    godzina = forms.ChoiceField(
-        label='godzina lekcji',
-        choices=[(f'{h:02d}:{m:02d}', f'{h:02d}:{m:02d}') for h in range(6, 24) for m in (0, 30)],
-    )
-    od_kiedy = forms.DateField(
-        label='od dnia',
-        widget=forms.DateInput(attrs={'type': 'date'}),
-    )
-    do_kiedy = forms.DateField(
-        label='do dnia (np. koniec roku szkolnego)',
-        widget=forms.DateInput(attrs={'type': 'date'}),
-    )
-    link_meet = forms.CharField(
-        label='link Google Meet',
-        help_text='Stały link do spotkań Google Meet (meet.google.com/...). Wpisz raz — będzie ten sam przy każdej lekcji.',
-    )
 class FormularzLekcjiCyklicznej(forms.Form):
     """Umawianie lekcji cyklicznej ucznia: dzień tygodnia, godzina i okres."""
 
