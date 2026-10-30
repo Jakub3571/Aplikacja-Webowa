@@ -51,6 +51,14 @@ def tylko_szef(widok):
 
 
 from django.core.mail import send_mail
+def zapisz_blad_maila(gdzie, blad):
+    """Zapisuje nieudana wysylke maila do pliku logi_maili.txt w katalogu projektu."""
+    from django.conf import settings
+    from pathlib import Path
+    import datetime
+    plik = Path(settings.BASE_DIR) / 'logi_maili.txt'
+    with open(plik, 'a', encoding='utf-8') as f:
+        f.write(f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S} | {gdzie} | {blad}\n')
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -259,8 +267,8 @@ def wyslij_powiadomienie_o_uczniu(request, uczen):
             None,
             odbiorcy,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        zapisz_blad_maila('powiadomienie_biuro_o_nowym_uczniu', e)
 
 
 def wyslij_powiadomienie_nauczycielowi(request, uczen):
@@ -285,8 +293,8 @@ def wyslij_powiadomienie_nauczycielowi(request, uczen):
             None,
             [nauczyciel.email],
         )
-    except Exception:
-        pass
+    except Exception as e:
+        zapisz_blad_maila('powiadomienie_nauczycielowi', e)
 
 
 @login_required
@@ -1611,8 +1619,8 @@ def uzytkownicy(request):
                     [nowy_uzytkownik.email],
                 )
                 messages.info(request, f'Powitalny e-mail wysłany na adres {nowy_uzytkownik.email}.')
-            except Exception:
-                pass
+            except Exception as e:
+                zapisz_blad_maila('mail_powitalny_pracownik', e)
         return redirect('uzytkownicy')
     admini = [u for u in lista if u.is_superuser]
     koordynatorzy = [u for u in lista if not u.is_superuser and not u.nauczyciel and (u.stanowisko or '').strip().lower() == 'koordynator']
@@ -1775,8 +1783,8 @@ def wyslij_link_meet_uczniowi(request, uczen):
             None,
             odbiorcy,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        zapisz_blad_maila('link_do_zajec_rodzic', e)
 
 
 def wyslij_zaproszenie_meet(uczen, adresat='glowny'):
@@ -1802,8 +1810,8 @@ def wyslij_zaproszenie_meet(uczen, adresat='glowny'):
             None,
             odbiorcy,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        zapisz_blad_maila('zaproszenie_meet_rodzic', e)
 
 
 @login_required

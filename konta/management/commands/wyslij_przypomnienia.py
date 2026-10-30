@@ -52,7 +52,16 @@ class Command(BaseCommand):
                         None,
                         adresy,
                     )
-                except Exception:
+                except Exception as e:
+                    from pathlib import Path
+                    from django.conf import settings
+                    import datetime
+                    plik = Path(settings.BASE_DIR) / 'logi_maili.txt'
+                    with open(plik, 'a', encoding='utf-8') as f:
+                        f.write(
+                            f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S} | '
+                            f'przypomnienie_o_lekcji | {e}\n'
+                        )
                     continue
                 PrzypomnienieLekcji.objects.create(lekcja=lekcja)
                 wyslane += 1
