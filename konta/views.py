@@ -1516,7 +1516,6 @@ def platnosci(request):
                 'liczba_zaplaconych': len(zaplacone_uczniowie),
                 'liczba_odbytych': liczba_odbytych,
                 'kwota': kwota,
-                'rozliczenia_pracownikow': rozliczenia_pracownikow,
             })
     # rozliczenie pracownikow (osob wpisujacych uczniow): licznik odbytych lekcji
     # uczniow, ktorych dany pracownik wpisal — tylko lekcje ODBYTE (nie odwolane, nie przyszle)
@@ -1554,6 +1553,7 @@ def platnosci(request):
         'zaplaconi': zaplaconi,
         'email_raportu': email_odbiorcy,
         'rozliczenia': rozliczenia,
+         'rozliczenia_pracownikow': rozliczenia_pracownikow,
     })
 
 @login_required
