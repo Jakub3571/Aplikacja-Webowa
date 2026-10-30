@@ -136,5 +136,5 @@ DEFAULT_FROM_EMAIL = os.environ.get('DJANGO_EMAIL_FROM', 'panel@example.com')
 
 # Adresy, na które idzie powiadomienie o nowym uczniu (można wpisać kilka).
 EMAILE_POWIADOMIEN = [
-    'biuro@example.com',
+    'korepetycje681@gmail.com',
 ]
