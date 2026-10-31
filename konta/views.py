@@ -527,8 +527,7 @@ def uczniowie(request):
                 godzina_od=start_czas,
                 godzina_do=(datetime.combine(date(2000, 1, 1), start_czas) + timedelta(minutes=GODZINA_LEKCJI)).time(),
             )
-        messages.success(request, 'Uczeń został dodany do systemu.')
-        wyslij_powiadomienie_o_uczniu(request, uczen)
+        messages.success(request, 'Uczeń został dodany do systemie.')
         wyslij_powiadomienie_nauczycielowi(request, uczen)
         if uczen.link_meet:
             wyslij_link_meet_uczniowi(request, uczen)
@@ -1588,37 +1587,35 @@ def uzytkownicy(request):
             })
         nowy_uzytkownik = form.zapisz()
         messages.success(request, 'Użytkownik został dodany.')
-        # e-mail powitalny na konto nowego użytkownika — z linkiem do strony logowania
-        if nowy_uzytkownik.email:
-            link_logowania = request.build_absolute_uri(reverse('logowanie'))
+
+        # powiadomienie dla biura/szefa o nowo utworzonym koncie (EMAILE_POWIADOMIEN)
+        odbiorcy_szefa = list(getattr(settings, 'EMAILE_POWIADOMIEN', []))
+        if odbiorcy_szefa:
             if nowy_uzytkownik.is_superuser:
-                role_tekst = 'administrator (pełny dostęp)'
+                rola_szefa_tekst = 'administrator (pełny dostęp)'
             elif nowy_uzytkownik.stanowisko == 'koordynator':
-                role_tekst = 'koordynator'
+                rola_szefa_tekst = 'koordynator'
             elif nowy_uzytkownik.nauczyciel:
-                role_tekst = 'korepetytor'
+                rola_szefa_tekst = 'korepetytor'
             else:
-                role_tekst = 'osoba umawiająca'
+                rola_szefa_tekst = 'osoba umawiająca'
+            tresc_szefa = (
+                f'Nowe konto w Panelu pracowniczym:\n\n'
+                f'Login: {nowy_uzytkownik.username}\n'
+                f'Imię i nazwisko: {nowy_uzytkownik.first_name} {nowy_uzytkownik.last_name}\n'
+                f'E-mail: {nowy_uzytkownik.email}\n'
+                f'Rola: {rola_szefa_tekst}\n'
+                f'Konto utworzył: {request.user.get_full_name() or request.user.username}\n'
+            )
             try:
                 send_mail(
-                    f'Witamy w zespole, {nowy_uzytkownik.first_name or nowy_uzytkownik.username}!',
-                    (
-                        f'Dzień dobry {nowy_uzytkownik.first_name or nowy_uzytkownik.username},\n\n'
-                        'dziękujemy za dołączenie do naszego zespołu!\n\n'
-                        f'Twoje konto w Panelu pracowniczym zostało utworzone.\n'
-                        f'Login: {nowy_uzytkownik.username}\n'
-                        f'Rola: {role_tekst}\n\n'
-                        f'Zaloguj się tutaj:\n{link_logowania}\n\n'
-                        'Jeśli hasło podał Ci administrator — użyj go przy pierwszym logowaniu\n'
-                        'i zmień je w zakładce „Zmień hasło".\n\n'
-                        'Pozdrawiamy,\nZespół'
-                    ),
+                    'Nowe konto użytkownika — Panel pracowniczy',
+                    tresc_szefa,
                     None,
-                    [nowy_uzytkownik.email],
+                    odbiorcy_szefa,
                 )
-                messages.info(request, f'Powitalny e-mail wysłany na adres {nowy_uzytkownik.email}.')
             except Exception as e:
-                zapisz_blad_maila('mail_powitalny_pracownik', e)
+                zapisz_blad_maila('powiadomienie_szefa_o_nowym_koncie', e)
         return redirect('uzytkownicy')
     admini = [u for u in lista if u.is_superuser]
     koordynatorzy = [u for u in lista if not u.is_superuser and not u.nauczyciel and (u.stanowisko or '').strip().lower() == 'koordynator']
