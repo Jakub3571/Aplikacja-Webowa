@@ -92,7 +92,11 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 AUTH_USER_MODEL = 'konta.Pracownik'
-
+# Adresy, z których wolno przesyłać formularze i zapytania AJAX (CSRF).
+# Bez tego Django 4.x odrzuca POST-y z JavaScriptu (kalendarz) błędem 403.
+CSRF_TRUSTED_ORIGINS = [
+    'https://www.nowoczesnekorepetycje.pl',
+]
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Dokąd przekierowuje po udanym logowaniu i skąd wymusza logowanie
