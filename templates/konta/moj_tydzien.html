@@ -202,10 +202,12 @@
               headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf() },
             });
           })
-          .then(function (odp) { if (odp) return odp.json(); })
           .then(function (wynik2) {
             if (wynik2 && wynik2.blad) { komunikat.textContent = wynik2.blad; return; }
             odswiezStrone();
+          })
+          .catch(function (blad) {
+            komunikat.textContent = 'Nie udało się zapisać (błąd połączenia z serwerem). Odśwież stronę i spróbuj ponownie.';
           });
         return;
       }
