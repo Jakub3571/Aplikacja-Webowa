@@ -134,6 +134,6 @@ else:
 DEFAULT_FROM_EMAIL = os.environ.get('DJANGO_EMAIL_FROM', 'panel@example.com')
 
 # Adresy, na które idzie powiadomienie o nowym uczniu (można wpisać kilka).
-EMAILE_POWIADOMIEN = [
-    'korepetycje681@gmail.com',
-]
+# Puste na czas odzyskiwania skrzynki biurowej.
+# Gdy konto wróci (lub założymy nowe/płatne), wpisz tu adresy odbiorców powiadomień.
+EMAILE_POWIADOMIEN = []
