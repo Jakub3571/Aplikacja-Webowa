@@ -587,6 +587,7 @@ def uczniowie(request):
                 godzina_do=(datetime.combine(date(2000, 1, 1), start_czas) + timedelta(minutes=GODZINA_LEKCJI)).time(),
             )
         messages.success(request, 'Uczeń został dodany do systemie.')
+        wyslij_powiadomienie_o_uczniu(request, uczen)
         wyslij_powiadomienie_nauczycielowi(request, uczen)
         if uczen.link_meet:
             wyslij_link_meet_uczniowi(request, uczen)
