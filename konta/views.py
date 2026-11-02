@@ -589,13 +589,12 @@ def uczniowie(request):
         messages.success(request, 'Uczeń został dodany do systemie.')
         wyslij_powiadomienie_o_uczniu(request, uczen)
         wyslij_powiadomienie_nauczycielowi(request, uczen)
-        if uczen.link_meet:
-            wyslij_link_meet_uczniowi(request, uczen)
-            messages.info(
-                request,
-                'Link Meet nauczyciela wysłany do rodzica na oba adresy e-mail — '
-                'dostanie go też w przypomnieniu 60 minut przed każdą lekcją.',
-            )
+        wyslij_potwierdzenie_rodzicowi(request, uczen)
+        messages.info(
+            request,
+            'Do rodzica wysłano potwierdzenie zapisu: termin 1. lekcji'
+            + (' i link Meet.' if uczen.link_meet else ' (link Meet poleci osobno, gdy nauczyciel go zapisze).'),
+        )
         return redirect('uczniowie')
 
     return render(request, 'konta/uczniowie.html', {
@@ -2041,6 +2040,47 @@ def wyslij_link_meet_uczniowi(request, uczen):
     except Exception as e:
         zapisz_blad_maila('link_do_zajec_rodzic', e)
 
+def wyslij_potwierdzenie_rodzicowi(request, uczen):
+    """Wysyła rodzicowi potwierdzenie zapisu: przedmiot, korepetytor,
+    data i godzina 1. lekcji oraz link Meet (jeśli nauczyciel go ma).
+    Odpowiedź na maila trafia do osoby, która umówiła ucznia."""
+    odbiorcy = odbiorcy_meet(uczen)
+    if not odbiorcy:
+        return
+    tresc = (
+        'Dzień dobry,\n\n'
+        f'potwierdzamy zapis {uczen.imie_ucznia} na korepetycje.\n\n'
+        f'Przedmiot: {uczen.przedmiot} (poziom: {uczen.poziom})\n'
+        f'Korepetytor: {uczen.korepetytor}\n'
+        f'Pierwsza lekcja: {uczen.pierwsza_lekcja:%d.%m.%Y o godz. %H:%M}\n'
+    )
+    if uczen.link_meet:
+        tresc += (
+            '\nLink do zajęć (stały — ten sam przy każdej lekcji):\n'
+            f'{uczen.link_meet}\n'
+        )
+    else:
+        tresc += '\nLink do zajęć online otrzymacie osobno, gdy będzie dostępny.\n'
+    tresc += (
+        '\nW razie pytań prosimy o odpowiedź na tego maila.\n\n'
+        f'Pozdrawiamy,\n{uczen.kto_umowil}\n'
+    )
+    tworca_email = getattr(uczen.umowil, 'email', '') or ''
+    try:
+        from django.core.mail import EmailMessage
+        mail = EmailMessage(
+            subject=(
+                f'Zapis na korepetycje — {uczen.imie_ucznia} ({uczen.przedmiot}), '
+                f'1. lekcja {uczen.pierwsza_lekcja:%d.%m.%Y %H:%M}'
+            ),
+            body=tresc,
+            to=odbiorcy,
+        )
+        if tworca_email:
+            mail.reply_to = [tworca_email]
+        mail.send()
+    except Exception as e:
+        zapisz_blad_maila('potwierdzenie_rodzica', e)
 
 def wyslij_zaproszenie_meet(uczen, adresat='glowny'):
     """Wysyła e-mail do rodzica z linkiem do lekcji cyklicznej na Google Meet."""
