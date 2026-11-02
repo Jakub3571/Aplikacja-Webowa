@@ -614,11 +614,11 @@ def edytuj_ucznia(request, uczen_id):
 
     # --- dodatkowe przedmioty ucznia: dodawanie ---
     if request.method == 'POST' and 'dodaj_przedmiot' in request.POST:
-        form_przedmiotu = FormularzPrzedmiotuUcznia(request.POST)
+        form_przedmiotu = FormularzPrzedmiotuUcznia(request.POST, prefix='przedmiotdod')
         form_przedmiotu.ustaw_korepetytorow(
-            request.POST.get('przedmiot'),
-            request.POST.get('poziom'),
-            request.POST.get('korepetytor'),
+            request.POST.get('przedmiotdod-przedmiot'),
+            request.POST.get('przedmiotdod-poziom'),
+            request.POST.get('przedmiotdod-korepetytor'),
         )
         if form_przedmiotu.is_valid():
             przedmiot = form_przedmiotu.cleaned_data['przedmiot']
@@ -721,7 +721,7 @@ def edytuj_ucznia(request, uczen_id):
 
     return render(request, 'konta/edytuj_ucznia.html', {
         'form': form,
-        'form_przedmiotu': FormularzPrzedmiotuUcznia(),
+        'form_przedmiotu': FormularzPrzedmiotuUcznia(prefix='przedmiotdod'),
         'uczen': uczen,
         'przedmioty_ucznia': list(uczen.przedmioty_ucznia.all()),
     })
