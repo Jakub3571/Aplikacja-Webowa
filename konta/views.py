@@ -1796,10 +1796,55 @@ def uzytkownicy(request):
                 'czy_szef': False,
                 'czy_koordynator': czy_koordynator(request.user),
             })
-        nowy_uzytkownik = form.zapisz()
-        messages.success(request, 'Użytkownik został dodany.')
-
-        # powiadomienie dla biura/szefa o nowo utworzonym koncie (EMAILE_POWIADOMIEN)
+        # mail powitalny do nowego użytkownika — z Reply-To do twórcy konta
+        # + jednorazowy link do ustawienia własnego hasła (jak reset hasła)
+        if nowy_uzytkownik.email:
+            link_logowania = request.build_absolute_uri(reverse('logowanie'))
+            # link do ustawienia hasla DOKLADNIE dla tego nowego konta
+            from django.contrib.auth.tokens import default_token_generator
+            from django.utils.encoding import force_bytes
+            from django.utils.http import urlsafe_base64_encode
+            uid = urlsafe_base64_encode(force_bytes(nowy_uzytkownik.pk))
+            token = default_token_generator.make_token(nowy_uzytkownik)
+            link_hasla = request.build_absolute_uri(
+                reverse('reset_hasla_potwierdz', kwargs={'uidb64': uid, 'token': token})
+            )
+            if nowy_uzytkownik.is_superuser:
+                role_tekst = 'administrator (pełny dostęp)'
+            elif nowy_uzytkownik.stanowisko == 'koordynator':
+                role_tekst = 'koordynator'
+            elif nowy_uzytkownik.nauczyciel:
+                role_tekst = 'korepetytor'
+            else:
+                role_tekst = 'osoba umawiająca'
+            tworca = request.user
+            tworca_email = tworca.email or ''
+            tworca_nazwa = tworca.get_full_name() or tworca.username
+            try:
+                from django.core.mail import EmailMessage
+                mail = EmailMessage(
+                    subject=f'Witamy w zespole, {nowy_uzytkownik.first_name or nowy_uzytkownik.username}!',
+                    body=(
+                        f'Dzień dobry {nowy_uzytkownik.first_name or nowy_uzytkownik.username},\n\n'
+                        'dziękujemy za dołączenie do naszego zespołu!\n\n'
+                        f'Twoje konto w Panelu pracowniczym zostało utworzone.\n'
+                        f'Login: {nowy_uzytkownik.username}\n'
+                        f'Rola: {role_tekst}\n\n'
+                        f'Zaloguj się tutaj:\n{link_logowania}\n\n'
+                        f'USTAW SWOJE HASŁO (kliknij — link ważny 3 dni):\n{link_hasla}\n\n'
+                        'Jeśli hasło podał Ci administrator, możesz go użyć przy pierwszym logowaniu\n'
+                        'i zmienić w zakładce „Zmień hasło" — albo po prostu ustaw własne hasło linkiem powyżej.\n\n'
+                        f'W razie pytań odpisz na tego maila — trafi do {tworca_nazwa}.\n\n'
+                        'Pozdrawiamy,\nZespół'
+                    ),
+                    to=[nowy_uzytkownik.email],
+                )
+                if tworca_email:
+                    mail.reply_to = [tworca_email]
+                mail.send()
+                messages.info(request, f'Powitalny e-mail wysłany na adres {nowy_uzytkownik.email} (odpowiedź trafi do {tworca_nazwa}).')
+            except Exception as e:
+                zapisz_blad_maila('mail_powitalny_pracownik', e)
         odbiorcy_szefa = list(getattr(settings, 'EMAILE_POWIADOMIEN', []))
         if odbiorcy_szefa:
             if nowy_uzytkownik.is_superuser:
