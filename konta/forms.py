@@ -15,6 +15,7 @@ from .models import (
     Nauczyciel,
     Pracownik,
     PrzedmiotNauczyciela,
+    PrzedmiotUcznia,
     Uczen,
 )
 
@@ -399,3 +400,45 @@ class WierszPrzedmiotu(forms.Form):
 
     przedmiot = forms.ChoiceField(label='przedmiot', choices=WYBIERZ_PRZEDMIOT)
     poziom = forms.ChoiceField(label='poziom', choices=POZIOMY_NAUCZYCIELA)
+
+class FormularzPrzedmiotuUcznia(forms.Form):
+    """Dodatkowy przedmiot ucznia: przedmiot + poziom + korepetytor.
+    Lista korepetytorów budowana w widoku (wg przedmiotu i poziomu)."""
+
+    przedmiot = forms.ChoiceField(
+        label='przedmiot',
+        choices=WYBIERZ_PRZEDMIOT,
+    )
+    poziom = forms.ChoiceField(
+        label='poziom',
+        choices=POZIOMY,
+    )
+    korepetytor = forms.ChoiceField(
+        label='korepetytor',
+        choices=[('', '— najpierw wybierz przedmiot i poziom —')],
+        help_text='Na liście pojawią się tylko korepetytorzy uczący tego przedmiotu na tym poziomie.',
+    )
+
+    def ustaw_korepetytorow(self, przedmiot=None, poziom=None, wybrany=None):
+        """Wypełnia listę korepetytorów dla przedmiotu+poziomu (jak w formularzu ucznia)."""
+        nauczyciele = Nauczyciel.objects.none()
+        if przedmiot:
+            wpisane = PrzedmiotNauczyciela.objects.filter(przedmiot=przedmiot)
+            if poziom:
+                poziom_nauczyciela = POZIOM_UCZEN_NA_NAUCZYCIELA.get(poziom, poziom)
+                wpisane = wpisane.filter(poziom=poziom_nauczyciela)
+            nauczyciele = (
+                Nauczyciel.objects
+                .filter(przedmioty__in=wpisane, aktywny=True)
+                .distinct()
+                .order_by('nazwisko', 'imie')
+            )
+        wybory = [('', '— wybierz korepetytora —')]
+        for n in nauczyciele:
+            wybory.append((
+                f'{n.imie} {n.nazwisko}',
+                f'{n.imie} {n.nazwisko} ({n.przedmioty_tekst()})',
+            ))
+        self.fields['korepetytor'].choices = wybory
+        if wybrany and any(w == wybrany for w, _ in wybory):
+            self.fields['korepetytor'].initial = wybrany

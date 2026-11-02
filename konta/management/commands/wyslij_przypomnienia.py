@@ -36,18 +36,28 @@ class Command(BaseCommand):
                 adresy = [a for a in (uczen.email_glowny, uczen.email_dodatkowy) if a]
                 if not adresy:
                   continue
+                # przedmiot i link Meet: z karty przedmiotu dodatkowego, gdy lekcja do niej należy
+                if lekcja.przedmiot_karta_id:
+                    karta = lekcja.przedmiot_karta
+                    przedmiot_info = karta.przedmiot
+                    korepetytor_info = karta.korepetytor
+                    link_info = karta.link_meet or uczen.link_meet
+                else:
+                    przedmiot_info = uczen.przedmiot
+                    korepetytor_info = uczen.korepetytor
+                    link_info = uczen.link_meet
                 tresc = (
                     'Dzień dobry,\n\n'
-                    f'przypomnienie o zajęciach {uczen.przedmiot} dla {uczen.imie_ucznia}:\n\n'
+                    f'przypomnienie o zajęciach {przedmiot_info} dla {uczen.imie_ucznia}:\n\n'
                     f'{start:%d.%m.%Y o godz. %H:%M}\n'
-                    f'Korepetytor: {uczen.korepetytor}\n'
+                    f'Korepetytor: {korepetytor_info}\n'
                 )
-                if uczen.link_meet:
-                    tresc += f'\nLink do zajęć: {uczen.link_meet}\n'
+                if link_info:
+                    tresc += f'\nLink do zajęć: {link_info}\n'
                 tresc += '\nDo zobaczenia na zajęciach!\n'
                 try:
                     send_mail(
-                        f'Przypomnienie: zajęcia {uczen.przedmiot} — {start:%d.%m.%Y %H:%M}',
+                        f'Przypomnienie: zajęcia {przedmiot_info} — {start:%d.%m.%Y %H:%M}',
                         tresc,
                         None,
                         adresy,

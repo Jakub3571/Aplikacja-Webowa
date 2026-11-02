@@ -16,12 +16,13 @@ from django.utils import timezone
 from .forms import (
     FormularzDyspozycyjnosc,
     FormularzLogowania,
+    FormularzPrzedmiotuUcznia,
     FormularzUcznia,
     FormularzUzytkownika,
     FormularzZmianyHasla,
     FormularzLekcjiCyklicznej,
 )
-from .models import Dostepnosc, Lekcja, Nauczyciel, Pracownik, PrzerwaDnia, PrzypomnienieLekcji, RaportPlatnosci, Uczen
+from .models import Dostepnosc, Lekcja, Nauczyciel, Pracownik, PrzedmiotUcznia, PrzerwaDnia, PrzypomnienieLekcji, RaportPlatnosci, Uczen
 
 MIESIACE = [
     'styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec',
@@ -92,6 +93,63 @@ def nauczyciel_z_korepetytora(korepetytor):
     imie, nazwisko = korepetytor.split(' ', 1)
     return Nauczyciel.objects.filter(imie__iexact=imie.strip(), nazwisko__iexact=nazwisko.strip()).first()
 
+def lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela):
+    """Czy dana lekcja należy do zajęć podanego nauczyciela?
+    Lekcja głównego przedmiotu: wg pola 'korepetytor' ucznia.
+    Lekcja dodatkowego przedmiotu: wg korepetytora z karty przedmiotu."""
+    if lekcja.przedmiot_karta_id:
+        return (lekcja.przedmiot_karta.korepetytor or '').strip().lower() == nazwa_nauczyciela
+    return (lekcja.uczen.korepetytor or '').strip().lower() == nazwa_nauczyciela
+
+
+def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None):
+    """Czy lekcja (60 min od start_lekcji) koliduje z istniejącą lekcją nauczyciela
+    lub wypada w okienku przerwy po innej lekcji.
+
+    Przerwa to stałe okno po KAŻDEJ lekcji (np. 5 min): lekcja efektywnie
+    zajmuje [start, koniec + przerwa). Dwie lekcje kolidują, gdy te przedziały się pokrywają.
+    Uwzględnia wszystkie przedmioty nauczyciela (główny i dodatkowe uczniów).
+    """
+    if not nauczyciel:
+        return False
+    if przerwa_min is None:
+        przerwa_min = nauczyciel.przerwa or 0
+    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+    koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
+    for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien, odwolana=False):
+        if not lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela):
+            continue
+        l_start = timezone.localtime(lekcja.data).replace(tzinfo=None)
+        l_koniec = l_start + timedelta(minutes=GODZINA_LEKCJI)
+        # 1) lekcje nie mogą na siebie nachodzić (bez przerwy)
+        if l_start < koniec and start_lekcji < l_koniec:
+            return True
+        # 2) nasza lekcja zaczyna się w oknie przerwy po tamtej lekcji:
+        #    [l_koniec, l_koniec + przerwa)
+        if przerwa_min and l_koniec <= start_lekcji < l_koniec + timedelta(minutes=przerwa_min):
+            return True
+    return False
+
+
+def inne_lekcje_nauczyciela(nauczyciel, uczen, dzien, godzina_start):
+    """Lekcje innych uczniów tego nauczyciela nachodzące na slot (60 min od godzina_start).
+    Uwzględnia wszystkie przedmioty nauczyciela (główny i dodatkowe)."""
+    if not nauczyciel:
+        return []
+    start_slotu = datetime.combine(dzien, godzina_start)
+    koniec_slotu = start_slotu + timedelta(minutes=GODZINA_LEKCJI)
+    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+    kolidujace = []
+    for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien, odwolana=False):
+        if lekcja.uczen_id == uczen.id:
+            continue
+        if not lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela):
+            continue
+        start_lekcji = timezone.localtime(lekcja.data).replace(tzinfo=None)
+        koniec_lekcji = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
+        if start_slotu < koniec_lekcji and start_lekcji < koniec_slotu:
+            kolidujace.append(lekcja)
+    return kolidujace
 
 def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None):
     """Czy lekcja (60 min od start_lekcji) koliduje z istniejącą lekcją nauczyciela
@@ -422,8 +480,9 @@ def korepetytorzy_dane(request):
             # lekcje nauczyciela tego dnia -> wyliczamy godziny wolne w każdym zakresie
             przerwa = n.przerwa or 0
             lekcje_dnia = []
-            for lekcja in Lekcja.objects.select_related('uczen').filter(data__date=dzien, odwolana=False):
-                if (lekcja.uczen.korepetytor or '').strip().lower() != f'{n.imie} {n.nazwisko}'.strip().lower():
+            nazwa_n = f'{n.imie} {n.nazwisko}'.strip().lower()
+            for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien, odwolana=False):
+                if not lekcja_jest_u_nauczyciela(lekcja, nazwa_n):
                     continue
                 l_start = timezone.localtime(lekcja.data).replace(tzinfo=None)
                 lekcje_dnia.append(l_start)
@@ -547,10 +606,71 @@ def uczniowie(request):
 
 @login_required
 def edytuj_ucznia(request, uczen_id):
-    """Edycja danych ucznia: admin może edytować każdego, pracownik — tylko swoich."""
+    """Edycja danych ucznia: admin może edytować każdego, pracownik — tylko swoich.
+    Do tego zarządzanie dodatkowymi przedmiotami ucznia (wielu korepetytorów)."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
     if not czy_szef(request.user) and not czy_koordynator(request.user) and uczen.umowil_id != request.user.id:
         raise PermissionDenied
+
+    # --- dodatkowe przedmioty ucznia: dodawanie ---
+    if request.method == 'POST' and 'dodaj_przedmiot' in request.POST:
+        form_przedmiotu = FormularzPrzedmiotuUcznia(request.POST)
+        form_przedmiotu.ustaw_korepetytorow(
+            request.POST.get('przedmiot'),
+            request.POST.get('poziom'),
+            request.POST.get('korepetytor'),
+        )
+        if form_przedmiotu.is_valid():
+            przedmiot = form_przedmiotu.cleaned_data['przedmiot']
+            poziom = form_przedmiotu.cleaned_data['poziom']
+            korepetytor = form_przedmiotu.cleaned_data['korepetytor']
+            # nie pozwalamy na duplikat: ten sam przedmiot+poziom już istnieje (główny lub dodatkowy)
+            if (uczen.przedmiot == przedmiot and uczen.poziom == poziom) or \
+               uczen.przedmioty_ucznia.filter(przedmiot=przedmiot, poziom=poziom).exists():
+                messages.error(
+                    request,
+                    f'{uczen.imie_ucznia} uczy się już {przedmiot} ({poziom}) — nie można dodać drugi raz.',
+                )
+            else:
+                nauczyciel = nauczyciel_z_korepetytora(korepetytor)
+                link = ''
+                if nauczyciel and nauczyciel.link_meet:
+                    link = nauczyciel.link_meet
+                PrzedmiotUcznia.objects.create(
+                    uczen=uczen,
+                    przedmiot=przedmiot,
+                    poziom=poziom,
+                    korepetytor=korepetytor,
+                    link_meet=link,
+                )
+                messages.success(
+                    request,
+                    f'Dodano przedmiot {przedmiot} ({poziom}) — korepetytor: {korepetytor}. '
+                    'Umów lekcje z tego przedmiotu w kalendarzu ucznia.',
+                )
+                return redirect('edytuj_ucznia', uczen_id=uczen.id)
+        # formularz z błędami — pokaż z powrotem
+        messages.error(request, 'Popraw dane w formularzu dodawania przedmiotu.')
+        return redirect('edytuj_ucznia', uczen_id=uczen.id)
+
+    # --- dodatkowe przedmioty ucznia: usuwanie ---
+    if request.method == 'POST' and 'usun_przedmiot' in request.POST:
+        karta_id = request.POST.get('przedmiot_ucznia_id')
+        karta = PrzedmiotUcznia.objects.filter(pk=karta_id, uczen=uczen).first()
+        if karta:
+            # zwalniamy zablokowane godziny tego przedmiotu u jego korepetytora
+            nauczyciel = nauczyciel_z_korepetytora(karta.korepetytor)
+            if nauczyciel:
+                for lekcja in Lekcja.objects.filter(uczen=uczen, przedmiot_karta=karta):
+                    start = timezone.localtime(lekcja.data)
+                    Dostepnosc.objects.filter(
+                        nauczyciel=nauczyciel,
+                        data_od=start.date(),
+                        godzina_od=start.time(),
+                    ).delete()
+            karta.delete()
+            messages.success(request, f'Usunięto przedmiot {karta} wraz z jego lekcjami.')
+        return redirect('edytuj_ucznia', uczen_id=uczen.id)
 
     if request.method == 'POST':
         form = FormularzUcznia(
@@ -599,7 +719,12 @@ def edytuj_ucznia(request, uczen_id):
         if uczen.korepetytor and uczen.korepetytor not in [w for w, _ in form.fields['korepetytor'].choices]:
             form.fields['korepetytor'].choices += [(uczen.korepetytor, uczen.korepetytor)]
 
-    return render(request, 'konta/edytuj_ucznia.html', {'form': form, 'uczen': uczen})
+    return render(request, 'konta/edytuj_ucznia.html', {
+        'form': form,
+        'form_przedmiotu': FormularzPrzedmiotuUcznia(),
+        'uczen': uczen,
+        'przedmioty_ucznia': list(uczen.przedmioty_ucznia.all()),
+    })
 
 
 @login_required
@@ -1092,8 +1217,8 @@ def kalendarz_dane(request, nauczyciel_id):
             przesuniecie += przerwa_min
     zajete = set()
     nazwa_nauczyciela_dane = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
-    for lekcja in Lekcja.objects.select_related('uczen').filter(data__date=dzien_data, odwolana=False):
-        if (lekcja.uczen.korepetytor or '').strip().lower() != nazwa_nauczyciela_dane:
+    for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien_data, odwolana=False):
+        if not lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela_dane):
             continue
         start = timezone.localtime(lekcja.data).replace(tzinfo=None)
         for minuty in range(0, GODZINA_LEKCJI, 30):
@@ -1145,8 +1270,12 @@ def lekcje(request):
         nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
         nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
         uczniowie_lista = [
-            u for u in Uczen.objects.filter(zakonczona=False)
+            u for u in Uczen.objects.filter(zakonczona=False).prefetch_related('przedmioty_ucznia')
             if (u.korepetytor or '').strip().lower() == nazwa_nauczyciela
+            or any(
+                (k.korepetytor or '').strip().lower() == nazwa_nauczyciela
+                for k in u.przedmioty_ucznia.all()
+            )
         ]
     elif czy_szef(request.user) or czy_koordynator(request.user):
         uczniowie_lista = list(Uczen.objects.filter(zakonczona=False))
@@ -1186,16 +1315,31 @@ def lekcje(request):
 @login_required
 def kalendarz_lekcji(request, uczen_id):
     """Kalendarz lekcji ucznia: miesiąc, dni i kafelki godzin do wpisywania lekcji.
-    Korepetytor widzi kalendarze swoich uczniów (wg pola korepetytor)."""
+    Przełącznik przedmiotów: główny przedmiot (bez ?karta=) lub dodatkowy (?karta=ID).
+    Korepetytor widzi kalendarze swoich uczniów (główny przedmiot wg pola korepetytor,
+    dodatkowe — wg kart przedmiotów)."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
+
+    # aktywny przedmiot: brak ?karta= -> główny; ?karta=ID -> dodatkowy przedmiot
+    karta = None
+    karta_id = request.GET.get('karta') or request.POST.get('karta')
+    if karta_id:
+        karta = uczen.przedmioty_ucznia.filter(pk=karta_id).first()
+        if not karta:
+            raise PermissionDenied
+
+    nazwa_glowna = f'{uczen.korepetytor}'.strip().lower()
+    nazwy_dodatkowe = [(k.korepetytor or '').strip().lower() for k in uczen.przedmioty_ucznia.all()]
+
     nauczyciel_id = getattr(request.user, 'nauczyciel_id', None)
     if nauczyciel_id:
         nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
         nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
-        if (uczen.korepetytor or '').strip().lower() != nazwa_nauczyciela:
+        if nazwa_nauczyciela != nazwa_glowna and nazwa_nauczyciela not in nazwy_dodatkowe:
             raise PermissionDenied
     elif not czy_szef(request.user) and not czy_koordynator(request.user) and uczen.umowil_id != request.user.id:
         raise PermissionDenied
+
     dzisiaj = date.today()
 
     rok = request.GET.get('rok')
@@ -1216,10 +1360,19 @@ def kalendarz_lekcji(request, uczen_id):
         except ValueError:
             wybrany_dzien = None
 
+    # pomocniczy filtr lekcji bieżącego przedmiotu
+    if karta:
+        filtr_karta = {'przedmiot_karta': karta}
+        filtr_karta_get = {'przedmiot_karta': karta}
+    else:
+        filtr_karta = {'przedmiot_karta__isnull': True}
+        filtr_karta_get = {'przedmiot_karta__isnull': True}
+
     lekcje_miesiaca = Lekcja.objects.filter(
         uczen=uczen,
         data__year=rok,
         data__month=miesiac,
+        **filtr_karta_get,
     )
     dni_z_lekcjami = set(timezone.localtime(l.data).date() for l in lekcje_miesiaca)
 
@@ -1241,31 +1394,35 @@ def kalendarz_lekcji(request, uczen_id):
     nastepny_miesiac = miesiac + 1 if miesiac < 12 else 1
     nastepny_rok = rok if miesiac < 12 else rok + 1
 
+    # nauczyciel bieżącego przedmiotu (głównego lub z karty dodatkowej)
+    nauczyciel = nauczyciel_z_korepetytora(karta.korepetytor if karta else uczen.korepetytor)
+
     zaznaczone = set()
     odwolane = set()
     if wybrany_dzien:
-        for lekcja in Lekcja.objects.filter(uczen=uczen, data__date=wybrany_dzien):
+        for lekcja in Lekcja.objects.filter(uczen=uczen, data__date=wybrany_dzien, **filtr_karta_get):
             etykieta = timezone.localtime(lekcja.data).strftime('%H:%M')
             zaznaczone.add(etykieta)
             if lekcja.odwolana:
                 odwolane.add(etykieta)
 
-    nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
-
     zajete_przez_innych = set()
     if wybrany_dzien and nauczyciel:
-        nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
-        for lekcja in Lekcja.objects.select_related('uczen').filter(data__date=wybrany_dzien, odwolana=False):
+        nazwa_nauczyciela_dane = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+        for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=wybrany_dzien, odwolana=False):
             if lekcja.uczen_id == uczen.id:
                 continue
-            if (lekcja.uczen.korepetytor or '').strip().lower() != nazwa_nauczyciela:
+            if not lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela_dane):
                 continue
             start_lekcji = timezone.localtime(lekcja.data).replace(tzinfo=None)
             for minuty in range(0, GODZINA_LEKCJI, 30):
                 zajete_przez_innych.add((start_lekcji + timedelta(minutes=minuty)).strftime('%H:%M'))
+
+    karta_param = f'&karta={karta.id}' if karta else ''
+
     if request.method == 'POST' and 'odwolaj_lekcje' in request.POST and wybrany_dzien:
         lekcja_id = request.POST.get('lekcja_id')
-        lekcja = Lekcja.objects.filter(pk=lekcja_id, uczen=uczen, data__date=wybrany_dzien).first()
+        lekcja = Lekcja.objects.filter(pk=lekcja_id, uczen=uczen, data__date=wybrany_dzien, **filtr_karta).first()
         if lekcja:
             lekcja.odwolana = True
             lekcja.save(update_fields=['odwolana'])
@@ -1282,12 +1439,12 @@ def kalendarz_lekcji(request, uczen_id):
             )
         return redirect(
             reverse('kalendarz_lekcji', args=[uczen.id])
-            + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}'
+            + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}{karta_param}'
         )
 
     if request.method == 'POST' and 'przywroc_lekcje' in request.POST and wybrany_dzien:
         lekcja_id = request.POST.get('lekcja_id')
-        lekcja = Lekcja.objects.filter(pk=lekcja_id, uczen=uczen, data__date=wybrany_dzien).first()
+        lekcja = Lekcja.objects.filter(pk=lekcja_id, uczen=uczen, data__date=wybrany_dzien, **filtr_karta).first()
         if lekcja:
             start_czas = timezone.localtime(lekcja.data).time()
             kolidujace = inne_lekcje_nauczyciela(nauczyciel, uczen, wybrany_dzien, start_czas)
@@ -1317,8 +1474,9 @@ def kalendarz_lekcji(request, uczen_id):
                 )
         return redirect(
             reverse('kalendarz_lekcji', args=[uczen.id])
-            + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}'
+            + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}{karta_param}'
         )
+
     kafelki = []
     for h in range(6, 21):
         for m in (0, 30):
@@ -1336,11 +1494,14 @@ def kalendarz_lekcji(request, uczen_id):
             messages.error(request, 'Nie wybrano godziny — kliknij kafelek z godziną.')
             return redirect(
                 reverse('kalendarz_lekcji', args=[uczen.id])
-                + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}'
+                + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}{karta_param}'
             )
         start_czas = datetime.strptime(etykieta, '%H:%M').time()
         data_lekcji = timezone.make_aware(datetime.combine(wybrany_dzien, start_czas))
-        istniejaca = Lekcja.objects.filter(uczen=uczen, data=data_lekcji).first()
+        if karta:
+            istniejaca = Lekcja.objects.filter(uczen=uczen, data=data_lekcji, przedmiot_karta=karta).first()
+        else:
+            istniejaca = Lekcja.objects.filter(uczen=uczen, data=data_lekcji, przedmiot_karta__isnull=True).first()
         if istniejaca and istniejaca.odwolana:
             messages.error(
                 request,
@@ -1372,7 +1533,7 @@ def kalendarz_lekcji(request, uczen_id):
                     f'{nauczyciel.imie} {nauczyciel.nazwisko}. Wybierz inną godzinę.',
                 )
             else:
-                Lekcja.objects.create(uczen=uczen, data=data_lekcji)
+                Lekcja.objects.create(uczen=uczen, przedmiot_karta=karta, data=data_lekcji)
                 if nauczyciel:
                     Dostepnosc.objects.get_or_create(
                         nauczyciel=nauczyciel,
@@ -1384,11 +1545,12 @@ def kalendarz_lekcji(request, uczen_id):
                 messages.success(request, f'Lekcja {etykieta} {wybrany_dzien:%d.%m.%Y} została dodana.')
         return redirect(
             reverse('kalendarz_lekcji', args=[uczen.id])
-            + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}'
+            + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}{karta_param}'
         )
+
     lekcje_dnia = []
     if wybrany_dzien:
-        for lekcja in Lekcja.objects.filter(uczen=uczen, data__date=wybrany_dzien).order_by('data'):
+        for lekcja in Lekcja.objects.filter(uczen=uczen, data__date=wybrany_dzien, **filtr_karta).order_by('data'):
             lekcje_dnia.append({
                 'id': lekcja.id,
                 'godzina': timezone.localtime(lekcja.data).strftime('%H:%M'),
@@ -1398,10 +1560,13 @@ def kalendarz_lekcji(request, uczen_id):
         uczen=uczen,
         data__year=dzisiaj.year,
         data__month=dzisiaj.month,
+        **filtr_karta,
     ).count()
 
     return render(request, 'konta/kalendarz_lekcji.html', {
         'uczen': uczen,
+        'karta': karta,
+        'przedmioty_ucznia': list(uczen.przedmioty_ucznia.all()),
         'tygodnie': tygodnie,
         'dni_tygodnia': DNI_TYGODNIA,
         'nazwa_miesiaca': MIESIACE[miesiac - 1],
@@ -1426,7 +1591,7 @@ def platnosci(request):
         raise PermissionDenied
     uczniowie_lista = Uczen.objects.filter(zaplacone=False, zakonczona=False)
     zaplaconi = Uczen.objects.filter(zaplacone=True, zakonczona=False)
-    wszyscy_uczniowie = list(Uczen.objects.filter(zakonczona=False))
+    wszyscy_uczniowie = list(Uczen.objects.filter(zakonczona=False).prefetch_related('przedmioty_ucznia'))
     email_odbiorcy = request.POST.get('email_raportu', '').strip()
 
     if request.method == 'POST' and 'oznacz_zaplacone' in request.POST:
@@ -1498,22 +1663,45 @@ def platnosci(request):
     rozliczenia = []
     for nauczyciel in Nauczyciel.objects.filter(aktywny=True).order_by('nazwisko', 'imie'):
         nazwa = f'{nauczyciel.imie} {nauczyciel.nazwisko}'
-        jego_uczniowie = [u for u in wszyscy_uczniowie if (u.korepetytor or '').strip() == nazwa]
+        nazwa_low = nazwa.strip().lower()
+        # uczniowie, u których ten nauczyciel uczy: głównego przedmiotu LUB dodatkowego
+        jego_uczniowie = [
+            u for u in wszyscy_uczniowie
+            if (u.korepetytor or '').strip().lower() == nazwa_low
+            or any(
+                (k.korepetytor or '').strip().lower() == nazwa_low
+                for k in u.przedmioty_ucznia.all()
+            )
+        ]
         if jego_uczniowie:
             zaplacone_uczniowie = [u for u in jego_uczniowie if u.zaplacone]
-            # kwota = suma stawek za kazda ODBYTA lekcje oplaconych uczniow:
-            # liczemy lekcje od dnia dodania ucznia do teraz, pomijamy odwolane
+            # kwota = suma stawek za kazda ODBYTA lekcje oplaconych uczniow
+            # TYLKO z przedmiotow tego nauczyciela (glownego i dodatkowych):
+            # liczemy lekcje do teraz, pomijamy odwolane
             kwota = 0
             liczba_odbytych = 0
             for u in zaplacone_uczniowie:
-                stawka = nauczyciel.stawka_dla(u.przedmiot, u.poziom)
-                odbyte = Lekcja.objects.filter(
-                    uczen=u,
-                    odwolana=False,
-                    data__lte=teraz,
-                ).count()
-                liczba_odbytych += odbyte
-                kwota += stawka * odbyte
+                # lekcje głównego przedmiotu (jeśli nauczyciel jest głównym korepetytorem)
+                if (u.korepetytor or '').strip().lower() == nazwa_low:
+                    odbyte = Lekcja.objects.filter(
+                        uczen=u,
+                        przedmiot_karta__isnull=True,
+                        odwolana=False,
+                        data__lte=teraz,
+                    ).count()
+                    liczba_odbytych += odbyte
+                    kwota += nauczyciel.stawka_dla(u.przedmiot, u.poziom) * odbyte
+                # lekcje dodatkowych przedmiotów tego nauczyciela
+                for karta in u.przedmioty_ucznia.all():
+                    if (karta.korepetytor or '').strip().lower() == nazwa_low:
+                        odbyte = Lekcja.objects.filter(
+                            uczen=u,
+                            przedmiot_karta=karta,
+                            odwolana=False,
+                            data__lte=teraz,
+                        ).count()
+                        liczba_odbytych += odbyte
+                        kwota += nauczyciel.stawka_dla(karta.przedmiot, karta.poziom) * odbyte
             rozliczenia.append({
                 'nauczyciel': nauczyciel,
                 'liczba_uczniow': len(jego_uczniowie),
@@ -1544,6 +1732,9 @@ def platnosci(request):
             ).count()
             if u.korepetytor:
                 nauczyciele_set.add(u.korepetytor.strip())
+            for k in u.przedmioty_ucznia.all():
+                if k.korepetytor:
+                    nauczyciele_set.add(k.korepetytor.strip())
         rozliczenia_pracownikow.append({
             'pracownik': pracownik,
             'liczba_uczniow': len(uczniowie_prac),
@@ -1692,8 +1883,8 @@ def moj_tydzien(request, nauczyciel_id=None):
         przerwy_dni[wpis.data] = wpis.minuty
     nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
     lekcje_dni = {}
-    for lekcja in Lekcja.objects.select_related('uczen').filter(data__gte=poniedzialek, data__lt=nastepny, odwolana=False):
-        if (lekcja.uczen.korepetytor or '').strip().lower() != nazwa_nauczyciela:
+    for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__gte=poniedzialek, data__lt=nastepny, odwolana=False):
+        if not lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela):
             continue
         dzien_lekcji = timezone.localtime(lekcja.data).date()
         lekcje_dni.setdefault(dzien_lekcji, []).append(lekcja)
@@ -1716,7 +1907,7 @@ def moj_tydzien(request, nauczyciel_id=None):
         for lekcja in sorted(lekcje_dni.get(dzien, []), key=lambda l: l.data):
             lekcje_listy.append({
                 'uczen': f'{lekcja.uczen.imie_ucznia} {lekcja.uczen.nazwisko_rodzica}',
-                'przedmiot': lekcja.uczen.przedmiot,
+                'przedmiot': (lekcja.przedmiot_karta.przedmiot if lekcja.przedmiot_karta_id else lekcja.uczen.przedmiot),
                 'godzina': timezone.localtime(lekcja.data).strftime('%H:%M'),
                 'koniec': (timezone.localtime(lekcja.data) + timedelta(minutes=GODZINA_LEKCJI)).strftime('%H:%M'),
             })
@@ -1808,14 +1999,25 @@ def wyslij_zaproszenie_meet(uczen, adresat='glowny'):
     except Exception as e:
         zapisz_blad_maila('zaproszenie_meet_rodzic', e)
 
-
 @login_required
 def umow_lekcje_cykliczna(request, uczen_id):
     """Umawia stałe lekcje ucznia: wiele slotów w tygodniu, presety okresu,
-    blokada terminów u korepetytora i e-mail z linkiem Meet do rodzica."""
+    blokada terminów u korepetytora i e-mail z linkiem Meet do rodzica.
+    Przełącznik przedmiotu: główny (bez karta) lub dodatkowy (?karta=ID)."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
     if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
         raise PermissionDenied
+
+    # aktywny przedmiot: główny lub dodatkowy (karta)
+    karta = None
+    karta_id = request.GET.get('karta') or request.POST.get('karta')
+    if karta_id:
+        karta = uczen.przedmioty_ucznia.filter(pk=karta_id).first()
+        if not karta:
+            raise PermissionDenied
+
+    # nauczyciel i link Meet bieżącego przedmiotu
+    nauczyciel = nauczyciel_z_korepetytora(karta.korepetytor if karta else uczen.korepetytor)
 
     def okres_dat(okres, od_dnia):
         """Zwraca (od, do) wg wybranego presetu."""
@@ -1855,7 +2057,6 @@ def umow_lekcje_cykliczna(request, uczen_id):
         if not sloty:
             messages.error(request, 'Dodaj min. jeden termin (dzień tygodnia i godzina).')
             return redirect('lekcja_cykliczna', uczen_id=uczen.id)
-        nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
         utworzone = 0
         pominiete_konflikt = 0
         pominiete_przerwa = 0
@@ -1872,7 +2073,10 @@ def umow_lekcje_cykliczna(request, uczen_id):
                     elif w_przerwie:
                         pominiete_przerwa += 1
                     else:
-                        Lekcja.objects.get_or_create(uczen=uczen, data=data_lekcji)
+                        if karta:
+                            Lekcja.objects.get_or_create(uczen=uczen, data=data_lekcji, przedmiot_karta=karta)
+                        else:
+                            Lekcja.objects.get_or_create(uczen=uczen, data=data_lekcji, przedmiot_karta__isnull=True)
                         if nauczyciel:
                             Dostepnosc.objects.get_or_create(
                                 nauczyciel=nauczyciel,
@@ -1900,25 +2104,36 @@ def umow_lekcje_cykliczna(request, uczen_id):
                 f'Stałe lekcje umówione — wpisano {utworzone} terminów do {do_dnia:%d.%m.%Y}. '
                 'Korepetytor ma zablokowane godziny w kalendarzu.',
             )
+        # flaga "zajęcia cykliczne" dotyczy ucznia (niezależnie od przedmiotu)
         if utworzone and not uczen.zajecia_cykliczne:
             uczen.zajecia_cykliczne = True
-        if link_meet:
+            uczen.save(update_fields=['zajecia_cykliczne'])
+        # link Meet: dla dodatkowego przedmiotu zapisujemy na jego karcie,
+        # dla głównego — na karcie ucznia (jak dotychczas)
+        if karta:
+            if link_meet:
+                karta.link_meet = link_meet
+                karta.save()
+        elif link_meet:
             uczen.link_meet = link_meet
             uczen.save()
-        elif uczen.link_meet:
-            # link z konta nauczyciela/przy uczniu — tylko zapisujemy
-            uczen.save(update_fields=['zajecia_cykliczne'])
         else:
-            uczen.save(update_fields=['zajecia_cykliczne'])
-        if uczen.link_meet:
+            if not uczen.pk or uczen.zajecia_cykliczne:
+                uczen.save(update_fields=['zajecia_cykliczne'])
+        biezacy_link = karta.link_meet if karta else uczen.link_meet
+        if biezacy_link:
             messages.info(
                 request,
                 'Link Meet zapisany — rodzic dostanie go automatycznie w przypomnieniu '
                 '60 minut przed każdą lekcją.',
             )
-        return redirect('kalendarz_lekcji', uczen_id=uczen.id)
+        karta_param = f'?karta={karta.id}' if karta else ''
+        return redirect(f"{reverse('kalendarz_lekcji', args=[uczen.id])}{karta_param}")
     return render(request, 'konta/lekcja_cykliczna.html', {
         'uczen': uczen,
+        'karta': karta,
+        'przedmioty_ucznia': list(uczen.przedmioty_ucznia.all()),
+        'biezacy_link_meet': (karta.link_meet if karta else uczen.link_meet) or '',
         'godziny': [f'{h:02d}:{m:02d}' for h in range(6, 24) for m in (0, 30)],
         'dzisiaj': date.today().isoformat(),
     })

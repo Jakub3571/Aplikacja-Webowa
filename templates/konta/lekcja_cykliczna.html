@@ -4,15 +4,36 @@
 <section class="karta">
   <h2>🔄 Stałe lekcje: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</h2>
   <p class="podtytul">
+    {% if karta %}
+    Przedmiot: {{ karta.przedmiot }} · poziom: {{ karta.poziom }} · korepetytor: {{ karta.korepetytor }}
+    {% else %}
     Uczeń: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }} · przedmiot: {{ uczen.przedmiot }}
-    · korepetytor: {{ uczen.korepetytor }} · umówił(a): {{ uczen.kto_umowil }}
+    · korepetytor: {{ uczen.korepetytor }}
+    {% endif %}
+    · umówił(a): {{ uczen.kto_umowil }}
   </p>
+
+  {% if przedmioty_ucznia %}
+  <p class="podpowiedz">
+    Umawiasz stałe lekcje dla przedmiotu:
+    {% if karta %}<a class="przycisk-kalendarz" href="?">główny ({{ uczen.przedmiot }})</a>{% endif %}
+    {% for kartap in przedmioty_ucznia %}
+      {% if kartap.id == karta.id %}
+      <strong class="przycisk-kalendarz">{{ kartap.przedmiot }} ({{ kartap.korepetytor }})</strong>
+      {% else %}
+      <a class="przycisk-kalendarz" href="?karta={{ kartap.id }}">{{ kartap.przedmiot }} ({{ kartap.korepetytor }})</a>
+      {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
+
   <p class="podpowiedz">
     Wybierz jeden lub więcej terminów tygodniowych — lekcje wpiszą się automatycznie do kalendarza,
     a korepetytor będzie miał zablokowane te godziny.
   </p>
   <form method="post" class="formularz">
     {% csrf_token %}
+    {% if karta %}<input type="hidden" name="karta" value="{{ karta.id }}">{% endif %}
 
     <label>Terminy tygodniowe <span class="gwiazdka">*</span></label>
     <div id="sloty-tygodniowe">
@@ -42,7 +63,7 @@
     <label for="id_data_poczatkowa">Pierwsza lekcja od (data) <span class="gwiazdka">*</span></label>
     <input type="date" name="data_poczatkowa" id="id_data_poczatkowa" value="{{ dzisiaj }}">
     <p class="podpowiedz">Możesz wpisać też datę z przeszłości — lekcje wpiszemy od tego dnia (przydatne, gdy ustaliliście terminy wcześniej).
-      Zostaw puste, jeśli ma być od dzisiaj.</p>
+      Zostaw puste, jeżeli ma być od dzisiaj.</p>
 
     <label>Obowiązuje do <span class="gwiazdka">*</span></label>
     <select name="okres" required>
@@ -50,10 +71,11 @@
       <option value="rok">do końca roku szkolnego (30 czerwca)</option>
       <option value="zawsze" selected>na zawsze (automatycznie przedłużane)</option>
     </select>
-    <p class="podpowiedz">„Na zawsze” wpisuje lekcje na 3 miesiące naprzód i co noc automatycznie je przedłuża — nikt nie musi się logować, żeby odnowić terminy.</p>
+    <p class="podpowiedz">
+      „Na zawsze" wpisuje lekcje na 3 miesiące naprzód i co noc automatycznie je przedłuża — nikt nie musi się logować, żeby odnowić terminy.</p>
 
     <label for="id_link_meet">Link Google Meet (opcjonalnie)</label>
-    <input type="text" name="link_meet" id="id_link_meet" placeholder="https://meet.google.com/...">
+    <input type="text" name="link_meet" id="id_link_meet" placeholder="https://meet.google.com/..." value="{{ biezacy_link_meet }}">
     <p class="podpowiedz">Jeśli podasz link, rodzic dostanie e-mail z zaproszeniem (link stały na każdą lekcję).</p>
 
     <button type="submit">Umów stałe lekcje</button>

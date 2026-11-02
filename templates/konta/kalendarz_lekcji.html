@@ -6,17 +6,35 @@
 <section class="karta kalendarz-zajawka">
   <h2>📅 Kalendarz lekcji: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</h2>
   <p class="podtytul">
-    Korepetytor: {{ uczen.korepetytor }} · przedmiot: {{ uczen.przedmiot }} · poziom: {{ uczen.poziom }} · lekcji razem: {{ liczba_lekcji }}
+    {% if karta %}
+    Przedmiot: {{ karta.przedmiot }} · poziom: {{ karta.poziom }} · korepetytor: {{ karta.korepetytor }}
+    {% else %}
+    Korepetytor: {{ uczen.korepetytor }} · przedmiot: {{ uczen.przedmiot }} · poziom: {{ uczen.poziom }}
+    {% endif %}
+    · lekcji w tym miesiącu: {{ liczba_lekcji }}
   </p>
+  {% if przedmioty_ucznia %}
+  <p class="podpowiedz">
+    Przełącz przedmiot:
+    {% if karta %}<a class="przycisk-kalendarz" href="?rok={{ rok }}&miesiac={{ miesiac }}">główny ({{ uczen.przedmiot }})</a>{% endif %}
+    {% for kartap in przedmioty_ucznia %}
+      {% if kartap.id == karta.id %}
+      <strong class="przycisk-kalendarz">{{ kartap.przedmiot }} ({{ kartap.korepetytor }})</strong>
+      {% else %}
+      <a class="przycisk-kalendarz" href="?karta={{ kartap.id }}&rok={{ rok }}&miesiac={{ miesiac }}">{{ kartap.przedmiot }} ({{ kartap.korepetytor }})</a>
+      {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
   <a class="powrot" href="{% url 'lekcje' %}">← Wróć do listy uczniów</a>
 </section>
 
 <div class="kalendarz-uklad">
   <section class="karta">
     <div class="kalendarz-naglowek">
-      <a class="strzalka" href="?rok={{ poprzedni_rok }}&miesiac={{ poprzedni_miesiac }}">&larr;</a>
+      <a class="strzalka" href="?{% if karta %}karta={{ karta.id }}&{% endif %}rok={{ poprzedni_rok }}&miesiac={{ poprzedni_miesiac }}">&larr;</a>
       <h3>{{ nazwa_miesiaca|capfirst }} {{ rok }}</h3>
-      <a class="strzalka" href="?rok={{ nastepny_rok }}&miesiac={{ nastepny_miesiac }}">&rarr;</a>
+      <a class="strzalka" href="?{% if karta %}karta={{ karta.id }}&{% endif %}rok={{ nastepny_rok }}&miesiac={{ nastepny_miesiac }}">&rarr;</a>
     </div>
     <table class="kalendarz">
       <thead>
@@ -32,7 +50,7 @@
                      {% if dzien.ma_lekcje %}dzien-dostepny{% endif %}
                      {% if dzien.wybrany %}dzien-wybrany{% endif %}">
             {% if dzien.w_tym_miesiacu %}
-            <a href="?rok={{ rok }}&miesiac={{ miesiac }}&dzien={{ dzien.data.day }}">{{ dzien.data.day }}</a>
+            <a href="?{% if karta %}karta={{ karta.id }}&{% endif %}rok={{ rok }}&miesiac={{ miesiac }}&dzien={{ dzien.data.day }}">{{ dzien.data.day }}</a>
             {% else %}
             {{ dzien.data.day }}
             {% endif %}
@@ -54,6 +72,7 @@
       <form method="post" class="kafelek-form">
         {% csrf_token %}
         <input type="hidden" name="przelacz_godzine" value="1">
+        {% if karta %}<input type="hidden" name="karta" value="{{ karta.id }}">{% endif %}
         <button type="submit" name="godzina" value="{{ kafelek.etykieta }}"
 class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %} {% if kafelek.odwolany %}kafelek-odwolany{% endif %} {% if kafelek.zajety %}kafelek-zajety{% endif %}"
                 {% if kafelek.zajety %}disabled title="Korepetytor ma już wtedy lekcję z innym uczniem"{% endif %}>
@@ -77,6 +96,7 @@ class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %} {% if ka
           {% csrf_token %}
           <input type="hidden" name="przywroc_lekcje" value="1">
           <input type="hidden" name="lekcja_id" value="{{ lekcja.id }}">
+          {% if karta %}<input type="hidden" name="karta" value="{{ karta.id }}">{% endif %}
           <button type="submit" class="przycisk-przywroc">Przywróć zajęcia</button>
         </form>
         {% else %}
@@ -84,6 +104,7 @@ class="kafelek {% if kafelek.zaznaczony %}kafelek-zaznaczony{% endif %} {% if ka
           {% csrf_token %}
           <input type="hidden" name="odwolaj_lekcje" value="1">
           <input type="hidden" name="lekcja_id" value="{{ lekcja.id }}">
+          {% if karta %}<input type="hidden" name="karta" value="{{ karta.id }}">{% endif %}
           <button type="submit" class="przycisk-odwolaj">Odwołaj zajęcia</button>
         </form>
         {% endif %}

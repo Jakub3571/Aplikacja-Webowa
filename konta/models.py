@@ -78,6 +78,48 @@ class Uczen(models.Model):
     def __str__(self):
         return f'{self.imie_ucznia} {self.nazwisko_rodzica} — {self.przedmiot}'
 
+    # NOWOŚĆ: wypisuje wszystkie przedmioty ucznia (główny + dodatkowe),
+    # np. 'matematyka (Anna), fizyka (Tomasz)'
+    def przedmioty_tekst(self):
+        wpisy = [f'{self.przedmiot} ({self.korepetytor})']
+        for k in self.przedmioty_ucznia.all():
+            wpisy.append(f'{k.przedmiot} ({k.korepetytor})')
+        return ', '.join(wpisy)
+
+
+# NOWOŚĆ: karta przedmiotu ucznia — pozwala jednemu uczniowi uczyć się
+# kilku przedmiotów u różnych korepetytorów (np. matematyka + fizyka).
+# Główny przedmiot (pola 'przedmiot'/'poziom'/'korepetytor' w karcie ucznia)
+# zostaje bez zmian — ta tabela przechowuje tylko PRZEDMIOTY DODATKOWE.
+class PrzedmiotUcznia(models.Model):
+    """Dodatkowy przedmiot ucznia z przypisanym korepetytorem."""
+
+    uczen = models.ForeignKey(
+        Uczen,
+        on_delete=models.CASCADE,
+        related_name='przedmioty_ucznia',
+        verbose_name='uczeń',
+    )
+    przedmiot = models.CharField('przedmiot', max_length=100, choices=PRZEDMIOTY)
+    poziom = models.CharField('poziom', max_length=50)
+    korepetytor = models.CharField('korepetytor', max_length=150)
+    link_meet = models.CharField('link Google Meet', max_length=200, blank=True)
+    dodano = models.DateTimeField('data dodania', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'przedmiot ucznia'
+        verbose_name_plural = 'przedmioty ucznia'
+        ordering = ['przedmiot']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['uczen', 'przedmiot', 'poziom'],
+                name='unikalny_przedmiot_poziom_ucznia',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.uczen.imie_ucznia} {self.uczen.nazwisko_rodzica} — {self.przedmiot} ({self.korepetytor})'
+
 
 POZIOMY_NAUCZYCIELA = [
     ('podstawowka', 'podstawówka'),
@@ -123,7 +165,7 @@ class Nauczyciel(models.Model):
         """Wypisuje wszystkie przedmioty nauczyciela z poziomami, np. 'matematyka (podstawa)'."""
         wpisy = [f'{p.przedmiot} ({p.poziom})' for p in self.przedmioty.all()]
         return ', '.join(wpisy) if wpisy else '—'
-        
+
     def stawka_dla(self, przedmiot, poziom_ucznia):
         """Stawka dla przedmiotu i poziomu ucznia (z kart przedmiotów);
         jeśli nie znajdzie, fallback do ogólnej stawki nauczyciela.
@@ -135,6 +177,7 @@ class Nauczyciel(models.Model):
             if p.przedmiot == przedmiot and bez_polskich(p.poziom) == szukany:
                 return p.stawka
         return self.stawka
+
 
 class PrzedmiotNauczyciela(models.Model):
     """Przedmiot, którego uczy nauczyciel, wraz z poziomem nauczania."""
@@ -169,6 +212,7 @@ class PrzedmiotNauczyciela(models.Model):
     def __str__(self):
         return f'{self.nauczyciel}: {self.przedmiot} ({self.poziom})'
 
+
 class Dostepnosc(models.Model):
     """Termin, w którym nauczyciel może przyjąć ucznia."""
 
@@ -192,6 +236,7 @@ class Dostepnosc(models.Model):
         if self.data_od == self.data_do:
             return f'{self.nauczyciel}: {self.data_od:%d.%m.%Y} {self.godzina_od:%H:%M}–{self.godzina_do:%H:%M}'
         return f'{self.nauczyciel}: {self.data_od:%d.%m.%Y}–{self.data_do:%d.%m.%Y} {self.godzina_od:%H:%M}–{self.godzina_do:%H:%M}'
+
 
 class PrzerwaDnia(models.Model):
     """Przerwa między zajęciami przypisana do konkretnego dnia nauczyciela."""
@@ -219,6 +264,7 @@ class PrzerwaDnia(models.Model):
     def __str__(self):
         return f'{self.nauczyciel}: {self.data:%d.%m.%Y} — przerwa {self.minuty} min'
 
+
 class RaportPlatnosci(models.Model):
     """Archiwum raportu płatności wysyłanego e-mailem."""
 
@@ -245,6 +291,17 @@ class Lekcja(models.Model):
         related_name='lekcje',
         verbose_name='uczeń',
     )
+    # NOWOŚĆ: przedmiot tej lekcji. Puste (null) = główny przedmiot ucznia
+    # (zachowanie jak dotychczas — wszystkie istniejące lekcje zostają przy
+    # głównym przedmiocie i nic się dla nich nie zmienia).
+    przedmiot_karta = models.ForeignKey(
+        'PrzedmiotUcznia',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='lekcje',
+        verbose_name='przedmiot (dodatkowy)',
+    )
     data = models.DateTimeField('data i godzina lekcji')
     dodano = models.DateTimeField('data dodania', auto_now_add=True)
     odwolana = models.BooleanField('zajęcia odwołane', default=False)
@@ -256,7 +313,6 @@ class Lekcja(models.Model):
 
     def __str__(self):
         return f'{self.uczen}: {self.data:%d.%m.%Y %H:%M}'
-
 
 
 class PrzypomnienieLekcji(models.Model):

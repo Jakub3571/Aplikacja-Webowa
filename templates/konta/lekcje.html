@@ -35,7 +35,7 @@
           <tr>
             <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
             <td>{{ uczen.korepetytor }}</td>
-            <td>{{ uczen.przedmiot }}</td>
+            <td>{{ uczen.przedmioty_tekst }}</td>
             <td>{{ uczen.liczba_lekcji }}</td>
             <td>
               <a class="ikona-kalendarza" href="{% url 'kalendarz_lekcji' uczen.id %}" title="Kalendarz lekcji">📅</a>
@@ -93,7 +93,7 @@
           <tr>
             <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
             <td>{{ uczen.korepetytor }}</td>
-            <td>{{ uczen.przedmiot }}</td>
+            <td>{{ uczen.przedmioty_tekst }}</td>
             <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
             <td>{{ uczen.liczba_lekcji }}</td>
             <td>{{ uczen.dodano|date:"d.m.Y H:i" }}</td>

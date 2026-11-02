@@ -66,4 +66,93 @@
   </form>
   <a class="powrot" href="{% url 'lekcje' %}">← Wróć do listy uczniów</a>
 </section>
+
+<section class="karta">
+  <h2>📚 Przedmioty ucznia</h2>
+  <p class="podpowiedz">
+    Główny przedmiot ({{ uczen.przedmiot }} — {{ uczen.korepetytor }}) edytujesz w formularzu powyżej.
+    Tutaj dodajesz kolejne przedmioty z innymi korepetytorami — lekcje umawiasz osobno dla każdego przedmiotu.
+  </p>
+
+  {% if przedmioty_ucznia %}
+  <div class="tabela-wrapper">
+    <table class="tabela">
+      <thead>
+        <tr>
+          <th>Przedmiot</th>
+          <th>Poziom</th>
+          <th>Korepetytor</th>
+          <th>Akcje</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for karta in przedmioty_ucznia %}
+        <tr>
+          <td>{{ karta.przedmiot }}</td>
+          <td>{{ karta.poziom }}</td>
+          <td>{{ karta.korepetytor }}</td>
+          <td>
+            <form method="post" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="przedmiot_ucznia_id" value="{{ karta.id }}">
+              <button type="submit" name="usun_przedmiot" value="1" title="Usuń przedmiot (razem z lekcjami)">🗑</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="podtytul">Uczeń ma tylko główny przedmiot. Dodaj kolejny poniżej.</p>
+  {% endif %}
+
+  <h3>➕ Dodaj przedmiot</h3>
+  <form method="post" class="formularz" id="formularz-przedmiotu">
+    {% csrf_token %}
+    <input type="hidden" name="dodaj_przedmiot" value="1">
+    <label for="{{ form_przedmiotu.przedmiot.id_for_label }}">Przedmiot</label>
+    {{ form_przedmiotu.przedmiot }}
+
+    <label for="{{ form_przedmiotu.poziom.id_for_label }}">Poziom</label>
+    {{ form_przedmiotu.poziom }}
+
+    <label for="{{ form_przedmiotu.korepetytor.id_for_label }}">Korepetytor</label>
+    {{ form_przedmiotu.korepetytor }}
+    <p class="podpowiedz">Lista korepetytorów pojawi się po wyborze przedmiotu i poziomu.</p>
+
+    <button type="submit">Dodaj przedmiot</button>
+  </form>
+</section>
+
+<script>
+  // dynamiczna lista korepetytorów dla dodatkowego przedmiotu
+  // (ten sam mechanizm co w formularzu dodawania ucznia)
+  (function () {
+    var selPrzedmiot = document.getElementById('{{ form_przedmiotu.przedmiot.id_for_label }}');
+    var selPoziom = document.getElementById('{{ form_przedmiotu.poziom.id_for_label }}');
+    var selKorepetytor = document.getElementById('{{ form_przedmiotu.korepetytor.id_for_label }}');
+    if (!selPrzedmiot || !selPoziom || !selKorepetytor) return;
+
+    function odswiezKorepetytorow() {
+      var przedmiot = selPrzedmiot.value;
+      var poziom = selPoziom.value;
+      selKorepetytor.innerHTML = '<option value="">— wybierz korepetytora —</option>';
+      if (!przedmiot || !poziom) return;
+      fetch('/korepetytorzy/dane/?przedmiot=' + encodeURIComponent(przedmiot) + '&poziom=' + encodeURIComponent(poziom))
+        .then(function (odp) { return odp.json(); })
+        .then(function (wynik) {
+          (wynik.korepetytorzy || []).forEach(function (k) {
+            var opcja = document.createElement('option');
+            opcja.value = k.nazwa;
+            opcja.textContent = k.nazwa;
+            selKorepetytor.appendChild(opcja);
+          });
+        });
+    }
+
+    selPrzedmiot.addEventListener('change', odswiezKorepetytorow);
+    selPoziom.addEventListener('change', odswiezKorepetytorow);
+  })();
+</script>
 {% endblock %}
