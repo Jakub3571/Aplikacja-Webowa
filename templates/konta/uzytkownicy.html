@@ -143,7 +143,7 @@ pracowniczy{% endblock %} {% block panel %}
                                     title="Edytuj dane konta"
                                     >✏️</a
                                 >
-                                {% if u.id != request.user.id %}
+                                {% if czy_szef %}{% if u.id != request.user.id %}
                                 <a
                                     class="przycisk-umowa umowa-nie"
                                     href="{% url 'przelacz_szefa' u.id %}"
@@ -157,7 +157,7 @@ pracowniczy{% endblock %} {% block panel %}
                                     >{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a
                                 >
                                 <a class="ikona-kalendarza" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">🗑</a>
-                                {% endif %}
+                                {% endif %}{% endif %}
                             </td>
                         </tr>
                         {% endfor %}
