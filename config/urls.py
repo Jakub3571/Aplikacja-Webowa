@@ -54,6 +54,7 @@ urlpatterns = [
     path('nauczyciele/<int:nauczyciel_id>/przywroc-wspolprace/', views.przywroc_wspolprace, name='przywroc_wspolprace'),
     path('uzytkownicy/<int:user_id>/edytuj/', views.edytuj_uzytkownika, name='edytuj_uzytkownika'),
     path('uzytkownicy/<int:user_id>/konto/', views.przelacz_konto, name='przelacz_konto'),
+    path('uzytkownicy/<int:user_id>/usun/', views.usun_konto, name='usun_konto'),
 ]
 
 handler403 = 'konta.views.brak_dostepu'

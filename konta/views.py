@@ -938,6 +938,26 @@ def przelacz_konto(request, user_id):
         messages.info(request, f'Konto {uzytkownik.username} zostało wyłączone — nie może się logować.')
     return redirect('uzytkownicy')
 
+@login_required
+@tylko_szef
+def usun_konto(request, user_id):
+    """Usuwa konto pracownika NA ZAWSZE — wraz z kartą nauczyciela (jeśli jest).
+    Dostępne tylko dla szefa/admina. Nie można usunąć własnego konta."""
+    uzytkownik = get_object_or_404(Pracownik, pk=user_id)
+    if uzytkownik.id == request.user.id:
+        messages.error(request, 'Nie możesz usunąć własnego konta.')
+        return redirect('uzytkownicy')
+    if request.method == 'POST':
+        login = uzytkownik.username
+        nauczyciel = uzytkownik.nauczyciel
+        uzytkownik.delete()
+        # karta nauczyciela: usuwamy razem z kontem (przedmioty, stawki,
+        # zaznaczone godziny znikną w kaskadzie) — żeby nie zostały "duchy"
+        if nauczyciel:
+            nauczyciel.delete()
+        messages.success(request, f'Konto {login} zostało usunięte na stałe.')
+        return redirect('uzytkownicy')
+    return render(request, 'konta/usun_konto.html', {'uzytkownik': uzytkownik})
 
 @login_required
 def pobierz_raport(request):
