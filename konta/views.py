@@ -1796,6 +1796,9 @@ def uzytkownicy(request):
                 'czy_szef': False,
                 'czy_koordynator': czy_koordynator(request.user),
             })
+        nowy_uzytkownik = form.zapisz()
+        messages.success(request, 'Użytkownik został dodany.')
+
         # mail powitalny do nowego użytkownika — z Reply-To do twórcy konta
         # + jednorazowy link do ustawienia własnego hasła (jak reset hasła)
         if nowy_uzytkownik.email:
