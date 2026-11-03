@@ -115,7 +115,8 @@ LOGOUT_REDIRECT_URL = 'logowanie'
 # X_FRAME_OPTIONS — strona nie może być osadzona w cudzej ramce (clickjacking).
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
-    SECURE_HSTS_SECONDS = 3600
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_PRELOAD = True
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
