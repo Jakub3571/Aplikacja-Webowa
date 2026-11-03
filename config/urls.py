@@ -6,7 +6,7 @@ from django.urls import path
 from konta import views
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('aligator_3571-J/', admin.site.urls),
     path('', views.logowanie, name='logowanie'),
     path('wyloguj/', views.wyloguj, name='wyloguj'),
     path('reset-hasla/', views.reset_hasla, name='reset_hasla'),
