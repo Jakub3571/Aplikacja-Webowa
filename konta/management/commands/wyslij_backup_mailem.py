@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Raz w tygodniu (w poniedziałek) wysyła najnowszy backup bazy mailem
+"""Raz w tygodniu (w niedzielę) wysyła najnowszy backup bazy mailem
 na adresy z EMAILE_POWIADOMIEN — kopia 'do szuflady' poza serwerem.
 
-Uruchamiane codziennie cronem; mail leci tylko w poniedziałki.
+Uruchamiane codziennie cronem; mail leci tylko w niedziele.
 """
 from datetime import date
 from pathlib import Path
@@ -15,11 +15,11 @@ from konta.models import Uczen
 
 
 class Command(BaseCommand):
-    help = 'Wysyła najnowszy backup bazy mailem (raz w tygodniu, w poniedziałek).'
+    help = 'Wysyła najnowszy backup bazy mailem (raz w tygodniu, w niedzielę).'
 
     def handle(self, *args, **options):
-        if date.today().weekday() != 6: # 6 = niedziela
-            self.stdout.write('Dziś nie poniedziałek — pomijam.')
+        if date.today().weekday() != 6:  # 6 = niedziela
+            self.stdout.write('Dziś nie niedziela — pomijam.')
             return
 
         katalog = Path(settings.BASE_DIR) / 'backupy'
