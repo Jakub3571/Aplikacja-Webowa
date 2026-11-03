@@ -4,7 +4,7 @@ Ktoś (mam nadzieję, że ty) poprosił o zmianę hasła do Panelu pracowniczego
 
 Jeśli to byłeś ty, kliknij poniższy link i ustaw nowe hasło:
 
-{{ protocol }}://{{ domain }}{% url 'reset_hasla_potwierdz' uidb64 token %}
+{{ protocol }}://{{ domain }}{% url 'reset_hasla_potwierdz' uid token %}
 
 Link działa jednorazowo. Jeśli nie prosiłeś o zmianę hasła, zignoruj tę wiadomość —
 twoje obecne hasło pozostaje bez zmian.
