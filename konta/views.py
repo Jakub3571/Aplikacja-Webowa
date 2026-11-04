@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.views import PasswordResetConfirmView
 from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse
@@ -1000,6 +1001,55 @@ def reset_hasla(request):
         success_url='/reset-hasla/wyslane/',
     )(request)
 
+def _link_przeterminowany(uidb64, token):
+    """True, gdy link był prawidłowy, ale minęły 3 dni (PASSWORD_RESET_TIMEOUT).
+    Fałszywy link zwraca False — wtedy pokazuje się zwykła strona błędu."""
+    from django.conf import settings as ustawienia
+    from django.contrib.auth.tokens import default_token_generator
+    from django.utils.crypto import constant_time_compare
+    from django.utils.http import base36_to_int, urlsafe_base64_decode
+    try:
+        uid = urlsafe_base64_decode(uidb64).decode()
+        uzytkownik = Pracownik.objects.get(pk=uid)
+        gen = default_token_generator
+        if gen.check_token(uzytkownik, token):
+            return False  # link wciąż ważny
+        czesci = token.split('-')
+        if len(czesci) != 2:
+            return False
+        try:
+            ts = base36_to_int(czesci[0])
+        except ValueError:
+            return False
+        # skrót musi się zgadzać — inaczej to fałszywy link, a nie przeterminowany
+        for secret in [gen.secret, *gen.secret_fallbacks]:
+            if constant_time_compare(
+                gen._make_token_with_timestamp(uzytkownik, ts, secret), token
+            ):
+                break
+        else:
+            return False
+        # dokładnie ten sam warunek czasowy co w check_token, tylko odwrócony
+        return (gen._num_seconds(gen._now()) - ts) > ustawienia.PASSWORD_RESET_TIMEOUT
+    except Exception:
+        return False
+
+
+class ResetHaslaPotwierdzWidok(PasswordResetConfirmView):
+    """Jak wbudowany widok Django, ale gdy link minął (3 dni) —
+    przekierowuje na osobną stronę „czas minął” zamiast pustego formularza."""
+
+    def dispatch(self, request, *args, **kwargs):
+        uidb64 = kwargs.get('uidb64')
+        token = kwargs.get('token')
+        if uidb64 and token and _link_przeterminowany(uidb64, token):
+            return redirect('reset_hasla_wygasl')
+        return super().dispatch(request, *args, **kwargs)
+
+
+def reset_hasla_wygasl(request):
+    """Strona „czas minął” — link do ustawienia hasła był ważny 3 dni i wygasł."""
+    return render(request, 'konta/reset_wygasl.html')
 
 @login_required
 def kalendarz_nauczyciela(request, nauczyciel_id):
@@ -1835,6 +1885,8 @@ def uzytkownicy(request):
                         f'Rola: {role_tekst}\n\n'
                         f'Zaloguj się tutaj:\n{link_logowania}\n\n'
                         f'USTAW SWOJE HASŁO (kliknij — link ważny 3 dni):\n{link_hasla}\n\n'
+                        'Po 3 dniach link wygasa i przestaje działać — wtedy na stronie\n'
+                        'logowania użyj opcji „Nie pamiętasz hasła?”, aby dostać nowy link.\n\n'
                         'Jeśli hasło podał Ci administrator, możesz go użyć przy pierwszym logowaniu\n'
                         'i zmienić w zakładce „Zmień hasło" — albo po prostu ustaw własne hasło linkiem powyżej.\n\n'
                         f'W razie pytań odpisz na tego maila — trafi do {tworca_nazwa}.\n\n'

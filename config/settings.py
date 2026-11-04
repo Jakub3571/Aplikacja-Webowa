@@ -102,7 +102,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Dokąd przekierowuje po udanym logowaniu i skąd wymusza logowanie
 LOGIN_REDIRECT_URL = 'pulpit'
 LOGIN_URL = 'logowanie'
-LOGOUT_REDIRECT_URL = 'logowanie'
+# Link do ustawienia/resetu hasła (z maila powitalnego i „nie pamiętam hasła”)
+# jest ważny 3 dni. Po tym czasie pokazujemy osobną stronę „czas minął”
+# (patrz ResetHaslaPotwierdzWidok w konta/views.py).
+PASSWORD_RESET_TIMEOUT = 3 * 24 * 60 * 60  # 3 dni w sekundach
 
 # --- Bezpieczeństwo na produkcji (HTTPS) ---
 # Aktywne tylko gdy DJANGO_DEBUG=0.

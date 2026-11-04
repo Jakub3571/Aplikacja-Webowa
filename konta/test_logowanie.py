@@ -917,3 +917,85 @@ class NoweFunkcjeTests(TestCase):
         self.client.post('/platnosci/', {'wyslij_raport': '1', 'email_raportu': 'szef@f.pl'}, follow=True)
         self.assertTrue(Uczen.objects.filter(id=self.uczen.id).exists(), 'uczeń musi zostać w bazie po raporcie')
         self.assertFalse(Uczen.objects.get(id=self.uczen.id).zaplacone)
+
+
+
+
+
+class ResetHaslaLinkTests(TestCase):
+    """Link do ustawienia hasła: ważny 3 dni, potem osobna strona „czas minął”."""
+
+    def setUp(self):
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+        self.token_generator = default_token_generator
+        self.user = Pracownik.objects.create_user(
+            'a.nowak', 'anna@firma.pl', 'Sup3rHaslo!',
+        )
+        self.uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        self.token = default_token_generator.make_token(self.user)
+
+    def _url(self, token):
+        from django.urls import reverse
+        return reverse('reset_hasla_potwierdz', kwargs={'uidb64': self.uid, 'token': token})
+
+    def _stary_token(self, dni=4):
+        from datetime import datetime
+        stary_ts = self.token_generator._num_seconds(datetime.now()) - dni * 24 * 60 * 60
+        return self.token_generator._make_token_with_timestamp(
+            self.user, stary_ts, self.token_generator.secret
+        )
+
+    def test_wazny_link_pokazuje_formularz(self):
+        r = self.client.get(self._url(self.token), follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Ustaw nowe hasło')
+
+    def test_waznym_linkiem_mozna_zmienic_haslo(self):
+        self.client.get(self._url(self.token))  # zapamiętanie tokena w sesji + redirect
+        url_set = self._url('set-password')
+        r = self.client.post(url_set, {
+            'new_password1': 'NoweHaslo123!',
+            'new_password2': 'NoweHaslo123!',
+        }, follow=True)
+        self.assertContains(r, 'Gotowe')
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('NoweHaslo123!'))
+
+    def test_przeterminowany_link_przekierowuje_na_czas_minal(self):
+        from django.urls import reverse
+        r = self.client.get(self._url(self._stary_token()))
+        self.assertRedirects(r, reverse('reset_hasla_wygasl'))
+
+    def test_przeterminowany_link_przy_post_tez_przekierowuje(self):
+        from django.urls import reverse
+        r = self.client.post(self._url(self._stary_token()), {
+            'new_password1': 'NoweHaslo123!',
+            'new_password2': 'NoweHaslo123!',
+        })
+        self.assertRedirects(r, reverse('reset_hasla_wygasl'))
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('Sup3rHaslo!'), 'hasło nie może się zmienić po terminie')
+
+    def test_falszywy_link_pokazuje_zwykly_blad(self):
+        r = self.client.get(self._url('abc-xyz'))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Link nie działa')
+
+    def test_link_juz_uzyty_pokazuje_zwykly_blad(self):
+        self.client.get(self._url(self.token))
+        self.client.post(self._url('set-password'), {
+            'new_password1': 'NoweHaslo123!',
+            'new_password2': 'NoweHaslo123!',
+        })
+        r = self.client.get(self._url(self.token))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Link nie działa')
+
+    def test_strona_czas_minal_dziala(self):
+        from django.urls import reverse
+        r = self.client.get(reverse('reset_hasla_wygasl'))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Czas minął')
+        self.assertContains(r, '3 dni')

@@ -17,11 +17,16 @@ urlpatterns = [
     ),
     path(
         'reset/<uidb64>/<token>/',
-        auth_views.PasswordResetConfirmView.as_view(
+        views.ResetHaslaPotwierdzWidok.as_view(
             template_name='konta/reset_nowe_haslo.html',
             success_url='/reset-hasla/gotowe/',
         ),
         name='reset_hasla_potwierdz',
+    ),
+    path(
+        'reset-hasla/wygasl/',
+        views.reset_hasla_wygasl,
+        name='reset_hasla_wygasl',
     ),
     path(
         'reset-hasla/gotowe/',

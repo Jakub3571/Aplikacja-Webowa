@@ -5,6 +5,7 @@
 {% block tresc %}
 <div class="logowanie-wrapper">
   <section class="karta">
+    {% if validlink %}
     <h1>Ustaw nowe hasło</h1>
     {% if form.errors %}
       <div class="komunikat error">
@@ -25,6 +26,15 @@
       {{ form.new_password2 }}
       <button type="submit">Zapisz nowe hasło</button>
     </form>
+    {% else %}
+    <h1>Link nie działa</h1>
+    <p class="podtytul">
+      Ten link jest nieprawidłowy albo został już użyty (linki działają jednorazowo).
+      Jeśli od wysłania wiadomości minęły 3 dni, zobaczysz osobną stronę „Czas minął”.
+    </p>
+    <a class="powrot" href="{% url 'reset_hasla' %}">Wyślij nowy link do hasła →</a>
+    <a class="powrot" href="{% url 'logowanie' %}">← Wróć do logowania</a>
+    {% endif %}
   </section>
 </div>
 {% endblock %}

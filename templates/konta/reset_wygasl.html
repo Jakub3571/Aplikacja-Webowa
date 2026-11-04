@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block tytul %}Czas minął — Panel pracowniczy{% endblock %}
+
+{% block tresc %}
+<div class="logowanie-wrapper">
+  <section class="karta">
+    <h1>Czas minął</h1>
+    <p class="podtytul">
+      Link do ustawienia hasła był ważny <strong>3 dni</strong> i ten czas już upłynął,
+      więc link przestał działać. Dla bezpieczeństwa nie można go „odświeżyć”.
+    </p>
+    <p>
+      Aby ustawić nowe hasło, na stronie logowania kliknij
+      <strong>„Nie pamiętasz hasła? Wyślij link resetujący”</strong> i podaj swój adres e-mail
+      — wyślemy nowy link. Możesz też napisać do osoby, która utworzyła Twoje konto.
+    </p>
+    <a class="powrot" href="{% url 'reset_hasla' %}">Wyślij nowy link do hasła →</a>
+    <a class="powrot" href="{% url 'logowanie' %}">← Wróć do logowania</a>
+  </section>
+</div>
+{% endblock %}
