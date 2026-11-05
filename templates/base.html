@@ -5,9 +5,9 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{% block tytul %}Panel pracowniczy{% endblock %}</title>
-        <link rel="stylesheet" href="{% static 'css/style.css' %}" />
-        <link rel="icon" type="image/jpeg" href="{% static 'img/logo.jpg' %}" />
-        <link rel="apple-touch-icon" href="{% static 'img/logo.jpg' %}" />
+        <link rel="stylesheet" href="{% static 'css/style.css' %}?v={{ wersja_statycznych }}" />
+        <link rel="icon" type="image/jpeg" href="{% static 'img/logo.jpg' %}?v={{ wersja_statycznych }}" />
+        <link rel="apple-touch-icon" href="{% static 'img/logo.jpg' %}?v={{ wersja_statycznych }}" />
     </head>
 	<body>
 		{% if messages %}

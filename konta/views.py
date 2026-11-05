@@ -48,10 +48,15 @@ def rola_context(request):
     """Oddaje role zalogowanego uzytkownika do KAZDEGO szablonu (menu itd.)."""
     u = getattr(request, 'user', None)
     if not u or not u.is_authenticated:
-        return {'czy_szef_ctx': False, 'czy_koordynator_ctx': False}
+        return {
+            'czy_szef_ctx': False,
+            'czy_koordynator_ctx': False,
+            'wersja_statycznych': settings.STATIC_VERSION,
+        }
     return {
         'czy_szef_ctx': czy_szef(u),
         'czy_koordynator_ctx': czy_koordynator(u),
+        'wersja_statycznych': settings.STATIC_VERSION,
     }
 
 

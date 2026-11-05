@@ -46,6 +46,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'konta.middleware.BezCacheHTML',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -90,6 +91,22 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+def _wersja_statycznych():
+    """Wersja statyków = aktualny skrót commita Gita. Po każdym deployu zmienia
+    się adres ?v=... w linkach do CSS, więc przeglądarka sama pobiera nowy plik
+    zamiast wyświetlać stary z kesza."""
+    try:
+        import subprocess
+        return subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            cwd=BASE_DIR,
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        return '1'
+
+
+STATIC_VERSION = os.environ.get('STATIC_VERSION') or _wersja_statycznych()
 
 AUTH_USER_MODEL = 'konta.Pracownik'
 # Adresy, z których wolno przesyłać formularze i zapytania AJAX (CSRF).
