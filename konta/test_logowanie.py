@@ -121,7 +121,7 @@ class DodawanieUczniaTests(TestCase):
         )
         dane = {
             'data_pierwszej_lekcji': '2026-10-05',
-            'godzina_pierwszej_lekcji': '17:00',
+            'godzina_pierwszej_lekcji': '16:00',
             'przedmiot': 'matematyka',
             'poziom': 'srednia rozszerzenie',
             'imie_ucznia': 'Kasia',
@@ -1056,13 +1056,13 @@ class KalendarzKorepetytoraTests(TestCase):
             nauczyciel=self.nauczyciel, data_od=self.dzien, data_do=self.dzien,
             godzina_od=self.czas(11, 10), godzina_do=self.czas(12, 10),
         )
-        start = datetime.combine(self.dzien, self.czas(11, 40))
+        start = datetime.combine(self.dzien, self.czas(11, 0))
         self.assertTrue(self.wolny_o(self.nauczyciel, self.dzien, start))
 
     def test_lista_godzin_zgodna_z_walidacja_formularza(self):
         self._sloty('11:00', '14:00')
         uczen = Uczen.objects.create(
-            pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 10))),
+            pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 0))),
             przedmiot='matematyka', poziom='podstawowka', szkola='SP 1',
             imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
             telefon_glowny='600100200', email_glowny='ewa@f.pl', telefon_dodatkowy='',
@@ -1070,9 +1070,9 @@ class KalendarzKorepetytoraTests(TestCase):
         )
         Lekcja.objects.create(uczen=uczen, data=uczen.pierwsza_lekcja)
         wolne = self.wolne_godziny(self.nauczyciel, self.dzien)
-        for etykieta in ('11:00', '11:10', '11:40', '12:00', '12:10'):
+        for etykieta in ('11:00', '12:00'):
             self.assertNotIn(etykieta, wolne)
-        self.assertIn('12:15', wolne)
+        self.assertIn('12:05', wolne)
         for h in range(6, 21):
             for m in range(0, 60, 5):
                 etykieta = f'{h:02d}:{m:02d}'
@@ -1086,7 +1086,7 @@ class KalendarzKorepetytoraTests(TestCase):
     def test_ajax_godziny_pokazuja_korepetytorow_i_omijaja_zajete(self):
         self._sloty('11:00', '14:00')
         uczen = Uczen.objects.create(
-            pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 10))),
+            pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 0))),
             przedmiot='matematyka', poziom='podstawowka', szkola='SP 1',
             imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
             telefon_glowny='600100200', email_glowny='ewa@f.pl', telefon_dodatkowy='',
@@ -1103,9 +1103,9 @@ class KalendarzKorepetytoraTests(TestCase):
         self.assertTrue(godziny, 'lista godzin nie może być pusta')
         self.assertTrue(all('Kowalska' in g['korepetytor'] for g in godziny))
         etykiety = [g['godzina'] for g in godziny]
-        self.assertNotIn('11:10', etykiety)
+        self.assertNotIn('11:00', etykiety)
         self.assertNotIn('12:00', etykiety)
-        self.assertIn('12:15', etykiety)
+        self.assertIn('12:05', etykiety)
 
     def _dane_ucznia(self, godzina):
         return {
@@ -1135,7 +1135,7 @@ class KalendarzKorepetytoraTests(TestCase):
     def test_dodanie_ucznia_w_wolna_godzine_przechodzi(self):
         self._sloty('11:00', '14:00')
         self.client.force_login(self.user)
-        r = self.client.post('/uczniowie/', self._dane_ucznia('12:15'), follow=True)
+        r = self.client.post('/uczniowie/', self._dane_ucznia('12:05'), follow=True)
         self.assertContains(r, 'został dodany')
         self.assertEqual(Uczen.objects.count(), 1)
 
@@ -1180,9 +1180,9 @@ class PoprawkiSzefaTests(TestCase):
         r = self.client.get(f'/korepetytorzy/dane/?nauczyciel={self.nauczyciel.id}&data={self.dzien.isoformat()}')
         self.assertEqual(r.status_code, 200)
         godziny = [g['godzina'] for g in r.json()['godziny']]
-        self.assertIn('11:20', godziny)
-        self.assertIn('12:00', godziny)
-        self.assertNotIn('12:30', godziny)
+        self.assertEqual(godziny, ['11:00'])
+        self.assertEqual(godziny, ['11:00'])
+        self.assertEqual(godziny, ['11:00'])
 
     def test_cykliczna_co_2_tygodnie_i_godzina_5min(self):
         self.client.force_login(self.user)
@@ -1244,3 +1244,46 @@ class komunikatBleduKalendarzaTests(TestCase):
         r = self.client.post('/uczniowie/', dane, follow=True)
         self.assertContains(r, 'nie mieści się w jego zaznaczonych godzinach')
         self.assertEqual(Uczen.objects.count(), 0)
+
+class SiatkaGodzinSzefaTests(TestCase):
+    """Siatka godzin szefa: pełne godziny co (60 + przerwa dnia); zajęta godzina wypada."""
+
+    def setUp(self):
+        from datetime import time as czas
+        from konta.views import wolne_godziny_nauczyciela, nauczyciel_wolny_o
+        from konta.models import PrzerwaDnia
+        self.czas = czas
+        self.wolne = wolne_godziny_nauczyciela
+        self.wolny_o = nauczyciel_wolny_o
+        self.PrzerwaDnia = PrzerwaDnia
+        self.n = Nauczyciel.objects.create(imie='Tomek', nazwisko='Tomek', email='t@f.pl')
+        self.dzien = date(2026, 11, 6)
+        k = datetime.combine(self.dzien, czas(10, 0))
+        koniec = datetime.combine(self.dzien, czas(14, 0))
+        while k < koniec:
+            Dostepnosc.objects.create(nauczyciel=self.n, data_od=self.dzien, data_do=self.dzien,
+                                      godzina_od=k.time(), godzina_do=(k + timedelta(minutes=30)).time())
+            k += timedelta(minutes=30)
+
+    def test_przerwa_5_min_siatka_10_00_11_05_12_10(self):
+        self.assertEqual(self.wolne(self.n, self.dzien), ['10:00', '11:05', '12:10'])
+
+    def test_przerwa_10_min_siatka_10_00_11_10_12_20(self):
+        self.PrzerwaDnia.objects.create(nauczyciel=self.n, data=self.dzien, minuty=10)
+        self.assertEqual(self.wolne(self.n, self.dzien), ['10:00', '11:10', '12:20'])
+
+    def test_zajeta_godzina_wypada_z_siatki(self):
+        u = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 0))),
+            przedmiot='matematyka', poziom='podstawowka', szkola='SP', imie_ucznia='K',
+            nazwisko_rodzica='N', rodzic='R', telefon_glowny='6', email_glowny='e@f.pl',
+            telefon_dodatkowy='', korepetytor='Tomek Tomek', kto_umowil='szef')
+        Lekcja.objects.create(uczen=u, data=u.pierwsza_lekcja)
+        wolne = self.wolne(self.n, self.dzien)
+        self.assertEqual(wolne, ['10:00', '12:10'])
+        start = datetime.combine(self.dzien, self.czas(12, 10))
+        self.assertTrue(self.wolny_o(self.n, self.dzien, start))
+        start = datetime.combine(self.dzien, self.czas(11, 0))
+        self.assertFalse(self.wolny_o(self.n, self.dzien, start))
+        start = datetime.combine(self.dzien, self.czas(11, 5))
+        self.assertFalse(self.wolny_o(self.n, self.dzien, start))

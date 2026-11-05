@@ -170,37 +170,39 @@ def _zakresy_dnia(nauczyciel, dzien):
 
 def nauczyciel_wolny_o(nauczyciel, dzien, start_lekcji):
     """Czy nauczyciel może przyjąć lekcję 60 min od start_lekcji:
-    cała lekcja mieści się w którymś z jego zaznaczonych zakresów dostępności
-    i nie koliduje z lekcjami ani przerwami."""
+    godzina musi być na SIATCE wolnych terminów tego dnia (patrz wolne_godziny_nauczyciela) —
+    wtedy na pewno mieści się w zakresie i nie koliduje z lekcjami/przerwami.
+    Dzięki temu lista rozwijana i walidacja formularza zawsze pokazują dokładnie to samo."""
     if not nauczyciel:
         return False
-    koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
-    for s, e in _zakresy_dnia(nauczyciel, dzien):
-        if s <= start_lekcji and koniec <= e:
-            if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji):
-                return False
-            # przerwa dnia: lekcja nie może zacząć się w okienku przerwy po innej lekcji
-            if godzina_w_przerwie(nauczyciel, dzien, start_lekcji.time()):
-                return False
-            return True
-    return False
+    return start_lekcji.strftime('%H:%M') in wolne_godziny_nauczyciela(nauczyciel, dzien)
 
 
 def wolne_godziny_nauczyciela(nauczyciel, dzien):
-    """Godziny startu lekcji (co 5 min), w których nauczyciel jest wolny:
-    lekcja mieści się w jego dostępności, nie koliduje z lekcją ani przerwą dnia.
-    Używane ZARÓWNO przez listę rozwijaną przy dodawaniu ucznia, jak i przez walidację
-    formularza — obie strony liczą dokładnie to samo, więc wybrana godzina zawsze przechodzi."""
+    """Godziny startu lekcji dostępne u nauczyciela w danym dniu — SIATKA:
+    od pierwszej PEŁNEJ godziny w zakresie, co (60 min lekcji + przerwa tego dnia).
+    Przykład: przerwa 5 min -> 10:00, 11:05, 12:10; przerwa 10 min -> 10:00, 11:10, 12:20.
+    Godziny kolidujące z istniejącą lekcją (lub przerwą) są pomijane, więc np. mając
+    lekcję o 11:00, z listy znika siatkowy termin, a dalej idzie kolejny (12:10 przy przerwie 5).
+    Używane ZARÓWNO przez listy rozwijane (Krok 4, kreator cykliczny), jak i przez walidację
+    formularza (nauczyciel_wolny_o) — obie strony liczą dokładnie to samo."""
     wynik = []
     if not nauczyciel:
         return wynik
+    wpis = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien).first()
+    przerwa = wpis.minuty if (wpis and wpis.minuty) else (nauczyciel.przerwa or 5)
+    krok = GODZINA_LEKCJI + przerwa
     for s, e in _zakresy_dnia(nauczyciel, dzien):
-        kursor = s
+        # pierwsza pełna godzina w tym zakresie
+        pierwsza = s.replace(minute=0, second=0, microsecond=0)
+        if pierwsza < s:
+            pierwsza += timedelta(hours=1)
+        kursor = pierwsza
         while kursor + timedelta(minutes=GODZINA_LEKCJI) <= e:
             if not kolizja_lekcji_nauczyciela(nauczyciel, dzien, kursor):
                 if not godzina_w_przerwie(nauczyciel, dzien, kursor.time()):
                     wynik.append(kursor.strftime('%H:%M'))
-            kursor += timedelta(minutes=5)
+            kursor += timedelta(minutes=krok)
     return sorted(set(wynik))
 
 

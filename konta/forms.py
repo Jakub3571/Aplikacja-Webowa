@@ -99,7 +99,7 @@ class FormularzUcznia(forms.ModelForm):
     godzina_pierwszej_lekcji = forms.ChoiceField(
         label='godzina 1. lekcji',
         choices=GODZINY_LEKCJI,
-        help_text='Godziny pojawiają się po wybraniu daty, przedmiotu i poziomu — to wolne terminy korepetytorów.',
+        help_text='Godziny pojawiają się po wybraniu daty, przedmiotu i poziomu — wolne terminy w rytmie lekcja+przerwa (np. przy przerwie 5 min: 10:00, 11:05, 12:10).',
     )
 
     class Meta:
