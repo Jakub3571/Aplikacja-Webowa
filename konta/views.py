@@ -479,8 +479,6 @@ def korepetytorzy_dane(request):
                 continue
         korepetytorzy.append({'nazwa': f'{n.imie} {n.nazwisko}'})
     return JsonResponse({'korepetytorzy': korepetytorzy})
-
-
 @login_required
 def uczniowie(request):
     """Zakładka uczniowie: lista, formularz dodawania i dostępność nauczycieli.
@@ -509,6 +507,29 @@ def uczniowie(request):
 
     form = FormularzUcznia(request.POST or None, przedmiot=wybrany_przedmiot, poziom=wybrany_poziom)
 
+    if request.method == 'POST':
+        # Krok 5 na POST: tylko korepetytorzy faktycznie wolni o wybranej dacie+godzinie
+        # (wysłana wartość zostaje na liście, żeby walidacja mogła pokazać dokładny komunikat)
+        try:
+            dzien_post = date.fromisoformat(request.POST.get('data_pierwszej_lekcji', ''))
+            godz_post = datetime.strptime(request.POST.get('godzina_pierwszej_lekcji', ''), '%H:%M').time()
+            start_post = datetime.combine(dzien_post, godz_post)
+        except (ValueError, TypeError):
+            start_post = None
+        if start_post:
+            wybrany = request.POST.get('korepetytor', '')
+            wolni = []
+            for wartosc, _etykieta in list(form.fields['korepetytor'].choices):
+                if not wartosc:
+                    continue
+                nn = nauczyciel_z_korepetytora(wartosc)
+                if nn and nauczyciel_wolny_o(nn, start_post.date(), start_post):
+                    wolni.append((wartosc, wartosc))
+                elif wartosc == wybrany:
+                    wolni.append((wartosc, wartosc))
+            if wolni:
+                form.fields['korepetytor'].choices = [('', '— wybierz korepetytora —')] + wolni
+
     if request.method == 'POST' and form.is_valid():
         uczen = form.save(commit=False)
         uczen.pierwsza_lekcja = form.cleaned_data['pierwsza_lekcja']
@@ -516,11 +537,25 @@ def uczniowie(request):
         nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
         start_dt = timezone.localtime(uczen.pierwsza_lekcja).replace(tzinfo=None)
         if nauczyciel and not nauczyciel_wolny_o(nauczyciel, start_dt.date(), start_dt):
+            # dokładna przyczyna: poza zakresem / kolizja / przerwa dnia
+            koniec_lekcji = start_dt + timedelta(minutes=GODZINA_LEKCJI)
+            w_zakresie = any(
+                s <= start_dt and koniec_lekcji <= e
+                for s, e in _zakresy_dnia(nauczyciel, start_dt.date())
+            )
+            if not w_zakresie:
+                powod = ('ta godzina nie mieści się w jego zaznaczonych godzinach tego dnia '
+                         '— otwórz jego „Mój tydzień” i sprawdź, czy dzień jest dobry')
+            elif kolizja_lekcji_nauczyciela(nauczyciel, start_dt.date(), start_dt):
+                powod = 'koliduje z jego inną lekcją (albo przerwą po niej)'
+            elif godzina_w_przerwie(nauczyciel, start_dt.date(), start_dt.time()):
+                powod = 'wypada w przerwie dnia korepetytora'
+            else:
+                powod = 'inny powód'
             messages.error(
                 request,
                 f'{uczen.korepetytor} nie może przyjąć lekcji {start_dt:%d.%m.%Y} o {start_dt:%H:%M} '
-                '— godzina nie jest w jego kalendarzu albo koliduje z inną lekcją/przerwą. '
-                'Wybierz inną godzinę z listy dostępnych.',
+                f'— {powod}. Wybierz godzinę z listy dostępnych (Krok 4) i korepetytora z listy (Krok 5).',
             )
             return render(request, 'konta/uczniowie.html', {
                 'form': form,
@@ -533,7 +568,7 @@ def uczniowie(request):
         if not uczen.link_meet and nauczyciel and nauczyciel.link_meet:
             uczen.link_meet = nauczyciel.link_meet
         uczen.save()
-        # 1. lekcja dostaje rekord i blokade u korepetytora — inaczej kolejny uczen
+        # 1. lekcja dostaje rekord i blokade u korepetytora — inaczej kolejny uczeń
         # moglby zostac umowiony na ta sama godzine (karta ucznia sama w sobie nie blokuje terminu)
         Lekcja.objects.get_or_create(uczen=uczen, data=uczen.pierwsza_lekcja)
         if nauczyciel:
@@ -561,7 +596,6 @@ def uczniowie(request):
         'uczniowie': uczniowie_lista,
         'nadchodzace_dostepnosci': dostepnosci_nauczycieli(),
     })
-
 
 @login_required
 def edytuj_ucznia(request, uczen_id):

@@ -1,6 +1,6 @@
 """Testy przepływu logowania pracownika."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from django.core.management import call_command
 
 from django.core import mail
@@ -1216,3 +1216,31 @@ class PoprawkiSzefaTests(TestCase):
             uczen=self.uczen, data__date__gte=date(2027, 3, 1)
         ).exists()
         self.assertTrue(pozno, 'okres powinien domyślnie iść do końca roku szkolnego, a nie 90 dni')
+
+
+class komunikatBleduKalendarzaTests(TestCase):
+    """Gdy godzina nie przechodzi walidacji — komunikat mówi DOKŁADNIE, co przeszkadza."""
+
+    def setUp(self):
+        self.n = Nauczyciel.objects.create(imie='Tomek', nazwisko='Tomek', email='t@f.pl')
+        PrzedmiotNauczyciela.objects.create(nauczyciel=self.n, przedmiot='matematyka', poziom='podstawowka', stawka=100)
+        self.user = Pracownik.objects.create_user('szef', 's@f.pl', 'Sup3rHaslo!', is_superuser=True)
+        self.dzien = date(2026, 11, 6)
+        Dostepnosc.objects.create(
+            nauczyciel=self.n, data_od=self.dzien, data_do=self.dzien,
+            godzina_od=time(6, 0), godzina_do=time(6, 30),
+        )
+
+    def test_komunikat_mowi_o_zakresie(self):
+        self.client.force_login(self.user)
+        dane = {
+            'data_pierwszej_lekcji': '2026-11-06', 'godzina_pierwszej_lekcji': '06:00',
+            'przedmiot': 'matematyka', 'poziom': 'podstawowka',
+            'imie_ucznia': 'Kasia', 'nazwisko_rodzica': 'Nowak', 'rodzic': 'Ewa Nowak',
+            'telefon_glowny': '600100200', 'email_glowny': 'ewa@f.pl',
+            'telefon_dodatkowy': '', 'email_dodatkowy': '',
+            'korepetytor': 'Tomek Tomek', 'notatka_od_rodzica': '', 'auto_wyslij_meet': 'on',
+        }
+        r = self.client.post('/uczniowie/', dane, follow=True)
+        self.assertContains(r, 'nie mieści się w jego zaznaczonych godzinach')
+        self.assertEqual(Uczen.objects.count(), 0)
