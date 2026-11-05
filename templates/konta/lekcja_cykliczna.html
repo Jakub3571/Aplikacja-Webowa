@@ -103,6 +103,49 @@
         }
       });
     });
+
+    // po wybraniu dnia tygodnia — lista godzin tylko z wolnych terminów korepetytora
+    function nastepnaData(dzienTygodnia, od) {
+      var d = new Date(od + 'T00:00:00');
+      var diff = (dzienTygodnia - d.getDay() + 7) % 7;
+      d.setDate(d.getDate() + diff);
+      var miesiac = ('0' + (d.getMonth() + 1)).slice(-2);
+      var dzien = ('0' + d.getDate()).slice(-2);
+      return d.getFullYear() + '-' + miesiac + '-' + dzien;
+    }
+    function odswiezGodzinyWiersza(wiersz) {
+      var wyborDnia = wiersz.querySelector('select[name="slot_dzien"]');
+      var wyborGodziny = wiersz.querySelector('select[name="slot_godzina"]');
+      if (!wyborDnia || !wyborGodziny) return;
+      var nt = kontenerSlotow.dataset.nauczyciel;
+      if (!nt || !wyborDnia.value) return;
+      var start = kontenerSlotow.dataset.start;
+      var poleStart = document.getElementById('id_data_poczatkowa');
+      if (poleStart && poleStart.value) start = poleStart.value;
+      var data = nastepnaData(parseInt(wyborDnia.value, 10), start);
+      fetch('/korepetytorzy/dane/?nauczyciel=' + encodeURIComponent(nt) + '&data=' + encodeURIComponent(data), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      })
+        .then(function (odp) { return odp.json(); })
+        .then(function (dane) {
+          var biezaca = wyborGodziny.value;
+          var opcje = '<option value="">— godzina (wolne terminy) —</option>';
+          (dane.godziny || []).forEach(function (g) {
+            opcje += '<option value="' + g.godzina + '">' + g.godzina + '</option>';
+          });
+          if (!(dane.godziny || []).length) {
+            opcje = '<option value="">— brak wolnych godzin tego dnia —</option>';
+          }
+          wyborGodziny.innerHTML = opcje;
+          if (biezaca) wyborGodziny.value = biezaca;
+        })
+        .catch(function () {});
+    }
+    kontenerSlotow.addEventListener('change', function (e) {
+      if (e.target && e.target.name === 'slot_dzien') {
+        odswiezGodzinyWiersza(e.target.closest('.wiersz-przedmiotu'));
+      }
+    });
   }
 </script>
 {% endblock %}
