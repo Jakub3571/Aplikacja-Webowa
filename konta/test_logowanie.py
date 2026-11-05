@@ -1184,10 +1184,12 @@ class PoprawkiSzefaTests(TestCase):
         self.assertEqual(godziny, ['11:00'])
         self.assertEqual(godziny, ['11:00'])
 
-    def test_cykliczna_co_2_tygodnie_i_godzina_5min(self):
+    def test_cykliczna_kwadracik_co_2_tygodnie(self):
+        # checkbox co_2_tygodnie + okres rok: lekcje tylko co 14 dni (09.11, 23.11, ...)
         self.client.force_login(self.user)
         r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', {
-            'okres': '2tygodnie',
+            'okres': 'rok',
+            'co_2_tygodnie': 'on',
             'data_poczatkowa': '2026-11-09',
             'slot_dzien': ['0'],
             'slot_godzina': ['11:20'],
@@ -1197,11 +1199,28 @@ class PoprawkiSzefaTests(TestCase):
         lekcje = Lekcja.objects.filter(uczen=self.uczen).order_by('data')
         daty = [timezone.localtime(l.data).date().isoformat() for l in lekcje]
         self.assertIn('2026-11-09', daty)
-        self.assertIn('2026-11-16', daty)
-        self.assertIn('2026-11-23', daty)
-        self.assertNotIn('2026-11-30', daty)
+        self.assertIn('2026-11-23', daty)      # +14 dni
+        self.assertNotIn('2026-11-16', daty)   # tydzień pośredni — NIE ma
+        self.assertNotIn('2026-11-30', daty)   # +21 dni — NIE ma
         godziny = {timezone.localtime(l.data).strftime('%H:%M') for l in lekcje}
         self.assertEqual(godziny, {'11:20'})
+
+    def test_cykliczna_bez_kwadracika_co_tydzien(self):
+        # bez checkboxa: co tydzień w wybranym dniu, w ramach okresu
+        self.client.force_login(self.user)
+        self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', {
+            'okres': 'miesiac',
+            'data_poczatkowa': '2026-11-09',
+            'slot_dzien': ['0'],
+            'slot_godzina': ['11:20'],
+            'link_meet': '',
+        }, follow=True)
+        daty = [timezone.localtime(l.data).date().isoformat() for l in Lekcja.objects.filter(uczen=self.uczen)]
+        self.assertIn('2026-11-09', daty)
+        self.assertIn('2026-11-16', daty)      # co tydzień
+        self.assertIn('2026-11-23', daty)
+        self.assertIn('2026-11-30', daty)      # koniec miesiąca wciąż w okresie
+        self.assertNotIn('2026-12-07', daty)   # poza miesiącem
 
     def test_okres_zawsze_nie_wraca_jako_90_dni(self):
         self.client.force_login(self.user)

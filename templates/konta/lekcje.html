@@ -23,7 +23,7 @@
             <th>Korepetytor</th>
             <th>Przedmiot</th>
             <th>Lekcje w tym miesiącu</th>
-            <th>Kalendarz</th>
+
             {% if not jest_nauczycielem %}
             <th>Dodaj kolejne</th>
             <th>Akcje</th>
@@ -37,9 +37,7 @@
             <td>{{ uczen.korepetytor }}</td>
             <td>{{ uczen.przedmioty_tekst }}</td>
             <td>{{ uczen.liczba_lekcji }}</td>
-            <td>
-              <a class="ikona-kalendarza" href="{% url 'kalendarz_lekcji' uczen.id %}" title="Kalendarz lekcji">📅</a>
-            </td>
+
             {% if not jest_nauczycielem %}
             <td>
               <a class="ikona-kalendarza" href="{% url 'lekcja_cykliczna' uczen.id %}" title="Dodaj kolejne zajęcia cykliczne">🔄</a>

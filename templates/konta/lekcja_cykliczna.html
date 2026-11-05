@@ -68,10 +68,14 @@
     <label>Obowiązuje do <span class="gwiazdka">*</span></label>
     <select name="okres" required>
       <option value="miesiac">do końca tego miesiąca</option>
-      <option value="2tygodnie">co 2 tygodnie (14 dni)</option>
       <option value="rok" selected>do końca roku szkolnego (30 czerwca)</option>
     </select>
     <p class="podpowiedz">Lekcje cykliczne zawsze mają określony koniec — wybierz miesiąc, co 2 tygodnie albo rok szkolny. Po tym czasie lekcje przestają się dopisywać.</p>
+        <div class="pole-checkbox">
+      <input type="checkbox" name="co_2_tygodnie" id="id_co_2_tygodnie">
+      <label for="id_co_2_tygodnie">zajęcia co 2 tygodnie (zamiast co tydzień)</label>
+    </div>
+    <p class="podpowiedz">Zaznacz, jeśli uczeń ma zajęcia raz na 2 tygodnie — wtedy wpiszą się tylko co 14 dni w wybranym dniu, w ramach wybranego okresu powyżej.</p>
     <p class="podpowiedz">
       „Na zawsze" wpisuje lekcje na 3 miesiące naprzód i co noc automatycznie je przedłuża — nikt nie musi się logować, żeby odnowić terminy.</p>
 

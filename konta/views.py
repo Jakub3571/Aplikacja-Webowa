@@ -2191,8 +2191,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
         """Zwraca (od, do) wg wybranego presetu.
         'zawsze' celowo usunięte — lekcje cykliczne zawsze mają koniec
         (miesiąc / co 2 tygodnie / do końca roku szkolnego)."""
-        if okres == '2tygodnie':
-            return od_dnia, od_dnia + timedelta(days=14)
+
         if okres == 'miesiac':
             if od_dnia.month == 12:
                 do = date(od_dnia.year, 12, 31)
@@ -2208,6 +2207,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
 
     if request.method == 'POST':
         okres = request.POST.get('okres', 'miesiac')
+        co_2_tygodnie = request.POST.get('co_2_tygodnie') == 'on'
         link_meet = request.POST.get('link_meet', '').strip()
         try:
             data_poczatkowa = date.fromisoformat(request.POST.get('data_poczatkowa', ''))
@@ -2234,7 +2234,9 @@ def umow_lekcje_cykliczna(request, uczen_id):
             godzina = datetime.strptime(godzina_txt, '%H:%M').time()
             dzien = od_dnia
             while dzien <= do_dnia:
-                if dzien.weekday() == dzien_tygodnia:
+                if dzien.weekday() == dzien_tygodnia and (
+                    not co_2_tygodnie or (dzien - od_dnia).days % 14 == 0
+                    ):
                     data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
                     kolidujace = inne_lekcje_nauczyciela(nauczyciel, uczen, dzien, godzina)
                     w_przerwie = godzina_w_przerwie(nauczyciel, dzien, godzina)
