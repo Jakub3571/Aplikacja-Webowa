@@ -206,14 +206,13 @@ pracowniczy{% endblock %} {% block panel %}
 
 <script>
 	(function () {
-		var polePrzedmiot = document.getElementById('id_przedmiot');
-		var polePoziom = document.getElementById('id_poziom');
-		var poleKorepetytor = document.getElementById('id_korepetytor');
-		if (!polePrzedmiot || !polePoziom || !poleKorepetytor) return;
-
+        var polePrzedmiot = document.getElementById('id_przedmiot');
+        var polePoziom = document.getElementById('id_poziom');
         var poleKorepetytor = document.getElementById('id_korepetytor');
         var wybierzKorepetytorow = document.getElementById('wybor-korepetytorow');
         if (!polePrzedmiot || !polePoziom || !poleKorepetytor) return;
+        var poleData = document.getElementById('id_data_pierwszej_lekcji');
+        var poleGodzina = document.getElementById('id_godzina_pierwszej_lekcji');
         if (poleKorepetytor) {
             // wybór korepetytora idzie przez przyciski poniżej; select zostaje jako ukryte pole formularza
             poleKorepetytor.required = false;
