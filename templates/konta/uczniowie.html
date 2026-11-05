@@ -112,7 +112,7 @@ pracowniczy{% endblock %} {% block panel %}
 			{{ form.korepetytor }} {% if form.korepetytor.help_text %}
 			<p class="podpowiedz">{{ form.korepetytor.help_text }}</p>
 			{% endif %}
-
+			<div id="wybor-korepetytorow" class="wybor-korepetytorow"></div>
             <label for="{{ form.notatka_od_rodzica.id_for_label }}"
                 >Notatka od rodzica (opcjonalnie)</label
             >
@@ -211,8 +211,14 @@ pracowniczy{% endblock %} {% block panel %}
 		var poleKorepetytor = document.getElementById('id_korepetytor');
 		if (!polePrzedmiot || !polePoziom || !poleKorepetytor) return;
 
-		var poleData = document.getElementById('id_data_pierwszej_lekcji');
-		var poleGodzina = document.getElementById('id_godzina_pierwszej_lekcji');
+        var poleKorepetytor = document.getElementById('id_korepetytor');
+        var wybierzKorepetytorow = document.getElementById('wybor-korepetytorow');
+        if (!polePrzedmiot || !polePoziom || !poleKorepetytor) return;
+        if (poleKorepetytor) {
+            // wybór korepetytora idzie przez przyciski poniżej; select zostaje jako ukryte pole formularza
+            poleKorepetytor.required = false;
+            poleKorepetytor.style.display = 'none';
+        }
 
 		function odswiezGodziny() {
 			// godziny 1. lekcji pobieramy z kalendarzy nauczycieli (dynamicznie, z przerwami)
@@ -239,11 +245,13 @@ pracowniczy{% endblock %} {% block panel %}
 				.then(function (odp) {
 					return odp.json();
 				})
-				.then(function (dane) {
+                .then(function (dane) {
+                    var seen = {};
                     var opcje = '<option value="">— wybierz godzinę —</option>';
                     dane.godziny.forEach(function (g) {
-                        opcje +=
-                            '<option value="' + g.godzina + '">' + g.godzina + ' — ' + g.korepetytor + '</option>';
+                        if (seen[g.godzina]) return;
+                        seen[g.godzina] = true;
+                        opcje += '<option value="' + g.godzina + '">' + g.godzina + '</option>';
                     });
 					if (!dane.godziny.length) {
 						opcje =
@@ -257,64 +265,77 @@ pracowniczy{% endblock %} {% block panel %}
 				});
 		}
 
-		function odswiezKorepetytorow() {
-			// korepetytorzy dostępni o wybranej dacie i godzinie (poziom/przedmiot też)
-			var przedmiot = polePrzedmiot.value;
-			var poziom = polePoziom.value;
-			var dataLekcji = poleData ? poleData.value : '';
-			var godzinaLekcji = poleGodzina ? poleGodzina.value : '';
-			poleKorepetytor.innerHTML =
-				'<option value="">— wybierz datę i godzinę 1. lekcji —</option>';
-			if (!przedmiot || !poziom) return;
-			if (dataLekcji && godzinaLekcji) {
-				poleKorepetytor.innerHTML =
-					'<option value="">— szukam korepetytorów dostępnych ' +
-					dataLekcji +
-					' o ' +
-					godzinaLekcji +
-					'... —</option>';
-			}
-			fetch(
-				'/korepetytorzy/dane/?przedmiot=' +
-					encodeURIComponent(przedmiot) +
-					'&poziom=' +
-					encodeURIComponent(poziom) +
-					'&data=' +
-					encodeURIComponent(dataLekcji) +
-					'&godzina=' +
-					encodeURIComponent(godzinaLekcji),
-				{
-					headers: { 'X-Requested-With': 'XMLHttpRequest' },
-				},
-			)
-				.then(function (odp) {
-					return odp.json();
-				})
-				.then(function (dane) {
-					var opcje = '<option value="">— wybierz korepetytora —</option>';
-					dane.korepetytorzy.forEach(function (k) {
-						opcje += '<option value="' + k.nazwa + '">' + k.nazwa + '</option>';
-					});
-					if (!dane.korepetytorzy.length) {
-						if (dataLekcji && godzinaLekcji) {
-							opcje =
-								'<option value="">— brak dostępnych korepetytorów ' +
-								dataLekcji +
-								' o ' +
-								godzinaLekcji +
-								' — zmień godzinę lub przedmiot —</option>';
-						} else {
-							opcje =
-								'<option value="">— wybierz datę i godzinę 1. lekcji, aby zobaczyć dostępnych korepetytorów —</option>';
-						}
-					}
-					poleKorepetytor.innerHTML = opcje;
-				})
-				.catch(function () {
-					poleKorepetytor.innerHTML =
-						'<option value="">— błąd pobierania listy —</option>';
-				});
-		}
+        function odswiezKorepetytorow() {
+            // korepetytorzy dostępni o wybranej dacie i godzinie (przedmiot/poziom też)
+            var przedmiot = polePrzedmiot.value;
+            var poziom = polePoziom.value;
+            var dataLekcji = poleData ? poleData.value : '';
+            var godzinaLekcji = poleGodzina ? poleGodzina.value : '';
+            poleKorepetytor.value = '';
+            poleKorepetytor.innerHTML =
+                '<option value="">— wybierz datę i godzinę 1. lekcji —</option>';
+            wybierzKorepetytorow.innerHTML = '';
+            if (!przedmiot || !poziom) return;
+            if (dataLekcji && godzinaLekcji) {
+                wybierzKorepetytorow.innerHTML =
+                    '<p class="podpowiedz">— szukam korepetytorów dostępnych ' +
+                    dataLekcji + ' o ' + godzinaLekcji + '... —</p>';
+            }
+            fetch(
+                '/korepetytorzy/dane/?przedmiot=' +
+                encodeURIComponent(przedmiot) +
+                '&poziom=' +
+                encodeURIComponent(poziom) +
+                '&data=' +
+                encodeURIComponent(dataLekcji) +
+                '&godzina=' +
+                encodeURIComponent(godzinaLekcji),
+                {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                },
+            )
+                .then(function (odp) {
+                    return odp.json();
+                })
+                .then(function (dane) {
+                    var opcje = '<option value="">— wybierz korepetytora —</option>';
+                    dane.korepetytorzy.forEach(function (k) {
+                        opcje += '<option value="' + k.nazwa + '">' + k.nazwa + '</option>';
+                    });
+                    poleKorepetytor.innerHTML = opcje;
+                    // przyciski do wyboru korepetytora — pod polem godziny
+                    wybierzKorepetytorow.innerHTML = '';
+                    if (dataLekcji && godzinaLekcji && dane.korepetytorzy.length) {
+                        dane.korepetytorzy.forEach(function (k) {
+                            var b = document.createElement('button');
+                            b.type = 'button';
+                            b.className = 'przycisk-kalendarz korepetytor-wybor';
+                            b.textContent = k.nazwa;
+                            b.addEventListener('click', function () {
+                                poleKorepetytor.value = k.nazwa;
+                                wybierzKorepetytorow
+                                    .querySelectorAll('.korepetytor-wybor')
+                                    .forEach(function (x) { x.classList.remove('aktywny'); });
+                                b.classList.add('aktywny');
+                            });
+                            wybierzKorepetytorow.appendChild(b);
+                        });
+                    } else if (dataLekcji && godzinaLekcji) {
+                        wybierzKorepetytorow.innerHTML =
+                            '<p class="podpowiedz">— brak dostępnych korepetytorów ' +
+                            dataLekcji + ' o ' + godzinaLekcji +
+                            ' — zmień godzinę lub przedmiot —</p>';
+                    } else if (przedmiot && poziom) {
+                        wybierzKorepetytorow.innerHTML =
+                            '<p class="podpowiedz">— wybierz datę i godzinę 1. lekcji, aby zobaczyć dostępnych korepetytorów —</p>';
+                    }
+                })
+                .catch(function () {
+                    poleKorepetytor.innerHTML =
+                        '<option value="">— błąd pobierania listy —</option>';
+                    wybierzKorepetytorow.innerHTML = '';
+                });
+        }
 
 		polePrzedmiot.addEventListener('change', function () {
 			odswiezGodziny();

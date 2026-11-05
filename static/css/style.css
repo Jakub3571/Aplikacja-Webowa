@@ -551,7 +551,18 @@ body {
   opacity: 0.45;
   cursor: not-allowed;
 }
+.wybor-korepetytorow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0.6rem;
+}
 
+.korepetytor-wybor.aktywny {
+  background: var(--akcent);
+  border-color: var(--akcent);
+  color: #fff;
+}
 /* Przycisk wyczysc dzien — czerwony akcent */
 .przycisk-kalendarz-usun:hover:not(:disabled) {
   border-color: #dc2626;
@@ -561,9 +572,32 @@ body {
 
 /* === Moj tydzien — dni w wierszach z plusikiem zakresu (styl Calendly) === */
 
-.tydzien-uklad { max-width: 60rem; margin: 0 auto; }
+.tydzien-uklad {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  max-width: 75rem;
+  margin: 0 auto;
+}
 
-.tydzien-karta { max-width: none; }
+.tydzien-karta { flex: 1; min-width: 0; max-width: none; }
+
+.instrukcja-kalendarza {
+  flex: 0 0 19rem;
+  margin-bottom: 0;
+  position: sticky;
+  top: 1rem;
+}
+
+.kalendarz-dol {
+  margin-top: 0.75rem;
+  margin-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .tydzien-uklad { flex-direction: column; max-width: 60rem; }
+  .instrukcja-kalendarza { flex: none; width: 100%; position: static; }
+}
 
 .dzien-wiersz {
   display: flex;
@@ -623,9 +657,6 @@ body {
 
 .zakres-usun:hover { color: #d92b1f; transform: scale(1.2); }
 
-.instrukcja-kalendarza {
-  margin-bottom: 1rem;
-}
 
 .instrukcja-kalendarza ul {
   margin: 0.5rem 0 0 1.2rem;
