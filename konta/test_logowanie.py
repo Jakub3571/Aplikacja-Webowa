@@ -1180,9 +1180,10 @@ class PoprawkiSzefaTests(TestCase):
         r = self.client.get(f'/korepetytorzy/dane/?nauczyciel={self.nauczyciel.id}&data={self.dzien.isoformat()}')
         self.assertEqual(r.status_code, 200)
         godziny = [g['godzina'] for g in r.json()['godziny']]
-        self.assertEqual(godziny, ['11:00'])
-        self.assertEqual(godziny, ['11:00'])
-        self.assertEqual(godziny, ['11:00'])
+        self.assertIn('11:00', godziny)
+        self.assertIn('11:05', godziny)
+        self.assertIn('12:00', godziny)
+        self.assertNotIn('12:05', godziny)  # 12:05+60 min poza zakresem 13:00
 
     def test_cykliczna_kwadracik_co_2_tygodnie(self):
         # checkbox co_2_tygodnie + okres rok: lekcje tylko co 14 dni (09.11, 23.11, ...)
@@ -1264,17 +1265,16 @@ class komunikatBleduKalendarzaTests(TestCase):
         self.assertContains(r, 'nie mieści się w jego zaznaczonych godzinach')
         self.assertEqual(Uczen.objects.count(), 0)
 
-class SiatkaGodzinSzefaTests(TestCase):
-    """Siatka godzin szefa: pełne godziny co (60 + przerwa dnia); zajęta godzina wypada."""
+
+class GodzinyCo5MinTests(TestCase):
+    """Krok 4: pełny zakres co 10 min; zajęta lekcja blokuje 1h + przerwa, potem dalej co 10 min."""
 
     def setUp(self):
         from datetime import time as czas
         from konta.views import wolne_godziny_nauczyciela, nauczyciel_wolny_o
-        from konta.models import PrzerwaDnia
         self.czas = czas
         self.wolne = wolne_godziny_nauczyciela
         self.wolny_o = nauczyciel_wolny_o
-        self.PrzerwaDnia = PrzerwaDnia
         self.n = Nauczyciel.objects.create(imie='Tomek', nazwisko='Tomek', email='t@f.pl')
         self.dzien = date(2026, 11, 6)
         k = datetime.combine(self.dzien, czas(10, 0))
@@ -1284,14 +1284,15 @@ class SiatkaGodzinSzefaTests(TestCase):
                                       godzina_od=k.time(), godzina_do=(k + timedelta(minutes=30)).time())
             k += timedelta(minutes=30)
 
-    def test_przerwa_5_min_siatka_10_00_11_05_12_10(self):
-        self.assertEqual(self.wolne(self.n, self.dzien), ['10:00', '11:05', '12:10'])
+    def test_pelny_zakres_co_10_min(self):
+        wolne = self.wolne(self.n, self.dzien)
+        self.assertEqual(wolne[0], '10:00')
+        self.assertEqual(wolne[-1], '13:00')
+        self.assertEqual(len(wolne), 37)
+        self.assertIn('10:05', wolne)
+        self.assertIn('10:10', wolne)
 
-    def test_przerwa_10_min_siatka_10_00_11_10_12_20(self):
-        self.PrzerwaDnia.objects.create(nauczyciel=self.n, data=self.dzien, minuty=10)
-        self.assertEqual(self.wolne(self.n, self.dzien), ['10:00', '11:10', '12:20'])
-
-    def test_zajeta_godzina_wypada_z_siatki(self):
+    def test_zajeta_lekcja_blokuje_1h_plus_przerwa(self):
         u = Uczen.objects.create(
             pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 0))),
             przedmiot='matematyka', poziom='podstawowka', szkola='SP', imie_ucznia='K',
@@ -1299,13 +1300,16 @@ class SiatkaGodzinSzefaTests(TestCase):
             telefon_dodatkowy='', korepetytor='Tomek Tomek', kto_umowil='szef')
         Lekcja.objects.create(uczen=u, data=u.pierwsza_lekcja)
         wolne = self.wolne(self.n, self.dzien)
-        self.assertEqual(wolne, ['10:00', '12:10'])
-        start = datetime.combine(self.dzien, self.czas(12, 10))
-        self.assertTrue(self.wolny_o(self.n, self.dzien, start))
-        start = datetime.combine(self.dzien, self.czas(11, 0))
-        self.assertFalse(self.wolny_o(self.n, self.dzien, start))
-        start = datetime.combine(self.dzien, self.czas(11, 5))
-        self.assertFalse(self.wolny_o(self.n, self.dzien, start))
+        self.assertIn('10:00', wolne)
+        self.assertNotIn('11:00', wolne)
+        self.assertNotIn('11:50', wolne)
+        self.assertNotIn('12:00', wolne)
+        self.assertIn('12:05', wolne)
+        self.assertIn('13:00', wolne)
+        self.assertTrue(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(12, 5))))
+        self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(11, 0))))
+        self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(12, 0))))
+
 
 class DodatkowyPrzedmiotZGrafikiemTests(TestCase):
     """Dodatkowy przedmiot z datą+godziną od razu zajmuje grafik korepetytora."""

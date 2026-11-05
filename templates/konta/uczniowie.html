@@ -48,6 +48,13 @@ pracowniczy{% endblock %} {% block panel %}
 				Lista pokazuje tylko godziny, w których korepetytorzy z tym przedmiotem
 				i poziomem mają wolny termin.
 			</p>
+						<label for="{{ form.korepetytor.id_for_label }}"
+				>Krok 5 — korepetytor (dostępni o wybranej godzinie)
+				<span class="gwiazdka">*</span></label
+			>
+			{{ form.korepetytor }} {% if form.korepetytor.help_text %}
+			<p class="podpowiedz">{{ form.korepetytor.help_text }}</p>
+			{% endif %}
 
 			<label for="{{ form.imie_ucznia.id_for_label }}"
 				>Uczeń — imię <span class="gwiazdka">*</span></label
@@ -105,13 +112,7 @@ pracowniczy{% endblock %} {% block panel %}
 			
 <p class="podpowiedz">Link Meet zapisuje się automatycznie — rodzic dostanie go w przypomnieniu 60 minut przed każdą lekcją.</p>
 
-			<label for="{{ form.korepetytor.id_for_label }}"
-				>Krok 5 — korepetytor (dostępni o wybranej godzinie)
-				<span class="gwiazdka">*</span></label
-			>
-			{{ form.korepetytor }} {% if form.korepetytor.help_text %}
-			<p class="podpowiedz">{{ form.korepetytor.help_text }}</p>
-			{% endif %}
+
             <label for="{{ form.notatka_od_rodzica.id_for_label }}"
                 >Notatka od rodzica (opcjonalnie)</label
             >

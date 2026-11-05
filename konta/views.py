@@ -170,39 +170,43 @@ def _zakresy_dnia(nauczyciel, dzien):
 
 def nauczyciel_wolny_o(nauczyciel, dzien, start_lekcji):
     """Czy nauczyciel może przyjąć lekcję 60 min od start_lekcji:
-    godzina musi być na SIATCE wolnych terminów tego dnia (patrz wolne_godziny_nauczyciela) —
-    wtedy na pewno mieści się w zakresie i nie koliduje z lekcjami/przerwami.
-    Dzięki temu lista rozwijana i walidacja formularza zawsze pokazują dokładnie to samo."""
+    cała lekcja mieści się w jego zaznaczonym zakresie tego dnia, godzina leży na siatce
+    10-min tego zakresu (ta sama co w wolne_godziny_nauczyciela) i nie koliduje z inną
+    lekcją (lekcja zajmuje [start, koniec + przerwa)) ani z oknem przerwy dnia.
+    Dzięki temu lista rozwijana i walidacja formularza zawsze pokazują to samo."""
     if not nauczyciel:
         return False
-    return start_lekcji.strftime('%H:%M') in wolne_godziny_nauczyciela(nauczyciel, dzien)
+    koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
+    for s, e in _zakresy_dnia(nauczyciel, dzien):
+        if s <= start_lekcji and koniec <= e:
+            if (start_lekcji - s).total_seconds() % 300 != 0:
+                continue  # nie na siatce 10-min tego zakresu
+            if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji):
+                return False
+            if godzina_w_przerwie(nauczyciel, dzien, start_lekcji.time()):
+                return False
+            return True
+    return False
 
 
 def wolne_godziny_nauczyciela(nauczyciel, dzien):
-    """Godziny startu lekcji dostępne u nauczyciela w danym dniu — SIATKA:
-    od pierwszej PEŁNEJ godziny w zakresie, co (60 min lekcji + przerwa tego dnia).
-    Przykład: przerwa 5 min -> 10:00, 11:05, 12:10; przerwa 10 min -> 10:00, 11:10, 12:20.
-    Godziny kolidujące z istniejącą lekcją (lub przerwą) są pomijane, więc np. mając
-    lekcję o 11:00, z listy znika siatkowy termin, a dalej idzie kolejny (12:10 przy przerwie 5).
-    Używane ZARÓWNO przez listy rozwijane (Krok 4, kreator cykliczny), jak i przez walidację
-    formularza (nauczyciel_wolny_o) — obie strony liczą dokładnie to samo."""
+    """Godziny startu lekcji dostępne u nauczyciela w danym dniu — pełny zakres CO 5 MIN
+    od początku każdego zaznaczonego zakresu, ale tylko gdy lekcja 60 min się mieści
+    i nie koliduje z inną lekcją ani przerwą. Zajęta lekcja blokuje też przerwę po sobie
+    (lekcja zajmuje [start, koniec + przerwa)), więc np. lekcja 11:00-12:00 przy przerwie
+    5 min zajmuje też 12:00-12:05, a dalej liczymy co 5 min (12:05, 12:10, ...).
+    Używane wszędzie, gdzie wybiera się godzinę: Krok 4 formularza ucznia, kreator
+    cykliczny, dodawanie przedmiotu — i przez walidację (nauczyciel_wolny_o)."""
     wynik = []
     if not nauczyciel:
         return wynik
-    wpis = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien).first()
-    przerwa = wpis.minuty if (wpis and wpis.minuty) else (nauczyciel.przerwa or 5)
-    krok = GODZINA_LEKCJI + przerwa
     for s, e in _zakresy_dnia(nauczyciel, dzien):
-        # pierwsza pełna godzina w tym zakresie
-        pierwsza = s.replace(minute=0, second=0, microsecond=0)
-        if pierwsza < s:
-            pierwsza += timedelta(hours=1)
-        kursor = pierwsza
+        kursor = s
         while kursor + timedelta(minutes=GODZINA_LEKCJI) <= e:
             if not kolizja_lekcji_nauczyciela(nauczyciel, dzien, kursor):
                 if not godzina_w_przerwie(nauczyciel, dzien, kursor.time()):
                     wynik.append(kursor.strftime('%H:%M'))
-            kursor += timedelta(minutes=krok)
+            kursor += timedelta(minutes=5)
     return sorted(set(wynik))
 
 

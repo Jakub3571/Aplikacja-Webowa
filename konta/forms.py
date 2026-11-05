@@ -99,7 +99,7 @@ class FormularzUcznia(forms.ModelForm):
     godzina_pierwszej_lekcji = forms.ChoiceField(
         label='godzina 1. lekcji',
         choices=GODZINY_LEKCJI,
-        help_text='Godziny pojawiają się po wybraniu daty, przedmiotu i poziomu — wolne terminy w rytmie lekcja+przerwa (np. przy przerwie 5 min: 10:00, 11:05, 12:10).',
+        help_text='Godziny pojawiają się po wybraniu daty, przedmiotu i poziomu — wolne terminy co 5 min (zajęte lekcje i przerwy są pomijane).',
     )
 
     class Meta:
@@ -400,7 +400,7 @@ class WierszPrzedmiotu(forms.Form):
 
     przedmiot = forms.ChoiceField(label='przedmiot', choices=WYBIERZ_PRZEDMIOT)
     poziom = forms.ChoiceField(label='poziom', choices=POZIOMY_NAUCZYCIELA)
-    
+
 class FormularzPrzedmiotuUcznia(forms.Form):
     """Dodatkowy przedmiot ucznia: przedmiot + poziom + korepetytor + data/godzina 1. lekcji.
     Lista korepetytorów budowana w widoku (wg przedmiotu i poziomu)."""
