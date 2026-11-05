@@ -2203,7 +2203,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
                 nast = date(od_dnia.year, od_dnia.month + 1, 1)
                 do = nast - timedelta(days=1)
             return od_dnia, do
-        if od_dnia.month >= 9:
+        if od_dnia.month >= 7:
             rok = od_dnia.year + 1
         else:
             rok = od_dnia.year

@@ -637,7 +637,27 @@ class LekcjeCykliczneTests(TestCase):
         # blokady u korepetytora: tyle samo co lekcji
         blokady = Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='17:00')
         self.assertEqual(blokady.count(), lekcje.count())
-
+    def test_okres_rok_startujacy_w_wakacje_lipiec_sierpien(self):
+        # start w lipcu: "do końca roku szkolnego" musi kończyć się 30.06.2027,
+        # a nie 30.06.2026 (data z przeszłości — wtedy powstawało 0 lekcji)
+        self.client.force_login(self.pracownik)
+        start = date(2026, 7, 15)
+        dane = {
+            'data_poczatkowa': start.isoformat(),
+            'slot_dzien': [str(start.weekday())],
+            'slot_godzina': ['17:00'],
+            'okres': 'rok',
+            'link_meet': '',
+        }
+        r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', dane, follow=True)
+        self.assertContains(r, 'Stałe lekcje umówione')
+        lekcje = Lekcja.objects.filter(uczen=self.uczen)
+        self.assertTrue(lekcje.exists())
+        daty = [timezone.localtime(l.data).date() for l in lekcje]
+        self.assertGreaterEqual(min(daty), start)
+        self.assertLessEqual(max(daty), date(2027, 6, 30))
+        self.assertTrue(all(d.weekday() == start.weekday() for d in daty))
+        
     def test_pracownik_nie_umowi_cyklicznej_cudzemu_uczniowi(self):
         obcy = Uczen.objects.create(
             pierwsza_lekcja='2026-10-07T17:00',
