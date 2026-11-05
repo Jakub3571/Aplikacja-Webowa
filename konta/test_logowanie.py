@@ -1138,3 +1138,81 @@ class KalendarzKorepetytoraTests(TestCase):
         r = self.client.post('/uczniowie/', self._dane_ucznia('12:15'), follow=True)
         self.assertContains(r, 'został dodany')
         self.assertEqual(Uczen.objects.count(), 1)
+
+
+
+class PoprawkiSzefaTests(TestCase):
+    """Komunikaty znikają po 3 s; cykliczne co 5 min i tylko wolne godziny; okresy bez 'zawsze'."""
+
+    def setUp(self):
+        from datetime import time as czas
+        self.czas = czas
+        self.nauczyciel = Nauczyciel.objects.create(
+            imie='Anna', nazwisko='Kowalska', email='anna@firma.pl',
+        )
+        PrzedmiotNauczyciela.objects.create(
+            nauczyciel=self.nauczyciel, przedmiot='matematyka',
+            poziom='podstawowka', stawka=100,
+        )
+        self.user = Pracownik.objects.create_user(
+            'szef', 'szef@firma.pl', 'Sup3rHaslo!', is_superuser=True,
+        )
+        self.uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 11, 9, 11, 0)),
+            przedmiot='matematyka', poziom='podstawowka', szkola='SP 1',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='ewa@f.pl', telefon_dodatkowy='',
+            korepetytor='Anna Kowalska', kto_umowil='szef', umowil=self.user,
+        )
+        self.dzien = date(2026, 11, 9)  # poniedziałek
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel, data_od=self.dzien, data_do=self.dzien,
+            godzina_od=self.czas(11, 0), godzina_do=self.czas(13, 0),
+        )
+
+    def test_komunikat_ma_skrypt_znikania_po_3s(self):
+        r = self.client.get('/')
+        self.assertContains(r, '3000')
+        self.assertContains(r, 'komunikaty')
+
+    def test_ajax_wolne_godziny_nauczyciela_5min(self):
+        self.client.force_login(self.user)
+        r = self.client.get(f'/korepetytorzy/dane/?nauczyciel={self.nauczyciel.id}&data={self.dzien.isoformat()}')
+        self.assertEqual(r.status_code, 200)
+        godziny = [g['godzina'] for g in r.json()['godziny']]
+        self.assertIn('11:20', godziny)
+        self.assertIn('12:00', godziny)
+        self.assertNotIn('12:30', godziny)
+
+    def test_cykliczna_co_2_tygodnie_i_godzina_5min(self):
+        self.client.force_login(self.user)
+        r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', {
+            'okres': '2tygodnie',
+            'data_poczatkowa': '2026-11-09',
+            'slot_dzien': ['0'],
+            'slot_godzina': ['11:20'],
+            'link_meet': '',
+        }, follow=True)
+        self.assertEqual(r.status_code, 200)
+        lekcje = Lekcja.objects.filter(uczen=self.uczen).order_by('data')
+        daty = [timezone.localtime(l.data).date().isoformat() for l in lekcje]
+        self.assertIn('2026-11-09', daty)
+        self.assertIn('2026-11-16', daty)
+        self.assertIn('2026-11-23', daty)
+        self.assertNotIn('2026-11-30', daty)
+        godziny = {timezone.localtime(l.data).strftime('%H:%M') for l in lekcje}
+        self.assertEqual(godziny, {'11:20'})
+
+    def test_okres_zawsze_nie_wraca_jako_90_dni(self):
+        self.client.force_login(self.user)
+        self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', {
+            'okres': 'zawsze',
+            'data_poczatkowa': '2026-11-09',
+            'slot_dzien': ['0'],
+            'slot_godzina': ['11:20'],
+            'link_meet': '',
+        }, follow=True)
+        pozno = Lekcja.objects.filter(
+            uczen=self.uczen, data__date__gte=date(2027, 3, 1)
+        ).exists()
+        self.assertTrue(pozno, 'okres powinien domyślnie iść do końca roku szkolnego, a nie 90 dni')

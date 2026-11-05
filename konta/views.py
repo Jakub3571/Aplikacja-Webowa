@@ -408,6 +408,20 @@ def korepetytorzy_dane(request):
     poziom = request.GET.get('poziom', '')
     data_txt = request.GET.get('data', '')
     godzina_txt = request.GET.get('godzina', '')
+    # tryb wolnych godzin JEDNEGO nauczyciela w konkretnym dniu (kreator lekcji cyklicznej)
+    nauczyciel_id = request.GET.get('nauczyciel', '')
+    if nauczyciel_id and data_txt:
+        try:
+            dzien_tmp = date.fromisoformat(data_txt)
+        except ValueError:
+            dzien_tmp = None
+        if dzien_tmp:
+            nt = Nauczyciel.objects.filter(pk=nauczyciel_id, aktywny=True).first()
+            if nt:
+                return JsonResponse({
+                    'godziny': [{'godzina': h} for h in wolne_godziny_nauczyciela(nt, dzien_tmp)]
+                })
+            return JsonResponse({'godziny': []})
     if not przedmiot or not poziom:
         return JsonResponse({'korepetytorzy': []})
     poziom_nauczyciela = {
@@ -2110,9 +2124,11 @@ def umow_lekcje_cykliczna(request, uczen_id):
     nauczyciel = nauczyciel_z_korepetytora(karta.korepetytor if karta else uczen.korepetytor)
 
     def okres_dat(okres, od_dnia):
-        """Zwraca (od, do) wg wybranego presetu."""
-        if okres == 'zawsze':
-            return od_dnia, od_dnia + timedelta(days=90)
+        """Zwraca (od, do) wg wybranego presetu.
+        'zawsze' celowo usunięte — lekcje cykliczne zawsze mają koniec
+        (miesiąc / co 2 tygodnie / do końca roku szkolnego)."""
+        if okres == '2tygodnie':
+            return od_dnia, od_dnia + timedelta(days=14)
         if okres == 'miesiac':
             if od_dnia.month == 12:
                 do = date(od_dnia.year, 12, 31)
@@ -2224,8 +2240,9 @@ def umow_lekcje_cykliczna(request, uczen_id):
         'karta': karta,
         'przedmioty_ucznia': list(uczen.przedmioty_ucznia.all()),
         'biezacy_link_meet': (karta.link_meet if karta else uczen.link_meet) or '',
-        'godziny': [f'{h:02d}:{m:02d}' for h in range(6, 24) for m in (0, 30)],
+        'godziny': [f'{h:02d}:{m:02d}' for h in range(6, 24) for m in range(0, 60, 5)],
         'dzisiaj': date.today().isoformat(),
+        'nauczyciel_id': nauczyciel.id if nauczyciel else '',
     })
 
 

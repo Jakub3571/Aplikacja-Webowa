@@ -158,7 +158,7 @@ class FormularzUcznia(forms.ModelForm):
                 )
                 for n in nauczyciele
             ],
-        help_text='Po wybraniu daty, przedmiotu, poziomu i godziny dostępni korepetytorzy pokażą się poniżej jako przyciski do kliknięcia.',
+        help_text='Lista korepetytorów pojawia się po wybraniu daty, przedmiotu, poziomu i godziny — tylko dostępni o wybranej godzinie.',
         )
         for nazwa, pole in self.fields.items():
             pole.required = True

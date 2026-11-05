@@ -52,7 +52,17 @@
 					wrapper.parentNode.insertBefore(otoczka, wrapper);
 					podepnijSzukanie(pole, tabela);
 				});
-			})();
+            })();
+
+            // komunikaty znikają po 3 s (nie blokują zakładek)
+            setTimeout(function () {
+                var komunikaty = document.querySelector('.komunikaty');
+                if (!komunikaty) return;
+                komunikaty.style.transition = 'opacity 0.4s ease';
+                komunikaty.style.opacity = '0';
+                setTimeout(function () { komunikaty.style.display = 'none'; }, 400);
+            }, 3000);
+        </script>
 		</script>
 
 		<footer class="stopka">

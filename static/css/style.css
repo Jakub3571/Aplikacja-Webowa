@@ -551,18 +551,7 @@ body {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.wybor-korepetytorow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0.4rem 0 0.6rem;
-}
 
-.korepetytor-wybor.aktywny {
-  background: var(--akcent);
-  border-color: var(--akcent);
-  color: #fff;
-}
 /* Przycisk wyczysc dzien — czerwony akcent */
 .przycisk-kalendarz-usun:hover:not(:disabled) {
   border-color: #dc2626;
