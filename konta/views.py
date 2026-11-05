@@ -1,5 +1,5 @@
 import calendar
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 from django.conf import settings
@@ -479,7 +479,7 @@ def korepetytorzy_dane(request):
             start_lekcji = datetime.combine(dzien, godzina)
             if not nauczyciel_wolny_o(n, dzien, start_lekcji):
                 continue
-        korepetytorzy.append({'nazwa': f'{n.imie} {n.nazwisko}'})
+        korepetytorzy.append({'nazwa': f'{n.imie} {n.nazwisko}', 'id': n.id})
     return JsonResponse({'korepetytorzy': korepetytorzy})
 @login_required
 def uczniowie(request):
@@ -631,17 +631,45 @@ def edytuj_ucznia(request, uczen_id):
                 link = ''
                 if nauczyciel and nauczyciel.link_meet:
                     link = nauczyciel.link_meet
-                PrzedmiotUcznia.objects.create(
+                # data + godzina 1. lekcji dla tego przedmiotu — od razu zajmuje grafik korepetytora
+                try:
+                    data_lekcji = form_przedmiotu.cleaned_data['data_pierwszej_lekcji']
+                    godzina_txt = form_przedmiotu.cleaned_data['godzina_pierwszej_lekcji']
+                    hh, mm = godzina_txt.split(':')
+                    czas = time(int(hh), int(mm))
+                    start_lekcji = datetime.combine(data_lekcji, czas)
+                except (ValueError, TypeError, AttributeError, KeyError):
+                    messages.error(request, 'Podaj datę i godzinę 1. lekcji dla tego przedmiotu.')
+                    return redirect('edytuj_ucznia', uczen_id=uczen.id)
+                if nauczyciel and not nauczyciel_wolny_o(nauczyciel, data_lekcji, start_lekcji):
+                    messages.error(
+                        request,
+                        f'{korepetytor} nie może przyjąć lekcji {data_lekcji:%d.%m.%Y} o {start_lekcji:%H:%M} '
+                        '— godzina nie mieści się w jego dostępności albo koliduje z inną lekcją/przerwą. '
+                        'Wybierz wolną godzinę z listy.',
+                    )
+                    return redirect('edytuj_ucznia', uczen_id=uczen.id)
+                karta = PrzedmiotUcznia.objects.create(
                     uczen=uczen,
                     przedmiot=przedmiot,
                     poziom=poziom,
                     korepetytor=korepetytor,
                     link_meet=link,
                 )
+                if nauczyciel:
+                    data_aware = timezone.make_aware(start_lekcji)
+                    Lekcja.objects.get_or_create(uczen=uczen, data=data_aware, przedmiot_karta=karta)
+                    Dostepnosc.objects.get_or_create(
+                        nauczyciel=nauczyciel,
+                        data_od=data_lekcji,
+                        data_do=data_lekcji,
+                        godzina_od=czas,
+                        godzina_do=(datetime.combine(date(2000, 1, 1), czas) + timedelta(minutes=GODZINA_LEKCJI)).time(),
+                    )
                 messages.success(
                     request,
-                    f'Dodano przedmiot {przedmiot} ({poziom}) — korepetytor: {korepetytor}. '
-                    'Umów lekcje z tego przedmiotu w kalendarzu ucznia.',
+                    f'Dodano przedmiot {przedmiot} ({poziom}) — korepetytor: {korepetytor}, '
+                    f'1. lekcja {data_lekcji:%d.%m.%Y} o {start_lekcji:%H:%M} (grafik korepetytora zablokowany).',
                 )
                 return redirect('edytuj_ucznia', uczen_id=uczen.id)
         # formularz z błędami — pokaż z powrotem

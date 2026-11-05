@@ -1287,3 +1287,63 @@ class SiatkaGodzinSzefaTests(TestCase):
         self.assertFalse(self.wolny_o(self.n, self.dzien, start))
         start = datetime.combine(self.dzien, self.czas(11, 5))
         self.assertFalse(self.wolny_o(self.n, self.dzien, start))
+
+class DodatkowyPrzedmiotZGrafikiemTests(TestCase):
+    """Dodatkowy przedmiot z datą+godziną od razu zajmuje grafik korepetytora."""
+
+    def setUp(self):
+        from datetime import time as czas
+        from konta.models import PrzedmiotUcznia
+        self.PrzedmiotUcznia = PrzedmiotUcznia
+        self.czas = czas
+        self.n = Nauczyciel.objects.create(imie='Anna', nazwisko='Kowalska', email='a@f.pl')
+        PrzedmiotNauczyciela.objects.create(nauczyciel=self.n, przedmiot='fizyka', poziom='podstawowka', stawka=100)
+        self.user = Pracownik.objects.create_user('szef', 's@f.pl', 'Sup3rHaslo!', is_superuser=True)
+        self.uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 11, 9, 16, 0)),
+            przedmiot='matematyka', poziom='podstawowka', szkola='SP 1',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='ewa@f.pl', telefon_dodatkowy='',
+            korepetytor='Jan Kowalski', kto_umowil='szef', umowil=self.user,
+        )
+        self.dzien = date(2026, 11, 9)
+        Dostepnosc.objects.create(
+            nauczyciel=self.n, data_od=self.dzien, data_do=self.dzien,
+            godzina_od=czas(11, 0), godzina_do=czas(13, 0),
+        )
+
+    def _dane(self, data, godzina):
+        return {
+            'dodaj_przedmiot': '1',
+            'przedmiotdod-przedmiot': 'fizyka',
+            'przedmiotdod-poziom': 'podstawowka',
+            'przedmiotdod-korepetytor': 'Anna Kowalska',
+            'przedmiotdod-data_pierwszej_lekcji': data,
+            'przedmiotdod-godzina_pierwszej_lekcji': godzina,
+        }
+
+    def test_dodanie_przedmiotu_blokuje_grafik_korepetytora(self):
+        self.client.force_login(self.user)
+        r = self.client.post(f'/uczniowie/{self.uczen.id}/edytuj/', self._dane('2026-11-09', '11:00'), follow=True)
+        self.assertContains(r, 'grafik korepetytora zablokowany')
+        karta = self.PrzedmiotUcznia.objects.get(uczen=self.uczen, przedmiot='fizyka')
+        self.assertTrue(Lekcja.objects.filter(
+            uczen=self.uczen, przedmiot_karta=karta, data__date=self.dzien, data__hour=11,
+        ).exists())
+        self.assertTrue(Dostepnosc.objects.filter(
+            nauczyciel=self.n, data_od=self.dzien, godzina_od=self.czas(11, 0),
+        ).exists())
+
+    def test_zajeta_godzina_nie_tworzy_przedmiotu(self):
+        inny = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 11, 9, 11, 0)),
+            przedmiot='fizyka', poziom='podstawowka', szkola='SP 1',
+            imie_ucznia='Ola', nazwisko_rodzica='Lis', rodzic='Ala Lis',
+            telefon_glowny='600', email_glowny='o@f.pl', telefon_dodatkowy='',
+            korepetytor='Anna Kowalska', kto_umowil='szef',
+        )
+        Lekcja.objects.create(uczen=inny, data=inny.pierwsza_lekcja)
+        self.client.force_login(self.user)
+        r = self.client.post(f'/uczniowie/{self.uczen.id}/edytuj/', self._dane('2026-11-09', '11:00'), follow=True)
+        self.assertContains(r, 'nie może przyjąć lekcji')
+        self.assertFalse(self.PrzedmiotUcznia.objects.filter(uczen=self.uczen, przedmiot='fizyka').exists())

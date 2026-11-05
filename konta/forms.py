@@ -400,9 +400,9 @@ class WierszPrzedmiotu(forms.Form):
 
     przedmiot = forms.ChoiceField(label='przedmiot', choices=WYBIERZ_PRZEDMIOT)
     poziom = forms.ChoiceField(label='poziom', choices=POZIOMY_NAUCZYCIELA)
-
+    
 class FormularzPrzedmiotuUcznia(forms.Form):
-    """Dodatkowy przedmiot ucznia: przedmiot + poziom + korepetytor.
+    """Dodatkowy przedmiot ucznia: przedmiot + poziom + korepetytor + data/godzina 1. lekcji.
     Lista korepetytorów budowana w widoku (wg przedmiotu i poziomu)."""
 
     przedmiot = forms.ChoiceField(
@@ -413,10 +413,20 @@ class FormularzPrzedmiotuUcznia(forms.Form):
         label='poziom',
         choices=POZIOMY,
     )
+    data_pierwszej_lekcji = forms.DateField(
+        label='data 1. lekcji',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        help_text='Ta lekcja od razu zajmie grafik korepetytora.',
+    )
     korepetytor = forms.ChoiceField(
         label='korepetytor',
         choices=[('', '— najpierw wybierz przedmiot i poziom —')],
         help_text='Na liście pojawią się tylko korepetytorzy uczący tego przedmiotu na tym poziomie.',
+    )
+    godzina_pierwszej_lekcji = forms.ChoiceField(
+        label='godzina 1. lekcji',
+        choices=GODZINY_LEKCJI,
+        help_text='Po wybraniu daty i korepetytora pokażą się jego wolne godziny (siatka lekcja+przerwa).',
     )
 
     def ustaw_korepetytorow(self, przedmiot=None, poziom=None, wybrany=None):

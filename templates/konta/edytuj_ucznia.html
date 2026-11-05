@@ -117,9 +117,17 @@
     <label for="{{ form_przedmiotu.poziom.id_for_label }}">Poziom</label>
     {{ form_przedmiotu.poziom }}
 
+    <label for="{{ form_przedmiotu.data_pierwszej_lekcji.id_for_label }}">Data 1. lekcji</label>
+    {{ form_przedmiotu.data_pierwszej_lekcji }}
+    <p class="podpowiedz">Ta lekcja od razu zajmie grafik korepetytora.</p>
+
     <label for="{{ form_przedmiotu.korepetytor.id_for_label }}">Korepetytor</label>
     {{ form_przedmiotu.korepetytor }}
     <p class="podpowiedz">Lista korepetytorów pojawi się po wyborze przedmiotu i poziomu.</p>
+
+    <label for="{{ form_przedmiotu.godzina_pierwszej_lekcji.id_for_label }}">Godzina 1. lekcji</label>
+    {{ form_przedmiotu.godzina_pierwszej_lekcji }}
+    <p class="podpowiedz">Po wybraniu daty i korepetytora pokażą się jego wolne godziny (siatka lekcja+przerwa).</p>
 
     <button type="submit">Dodaj przedmiot</button>
   </form>
@@ -132,7 +140,35 @@
     var selPrzedmiot = document.getElementById('{{ form_przedmiotu.przedmiot.id_for_label }}');
     var selPoziom = document.getElementById('{{ form_przedmiotu.poziom.id_for_label }}');
     var selKorepetytor = document.getElementById('{{ form_przedmiotu.korepetytor.id_for_label }}');
+    var selData = document.getElementById('{{ form_przedmiotu.data_pierwszej_lekcji.id_for_label }}');
+    var selGodzina = document.getElementById('{{ form_przedmiotu.godzina_pierwszej_lekcji.id_for_label }}');
     if (!selPrzedmiot || !selPoziom || !selKorepetytor) return;
+    var mapaId = {};
+
+    // wolne godziny (siatka) wybranego korepetytora w wybranym dniu
+    function odswiezGodziny() {
+      if (!selData || !selGodzina) return;
+      var data = selData.value;
+      var id = mapaId[selKorepetytor.value];
+      if (!data || !id) return;
+      fetch('/korepetytorzy/dane/?nauczyciel=' + id + '&data=' + encodeURIComponent(data), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      })
+        .then(function (odp) { return odp.json(); })
+        .then(function (wynik) {
+          var biezaca = selGodzina.value;
+          var opcje = '<option value="">— wybierz godzinę —</option>';
+          (wynik.godziny || []).forEach(function (g) {
+            opcje += '<option value="' + g.godzina + '">' + g.godzina + '</option>';
+          });
+          if (!(wynik.godziny || []).length) {
+            opcje = '<option value="">— brak wolnych godzin tego dnia —</option>';
+          }
+          selGodzina.innerHTML = opcje;
+          if (biezaca) selGodzina.value = biezaca;
+        })
+        .catch(function () {});
+    }
 
     function odswiezKorepetytorow() {
       var przedmiot = selPrzedmiot.value;
@@ -142,17 +178,22 @@
       fetch('/korepetytorzy/dane/?przedmiot=' + encodeURIComponent(przedmiot) + '&poziom=' + encodeURIComponent(poziom))
         .then(function (odp) { return odp.json(); })
         .then(function (wynik) {
+          mapaId = {};
           (wynik.korepetytorzy || []).forEach(function (k) {
+            mapaId[k.nazwa] = k.id;
             var opcja = document.createElement('option');
             opcja.value = k.nazwa;
             opcja.textContent = k.nazwa;
             selKorepetytor.appendChild(opcja);
           });
+          odswiezGodziny();
         });
     }
 
     selPrzedmiot.addEventListener('change', odswiezKorepetytorow);
     selPoziom.addEventListener('change', odswiezKorepetytorow);
+    selKorepetytor.addEventListener('change', odswiezGodziny);
+    if (selData) selData.addEventListener('change', odswiezGodziny);
   })();
 </script>
 {% endblock %}
