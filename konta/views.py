@@ -114,7 +114,7 @@ def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None
     if not nauczyciel:
         return False
     if przerwa_min is None:
-        przerwa_min = nauczyciel.przerwa or 0
+        przerwa_min = nauczyciel.przerwa or 5
     nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
     koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
     for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien, odwolana=False):
@@ -152,79 +152,56 @@ def inne_lekcje_nauczyciela(nauczyciel, uczen, dzien, godzina_start):
             kolidujace.append(lekcja)
     return kolidujace
 
-def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None):
-    """Czy lekcja (60 min od start_lekcji) koliduje z istniejącą lekcją nauczyciela
-    lub wypada w okienku przerwy po innej lekcji.
-
-    Przerwa to stałe okno po KAŻDEJ lekcji (np. 5 min): lekcja efektywnie
-    zajmuje [start, koniec + przerwa). Dwie lekcje kolidują, gdy te przedziały się pokrywają.
-    """
-    if not nauczyciel:
-        return False
-    if przerwa_min is None:
-        przerwa_min = nauczyciel.przerwa or 0
-    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
-    koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
-    for lekcja in Lekcja.objects.select_related('uczen').filter(data__date=dzien, odwolana=False):
-        if (lekcja.uczen.korepetytor or '').strip().lower() != nazwa_nauczyciela:
-            continue
-        l_start = timezone.localtime(lekcja.data).replace(tzinfo=None)
-        l_koniec = l_start + timedelta(minutes=GODZINA_LEKCJI)
-        # 1) lekcje nie mogą na siebie nachodzić (bez przerwy)
-        if l_start < koniec and start_lekcji < l_koniec:
-            return True
-        # 2) nasza lekcja zaczyna się w oknie przerwy po tamtej lekcji:
-        #    [l_koniec, l_koniec + przerwa)
-        if przerwa_min and l_koniec <= start_lekcji < l_koniec + timedelta(minutes=przerwa_min):
-            return True
-    return False
+def _zakresy_dnia(nauczyciel, dzien):
+    """Zakresy dostępności nauczyciela w dniu jako lista (start, koniec) datetimeów.
+    Skleja sloty, które się stykają LUB nachodzą na siebie (unia przedziałów) —
+    dzięki temu pojedynczy „krzywy” slot (np. 11:10–12:10 po umówionej lekcji)
+    nie rozbija sąsiednich zakresów i kolejna lekcja dalej mieści się w całości."""
+    zakresy = []
+    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien).order_by('godzina_od'):
+        s = datetime.combine(dzien, termin.godzina_od)
+        e = datetime.combine(dzien, termin.godzina_do)
+        if zakresy and s <= zakresy[-1][1]:
+            zakresy[-1] = (zakresy[-1][0], max(zakresy[-1][1], e))
+        else:
+            zakresy.append((s, e))
+    return zakresy
 
 
 def nauczyciel_wolny_o(nauczyciel, dzien, start_lekcji):
     """Czy nauczyciel może przyjąć lekcję 60 min od start_lekcji:
     cała lekcja mieści się w którymś z jego zaznaczonych zakresów dostępności
-    (sąsiednie sloty 30-min sklejane w jeden zakres) i bez kolizji z lekcjami/przerwami."""
+    i nie koliduje z lekcjami ani przerwami."""
     if not nauczyciel:
         return False
     koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
-    # sklejamy sąsiednie sloty w ciągłe zakresy
-    zakresy = []
-    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien).order_by('godzina_od'):
-        s = datetime.combine(dzien, termin.godzina_od)
-        e = datetime.combine(dzien, termin.godzina_do)
-        if zakresy and zakresy[-1][1] == s:
-            zakresy[-1] = (zakresy[-1][0], e)
-        else:
-            zakresy.append((s, e))
-    for s, e in zakresy:
+    for s, e in _zakresy_dnia(nauczyciel, dzien):
         if s <= start_lekcji and koniec <= e:
             if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji):
                 return False
-            # przerwa dnia: lekcja nie moze zaczac sie w okienku przerwy po innej lekcji
+            # przerwa dnia: lekcja nie może zacząć się w okienku przerwy po innej lekcji
             if godzina_w_przerwie(nauczyciel, dzien, start_lekcji.time()):
                 return False
             return True
     return False
 
 
-def inne_lekcje_nauczyciela(nauczyciel, uczen, dzien, godzina_start):
-    """Lekcje innych uczniów tego nauczyciela nachodzące na slot (60 min od godzina_start)."""
+def wolne_godziny_nauczyciela(nauczyciel, dzien):
+    """Godziny startu lekcji (co 5 min), w których nauczyciel jest wolny:
+    lekcja mieści się w jego dostępności, nie koliduje z lekcją ani przerwą dnia.
+    Używane ZARÓWNO przez listę rozwijaną przy dodawaniu ucznia, jak i przez walidację
+    formularza — obie strony liczą dokładnie to samo, więc wybrana godzina zawsze przechodzi."""
+    wynik = []
     if not nauczyciel:
-        return []
-    start_slotu = datetime.combine(dzien, godzina_start)
-    koniec_slotu = start_slotu + timedelta(minutes=GODZINA_LEKCJI)
-    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
-    kolidujace = []
-    for lekcja in Lekcja.objects.select_related('uczen').filter(data__date=dzien, odwolana=False):
-        if lekcja.uczen_id == uczen.id:
-            continue
-        if (lekcja.uczen.korepetytor or '').strip().lower() != nazwa_nauczyciela:
-            continue
-        start_lekcji = timezone.localtime(lekcja.data).replace(tzinfo=None)
-        koniec_lekcji = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
-        if start_slotu < koniec_lekcji and start_lekcji < koniec_slotu:
-            kolidujace.append(lekcja)
-    return kolidujace
+        return wynik
+    for s, e in _zakresy_dnia(nauczyciel, dzien):
+        kursor = s
+        while kursor + timedelta(minutes=GODZINA_LEKCJI) <= e:
+            if not kolizja_lekcji_nauczyciela(nauczyciel, dzien, kursor):
+                if not godzina_w_przerwie(nauczyciel, dzien, kursor.time()):
+                    wynik.append(kursor.strftime('%H:%M'))
+            kursor += timedelta(minutes=5)
+    return sorted(set(wynik))
 
 
 def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
@@ -235,6 +212,7 @@ def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
     wpis = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien).first()
     if not wpis or not wpis.minuty:
         return False
+    minuty = wpis.minuty
 
     zaznaczone = set()
     for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien):
@@ -267,7 +245,7 @@ def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
     for numer, (start_bloku, dlugosc) in enumerate(bloki, start=1):
         start = start_bloku + timedelta(minutes=przesuniecie)
         if numer > 1:
-            przerwy.append((start - timedelta(minutes=wpis.minuty), start))
+            przerwy.append((start - timedelta(minutes=minuty), start))
         przesuniecie += wpis.minuty
 
     start_slotu = datetime.combine(date(1900, 1, 1), godzina_start)
@@ -458,6 +436,8 @@ def korepetytorzy_dane(request):
     # tryb GODZINY: dla przedmiotu/poziomu/daty zwracamy dostępne godziny lekcji (z przerwami)
     tryb = request.GET.get('tryb', '')
     if tryb == 'godziny' and dzien:
+        # te same zasady co walidacja formularza (wolne_godziny_nauczyciela):
+        # dostępność + kolizje z lekcjami + przerwy — lista nigdy nie „kłamie”
         godziny_wynik = []
         for n in Nauczyciel.objects.filter(aktywny=True).prefetch_related('przedmioty').order_by('nazwisko', 'imie'):
             pasuje_przedmiot = any(
@@ -466,45 +446,9 @@ def korepetytorzy_dane(request):
             )
             if not pasuje_przedmiot:
                 continue
-            # zakresy dostępności nauczyciela w tym dniu — sklejanie sąsiednich slotów w jeden zakres
-            zakresy = []
-            for termin in Dostepnosc.objects.filter(nauczyciel=n, data_od=dzien).order_by('godzina_od'):
-                poczatek = datetime.combine(dzien, termin.godzina_od)
-                koniec_slotu = datetime.combine(dzien, termin.godzina_do)
-                if zakresy and zakresy[-1][1] == poczatek:
-                    # sąsiedni slot — doklejamy do bieżącego zakresu
-                    zakresy[-1] = (zakresy[-1][0], koniec_slotu)
-                else:
-                    zakresy.append((poczatek, koniec_slotu))
-            if not zakresy:
-                continue
-            # lekcje nauczyciela tego dnia -> wyliczamy godziny wolne w każdym zakresie
-            przerwa = n.przerwa or 0
-            lekcje_dnia = []
-            nazwa_n = f'{n.imie} {n.nazwisko}'.strip().lower()
-            for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien, odwolana=False):
-                if not lekcja_jest_u_nauczyciela(lekcja, nazwa_n):
-                    continue
-                l_start = timezone.localtime(lekcja.data).replace(tzinfo=None)
-                lekcje_dnia.append(l_start)
-            for poczatek, koniec_zakresu in zakresy:
-                # kandydackie starty co 5 min w zakresie (lekcja 60 min)
-                kursor = poczatek
-                while kursor + timedelta(minutes=GODZINA_LEKCJI) <= koniec_zakresu:
-                    etykieta = kursor.strftime('%H:%M')
-                    koliduje = False
-                    for l_start in lekcje_dnia:
-                        l_koniec = l_start + timedelta(minutes=GODZINA_LEKCJI)
-                        if l_start < kursor + timedelta(minutes=GODZINA_LEKCJI) and kursor < l_koniec:
-                            koliduje = True
-                            break
-                        if przerwa and l_koniec <= kursor < l_koniec + timedelta(minutes=przerwa):
-                            koliduje = True
-                            break
-                    if not koliduje:
-                        godziny_wynik.append({'godzina': etykieta, 'korepetytor': f'{n.imie} {n.nazwisko}'})
-                    kursor += timedelta(minutes=5)
-        godziny_wynik = sorted(godziny_wynik, key=lambda g: g['godzina'])
+            for godzina_txt in wolne_godziny_nauczyciela(n, dzien):
+                godziny_wynik.append({'godzina': godzina_txt, 'korepetytor': f'{n.imie} {n.nazwisko}'})
+        godziny_wynik = sorted(godziny_wynik, key=lambda g: (g['godzina'], g['korepetytor']))
         return JsonResponse({'godziny': godziny_wynik})
     for n in Nauczyciel.objects.filter(aktywny=True).prefetch_related('przedmioty').order_by('nazwisko', 'imie'):
         pasuje_przedmiot = any(
@@ -1106,14 +1050,14 @@ def kalendarz_dane(request, nauczyciel_id):
             nowa_przerwa = int(request.POST.get('przerwa', 0))
         except (TypeError, ValueError):
             nowa_przerwa = 0
-        if nowa_przerwa not in (0, 5, 10, 15, 30):
-            nowa_przerwa = 0
+        if nowa_przerwa not in (5, 10, 15, 30):
+            nowa_przerwa = 5
         PrzerwaDnia.objects.update_or_create(
             nauczyciel=nauczyciel,
             data=dzien_data,
             defaults={'minuty': nowa_przerwa},
         )
-        komunikat = f'Przerwa {dzien_data:%d.%m.%Y}: {nowa_przerwa} min.' if nowa_przerwa else f'Przerwa {dzien_data:%d.%m.%Y}: brak.'
+        komunikat = f'Przerwa {dzien_data:%d.%m.%Y}: {nowa_przerwa} min.'
     elif akcja == 'zaznacz_zakres':
         try:
             start = datetime.strptime(request.POST.get('od', ''), '%H:%M').time()
@@ -1244,7 +1188,7 @@ def kalendarz_dane(request, nauczyciel_id):
             start += timedelta(minutes=30)
 
     wpis = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien_data).first()
-    przerwa_min = wpis.minuty if wpis else 0
+    przerwa_min = wpis.minuty if wpis else (nauczyciel.przerwa or 5)
 
     plan_dnia, sloty_przerwy = [], set()
     sloty = sorted(zaznaczone)
@@ -1962,7 +1906,6 @@ def przelacz_szefa(request, user_id):
     return redirect('uzytkownicy')
 
 
-@login_required
 def moj_tydzien(request, nauczyciel_id=None):
     """Widok tygodnia nauczyciela w stylu Calendly: 7 dni obok siebie,
     godziny dodaje się pojedynczym kliknięciem, przerwa 5/10/15/30 min pigułkami.
@@ -1992,11 +1935,6 @@ def moj_tydzien(request, nauczyciel_id=None):
     poprzedni = poniedzialek - timedelta(days=7)
     nastepny = poniedzialek + timedelta(days=7)
 
-    # zakresy dostępności pogrupowane per dzień (scalamy sąsiednie sloty w jeden zakres)
-    sloty_dnia = {}
-    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__in=dni_tygodnia).order_by('data_od', 'godzina_od'):
-        sloty_dnia.setdefault(termin.data_od, []).append(termin)
-
     dzisiaj = date.today()
     przerwy_dni = {}
     for wpis in PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data__in=dni_tygodnia):
@@ -2010,19 +1948,10 @@ def moj_tydzien(request, nauczyciel_id=None):
         lekcje_dni.setdefault(dzien_lekcji, []).append(lekcja)
     dni = []
     for dzien in dni_tygodnia:
-        zakresy = []
-        aktualny = None
-        for termin in sloty_dnia.get(dzien, []):
-            od = termin.godzina_od.strftime('%H:%M')
-            do_ = termin.godzina_do.strftime('%H:%M')
-            if aktualny and aktualny['do'] == od:
-                aktualny['do'] = do_
-            else:
-                if aktualny:
-                    zakresy.append(aktualny)
-                aktualny = {'od': od, 'do': do_}
-        if aktualny:
-            zakresy.append(aktualny)
+        zakresy = [
+            {'od': s.strftime('%H:%M'), 'do': e.strftime('%H:%M')}
+            for s, e in _zakresy_dnia(nauczyciel, dzien)
+        ]
         lekcje_listy = []
         for lekcja in sorted(lekcje_dni.get(dzien, []), key=lambda l: l.data):
             lekcje_listy.append({
@@ -2035,7 +1964,7 @@ def moj_tydzien(request, nauczyciel_id=None):
             'data': dzien,
             'zakresy': zakresy,
             'lekcje': lekcje_listy,
-            'przerwa': przerwy_dni.get(dzien, 0),
+            'przerwa': przerwy_dni.get(dzien, nauczyciel.przerwa or 5),
             'dzisiaj': dzien == dzisiaj,
         })
 

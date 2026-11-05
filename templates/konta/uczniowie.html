@@ -240,14 +240,11 @@ pracowniczy{% endblock %} {% block panel %}
 					return odp.json();
 				})
 				.then(function (dane) {
-					var seen = {};
-					var opcje = '<option value="">— wybierz godzinę —</option>';
-					dane.godziny.forEach(function (g) {
-						if (seen[g.godzina]) return;
-						seen[g.godzina] = true;
-						opcje +=
-							'<option value="' + g.godzina + '">' + g.godzina + '</option>';
-					});
+                    var opcje = '<option value="">— wybierz godzinę —</option>';
+                    dane.godziny.forEach(function (g) {
+                        opcje +=
+                            '<option value="' + g.godzina + '">' + g.godzina + ' — ' + g.korepetytor + '</option>';
+                    });
 					if (!dane.godziny.length) {
 						opcje =
 							'<option value="">— brak dostępnych godzin tego dnia — zmień datę, przedmiot lub poziom —</option>';

@@ -999,3 +999,142 @@ class ResetHaslaLinkTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Czas minął')
         self.assertContains(r, '3 dni')
+
+
+
+
+class KalendarzKorepetytoraTests(TestCase):
+    """Poprawki szefa: przerwa min. 5 min, ✖ zamiast kosza, spójna lista godzin."""
+
+    def setUp(self):
+        from datetime import time as czas
+        from konta.views import nauczyciel_wolny_o, wolne_godziny_nauczyciela
+        from konta.models import PrzerwaDnia
+        self.PrzerwaDnia = PrzerwaDnia
+        self.wolny_o = nauczyciel_wolny_o
+        self.wolne_godziny = wolne_godziny_nauczyciela
+        self.czas = czas
+        self.nauczyciel = Nauczyciel.objects.create(
+            imie='Anna', nazwisko='Kowalska', email='anna@firma.pl',
+        )
+        PrzedmiotNauczyciela.objects.create(
+            nauczyciel=self.nauczyciel, przedmiot='matematyka',
+            poziom='podstawowka', stawka=100,
+        )
+        self.user = Pracownik.objects.create_user(
+            'szef', 'szef@firma.pl', 'Sup3rHaslo!', is_superuser=True,
+        )
+        self.dzien = date(2026, 11, 9)  # poniedziałek
+
+    def _sloty(self, od, do):
+        kursor = datetime.combine(self.dzien, self.czas(*map(int, od.split(':'))))
+        koniec = datetime.combine(self.dzien, self.czas(*map(int, do.split(':'))))
+        while kursor < koniec:
+            Dostepnosc.objects.create(
+                nauczyciel=self.nauczyciel,
+                data_od=self.dzien, data_do=self.dzien,
+                godzina_od=kursor.time(),
+                godzina_do=(kursor + timedelta(minutes=30)).time(),
+            )
+            kursor += timedelta(minutes=30)
+
+    def test_domyslna_przerwa_nauczyciela_to_5_min(self):
+        self.assertEqual(self.nauczyciel.przerwa, 5)
+
+    def test_przerwa_0_z_kalendarza_zapisuje_sie_jako_5(self):
+        self.client.force_login(self.user)
+        r = self.client.post(f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/', {
+            'dzien': self.dzien.isoformat(), 'akcja': 'zapisz_przerwe', 'przerwa': '0',
+        })
+        self.assertEqual(r.status_code, 200)
+        wpis = self.PrzerwaDnia.objects.get(nauczyciel=self.nauczyciel, data=self.dzien)
+        self.assertEqual(wpis.minuty, 5)
+
+    def test_krzywy_slot_lekcji_nie_rozbija_zakresu(self):
+        self._sloty('11:00', '13:00')
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel, data_od=self.dzien, data_do=self.dzien,
+            godzina_od=self.czas(11, 10), godzina_do=self.czas(12, 10),
+        )
+        start = datetime.combine(self.dzien, self.czas(11, 40))
+        self.assertTrue(self.wolny_o(self.nauczyciel, self.dzien, start))
+
+    def test_lista_godzin_zgodna_z_walidacja_formularza(self):
+        self._sloty('11:00', '14:00')
+        uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 10))),
+            przedmiot='matematyka', poziom='podstawowka', szkola='SP 1',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='ewa@f.pl', telefon_dodatkowy='',
+            korepetytor='Anna Kowalska', kto_umowil='szef',
+        )
+        Lekcja.objects.create(uczen=uczen, data=uczen.pierwsza_lekcja)
+        wolne = self.wolne_godziny(self.nauczyciel, self.dzien)
+        for etykieta in ('11:00', '11:10', '11:40', '12:00', '12:10'):
+            self.assertNotIn(etykieta, wolne)
+        self.assertIn('12:15', wolne)
+        for h in range(6, 21):
+            for m in range(0, 60, 5):
+                etykieta = f'{h:02d}:{m:02d}'
+                start = datetime.combine(self.dzien, self.czas(h, m))
+                self.assertEqual(
+                    self.wolny_o(self.nauczyciel, self.dzien, start),
+                    etykieta in wolne,
+                    f'niezgodność listy z walidacją dla {etykieta}',
+                )
+
+    def test_ajax_godziny_pokazuja_korepetytorow_i_omijaja_zajete(self):
+        self._sloty('11:00', '14:00')
+        uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 10))),
+            przedmiot='matematyka', poziom='podstawowka', szkola='SP 1',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='ewa@f.pl', telefon_dodatkowy='',
+            korepetytor='Anna Kowalska', kto_umowil='szef',
+        )
+        Lekcja.objects.create(uczen=uczen, data=uczen.pierwsza_lekcja)
+        self.client.force_login(self.user)
+        r = self.client.get(
+            '/korepetytorzy/dane/?tryb=godziny&przedmiot=matematyka'
+            f'&poziom=podstawowka&data={self.dzien.isoformat()}'
+        )
+        self.assertEqual(r.status_code, 200)
+        godziny = r.json()['godziny']
+        self.assertTrue(godziny, 'lista godzin nie może być pusta')
+        self.assertTrue(all('Kowalska' in g['korepetytor'] for g in godziny))
+        etykiety = [g['godzina'] for g in godziny]
+        self.assertNotIn('11:10', etykiety)
+        self.assertNotIn('12:00', etykiety)
+        self.assertIn('12:15', etykiety)
+
+    def _dane_ucznia(self, godzina):
+        return {
+            'data_pierwszej_lekcji': self.dzien.isoformat(),
+            'godzina_pierwszej_lekcji': godzina,
+            'przedmiot': 'matematyka',
+            'poziom': 'podstawowka',
+            'imie_ucznia': 'Kasia',
+            'nazwisko_rodzica': 'Nowak',
+            'rodzic': 'Ewa Nowak',
+            'telefon_glowny': '600100200',
+            'email_glowny': 'ewa@f.pl',
+            'telefon_dodatkowy': '',
+            'email_dodatkowy': '',
+            'korepetytor': 'Anna Kowalska',
+            'notatka_od_rodzica': '',
+            'auto_wyslij_meet': 'on',
+        }
+
+    def test_dodanie_ucznia_w_godzine_spoza_kalendarza_odrzucone(self):
+        self._sloty('11:00', '12:00')
+        self.client.force_login(self.user)
+        r = self.client.post('/uczniowie/', self._dane_ucznia('12:30'), follow=True)
+        self.assertContains(r, 'nie może przyjąć lekcji')
+        self.assertEqual(Uczen.objects.count(), 0)
+
+    def test_dodanie_ucznia_w_wolna_godzine_przechodzi(self):
+        self._sloty('11:00', '14:00')
+        self.client.force_login(self.user)
+        r = self.client.post('/uczniowie/', self._dane_ucznia('12:15'), follow=True)
+        self.assertContains(r, 'został dodany')
+        self.assertEqual(Uczen.objects.count(), 1)

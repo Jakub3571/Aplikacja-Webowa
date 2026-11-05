@@ -141,8 +141,8 @@ class Nauczyciel(models.Model):
     aktywny = models.BooleanField('aktywny (współpracuje)', default=True)
     przerwa = models.PositiveIntegerField(
         'przerwa między zajęciami (minuty)',
-        default=0,
-        help_text='Ile minut przerwy nauczyciel potrzebuje między zajęciami.',
+        default=5,
+        help_text='Ile minut przerwy nauczyciel potrzebuje między zajęciami (minimum 5).',
     )
     dyspozycyjnosc_uzupelniona = models.BooleanField('dyspozycyjność uzupełniona', default=False)
     link_meet = models.CharField(

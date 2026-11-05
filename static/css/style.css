@@ -613,13 +613,28 @@ body {
 .zakres-usun {
   background: none;
   border: none;
-  color: #fff;
+  color: #ff5a4e;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 0;
+  line-height: 1;
+}
+
+.zakres-usun:hover { color: #d92b1f; transform: scale(1.2); }
+
+.instrukcja-kalendarza {
+  margin-bottom: 1rem;
+}
+
+.instrukcja-kalendarza ul {
+  margin: 0.5rem 0 0 1.2rem;
   padding: 0;
 }
 
-.zakres-usun:hover { opacity: 0.7; }
+.instrukcja-kalendarza li {
+  margin-bottom: 0.35rem;
+}
 
 .zakres-pusty {
   opacity: 0.5;

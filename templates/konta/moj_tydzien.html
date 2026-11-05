@@ -10,11 +10,16 @@
       <h2>🗓 Mój tydzień: {{ poprzedni_tydzien|date:"d.m" }} – {{ nastepny_tydzien|date:"d.m.Y" }}</h2>
       <a class="strzalka" href="?rok={{ nastepny_tydzien.year }}&miesiac={{ nastepny_tydzien.month }}&dzien={{ nastepny_tydzien.day }}">&rarr;</a>
     </div>
-    <p class="podpowiedz">
-      Kliknij <strong>＋</strong> przy dniu, wpisz godziny „od — do” i przerwę po lekcji, i zapisz.
-      Możesz dodać kilka zakresów w jednym dniu. Usuwasz klikając kosz przy zakresie.
-      Przerwa pojawi się na grafiku automatycznie, gdy ktoś umówi lekcję.
-    </p>
+    <section class="karta instrukcja-kalendarza">
+      <h3>📖 Jak korzystać z kalendarza</h3>
+      <ul>
+        <li>Strzałkami <strong>← →</strong> u góry zmieniasz tydzień.</li>
+        <li>Kliknij <strong>＋</strong> przy dniu → wpisz godziny „od — do” i przerwę po każdej lekcji (minimum <strong>5 min</strong>, możesz ustawić więcej: 10/15/30) → <strong>Zapisz</strong>. Możesz dodać kilka zakresów w jednym dniu.</li>
+        <li>Zakres usuwasz czerwonym <strong>✖</strong> obok niego. Przycisk <strong>🔄</strong> powtarza ten plan dnia co tydzień aż do końca roku szkolnego (30 czerwca).</li>
+        <li>Przy dodawaniu ucznia (zakładka <strong>Uczniowie</strong>): wybierz przedmiot, poziom i datę — pokażą się wtedy wolne godziny korepetytorów na ten dzień, z uwzględnieniem ich przerw i już umówionych lekcji.</li>
+        <li><strong>Zajęcia cykliczne:</strong> wejdź na kartę ucznia i kliknij „Lekcja cykliczna” → wybierz dzień tygodnia i godzinę → lekcje wpiszą się automatycznie co tydzień, a korepetytor będzie miał te godziny zablokowane.</li>
+      </ul>
+    </section>
 
     <div class="przerwa-form meet-form">
       <h3>🖥 Mój link Google Meet</h3>
@@ -38,7 +43,7 @@
           {% for zakres in dzien.zakresy %}
           <span class="zakres-pigulka">
             {{ zakres.od }} – {{ zakres.do }}{% if dzien.przerwa %} · przerwa {{ dzien.przerwa }} min{% endif %}
-            <button type="button" class="zakres-usun" data-dzien="{{ dzien.data|date:'Y-m-d' }}" data-od="{{ zakres.od }}" data-do="{{ zakres.do }}" title="Usuń ten zakres">🗑</button>
+            <button type="button" class="zakres-usun" data-dzien="{{ dzien.data|date:'Y-m-d' }}" data-od="{{ zakres.od }}" data-do="{{ zakres.do }}" title="Usuń ten zakres">✖</button>
           </span>
           {% endfor %}
           {% if not dzien.zakresy %}
@@ -71,8 +76,7 @@
           <div class="zakres-pola">
             <label>przerwa po każdej lekcji
               <select class="zakres-przerwa">
-                <option value="0">bez przerwy</option>
-                <option value="5">5 min</option>
+                <option value="5" selected>5 min</option>
                 <option value="10">10 min</option>
                 <option value="15">15 min</option>
                 <option value="30">30 min</option>
