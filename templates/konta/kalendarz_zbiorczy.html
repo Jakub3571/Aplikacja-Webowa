@@ -1,0 +1,52 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Kalendarz — Panel pracowniczy{% endblock %}
+
+{% block panel %}
+<div class="tydzien-uklad">
+  <section class="karta tydzien-karta">
+    <div class="kalendarz-naglowek kalendarz-dol">
+      <a class="strzalka" href="?rok={{ poprzedni_tydzien.year }}&miesiac={{ poprzedni_tydzien.month }}&dzien={{ poprzedni_tydzien.day }}">&larr;</a>
+      <h2>📅 Kalendarz wszystkich korepetytorów: {{ poprzedni_tydzien|date:"d.m" }} – {{ nastepny_tydzien|date:"d.m.Y" }}</h2>
+      <a class="strzalka" href="?rok={{ nastepny_tydzien.year }}&miesiac={{ nastepny_tydzien.month }}&dzien={{ nastepny_tydzien.day }}">&rarr;</a>
+    </div>
+    <p class="podpowiedz">
+      Tylko do odczytu — zmiany robisz w „Mój tydzień” nauczyciela lub w kalendarzu ucznia.
+      <span class="zakres-pigulka">zielony: godziny pracy</span>
+      <span class="zakres-pigulka pigulka-lekcja">niebieski: zajęta lekcja (uczeń · przedmiot · godzina)</span>
+      przerwa dnia pokazana przy zakresie.
+    </p>
+
+    <div class="kalendarz-zbiorczy">
+      {% for wpis in nauczyciele %}
+      <section class="karta zbiorczy-nauczyciel">
+        <h3>{{ wpis.nauczyciel.imie }} {{ wpis.nauczyciel.nazwisko }}
+          <span class="podpowiedz">{{ wpis.przedmioty }}</span></h3>
+        {% for dzien in wpis.dni %}
+        <div class="dzien-wiersz">
+          <div class="dzien-nazwa">
+            <strong>{{ dzien.data|date:"D" }}</strong>
+            <span class="dzien-data">{{ dzien.data|date:"d.m" }}</span>
+            {% if dzien.dzisiaj %}<span class="pigulka pigulka-godziny">dziś</span>{% endif %}
+          </div>
+          <div class="dzien-zakresy">
+            {% for zakres in dzien.zakresy %}
+            <span class="zakres-pigulka">{{ zakres.od }} – {{ zakres.do }}{% if dzien.przerwa %} · przerwa {{ dzien.przerwa }} min{% endif %}</span>
+            {% endfor %}
+            {% if not dzien.zakresy %}
+            <span class="zakres-pusty">wolny dzień</span>
+            {% endif %}
+            {% for lekcja in dzien.lekcje %}
+            <span class="zakres-pigulka pigulka-lekcja">📚 {{ lekcja.uczen }} · {{ lekcja.przedmiot }} · {{ lekcja.godzina }}–{{ lekcja.koniec }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </section>
+      {% empty %}
+      <p>Brak aktywnych nauczycieli w systemie.</p>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

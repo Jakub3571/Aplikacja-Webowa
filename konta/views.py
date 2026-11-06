@@ -2093,7 +2093,74 @@ def moj_tydzien(request, nauczyciel_id=None):
         'poprzedni_tydzien': poprzedni,
         'nastepny_tydzien': nastepny,
     })
+@login_required
+def kalendarz_zbiorczy(request):
+    """Zbiorczy kalendarz WSZYSTKICH aktywnych nauczycieli — tylko do odczytu.
+    Pokazuje tydzień (strzałki ← →): dostępność (zakresy godzin), przerwę dnia
+    i zajęte lekcje z nazwiskami uczniów. Aktualizuje się na bieżąco z bazy.
+    Dostęp: pracownicy biura (szef/koordynator/pracownik); konto nauczyciela → 403."""
+    if getattr(request.user, 'nauczyciel_id', None):
+        raise PermissionDenied
+    dzis = date.today()
+    try:
+        start = date(
+            int(request.GET.get('rok') or dzis.year),
+            int(request.GET.get('miesiac') or dzis.month),
+            int(request.GET.get('dzien') or dzis.day),
+        )
+    except ValueError:
+        start = dzis
+    poniedzialek = start - timedelta(days=start.weekday())
+    dni_tygodnia = [poniedzialek + timedelta(days=i) for i in range(7)]
+    poprzedni = poniedzialek - timedelta(days=7)
+    nastepny = poniedzialek + timedelta(days=7)
 
+    nauczyciele_dane = []
+    for n in Nauczyciel.objects.filter(aktywny=True).prefetch_related('przedmioty').order_by('nazwisko', 'imie'):
+        nazwa = f'{n.imie} {n.nazwisko}'.strip().lower()
+        przerwy_dni = {
+            w.data: w.minuty
+            for w in PrzerwaDnia.objects.filter(nauczyciel=n, data__in=dni_tygodnia)
+        }
+        lekcje_dni = {}
+        for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(
+            data__gte=poniedzialek, data__lt=nastepny, odwolana=False
+        ):
+            if not lekcja_jest_u_nauczyciela(lekcja, nazwa):
+                continue
+            lekcje_dni.setdefault(timezone.localtime(lekcja.data).date(), []).append(lekcja)
+        dni = []
+        for dzien in dni_tygodnia:
+            zakresy = [
+                {'od': s.strftime('%H:%M'), 'do': e.strftime('%H:%M')}
+                for s, e in _zakresy_dnia(n, dzien)
+            ]
+            lekcje_listy = []
+            for lekcja in sorted(lekcje_dni.get(dzien, []), key=lambda l: l.data):
+                lekcje_listy.append({
+                    'uczen': f'{lekcja.uczen.imie_ucznia} {lekcja.uczen.nazwisko_rodzica}',
+                    'przedmiot': (lekcja.przedmiot_karta.przedmiot if lekcja.przedmiot_karta_id else lekcja.uczen.przedmiot),
+                    'godzina': timezone.localtime(lekcja.data).strftime('%H:%M'),
+                    'koniec': (timezone.localtime(lekcja.data) + timedelta(minutes=GODZINA_LEKCJI)).strftime('%H:%M'),
+                })
+            dni.append({
+                'data': dzien,
+                'zakresy': zakresy,
+                'lekcje': lekcje_listy,
+                'przerwa': przerwy_dni.get(dzien, n.przerwa or 5),
+                'dzisiaj': dzien == dzis,
+            })
+        nauczyciele_dane.append({
+            'nauczyciel': n,
+            'przedmioty': n.przedmioty_tekst(),
+            'dni': dni,
+        })
+
+    return render(request, 'konta/kalendarz_zbiorczy.html', {
+        'nauczyciele': nauczyciele_dane,
+        'poprzedni_tydzien': poprzedni,
+        'nastepny_tydzien': nastepny,
+    })
 
 @login_required
 def kreator_dyspozycyjnosc(request):

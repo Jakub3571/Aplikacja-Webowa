@@ -1354,7 +1354,52 @@ class komunikatBleduKalendarzaTests(TestCase):
         r = self.client.post('/uczniowie/', dane, follow=True)
         self.assertContains(r, 'nie mieści się w jego zaznaczonych godzinach')
         self.assertEqual(Uczen.objects.count(), 0)
+class KalendarzZbiorczyTests(TestCase):
+    """Zbiorczy kalendarz: wszyscy aktywni nauczyciele, tylko do odczytu, strzałki tygodni."""
 
+    def setUp(self):
+        self.admin = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
+        self.n = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='j@n.pl')
+        self.teacher_user = Pracownik.objects.create_user('jk', 'jk@n.pl', 'Sup3rHaslo!', nauczyciel=self.n)
+        dzis = date.today()
+        self.uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime.combine(dzis, time(17, 0))),
+            przedmiot='matematyka', poziom='podstawowka', szkola='SP1',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600', email_glowny='e@f.pl', telefon_dodatkowy='', email_dodatkowy='',
+            korepetytor='Jan Kowalski', kto_umowil='prac', umowil=self.pracownik,
+        )
+        Dostepnosc.objects.create(
+            nauczyciel=self.n, data_od=dzis, data_do=dzis,
+            godzina_od=time(16, 0), godzina_do=time(20, 0),
+        )
+        Lekcja.objects.create(uczen=self.uczen, data=self.uczen.pierwsza_lekcja)
+
+    def test_szef_i_pracownik_widza_kalendarz_zbiorczy(self):
+        for user in (self.admin, self.pracownik):
+            self.client.force_login(user)
+            r = self.client.get('/kalendarz/')
+            self.assertEqual(r.status_code, 200)
+            self.assertContains(r, 'Jan Kowalski')   # karta nauczyciela
+            self.assertContains(r, 'Kasia Nowak')     # uczeń przy zajętej lekcji
+            self.assertContains(r, '16:00')           # dostępność
+            self.assertContains(r, '17:00')           # godzina lekcji
+
+    def test_nauczyciel_ma_403(self):
+        self.client.force_login(self.teacher_user)
+        r = self.client.get('/kalendarz/')
+        self.assertEqual(r.status_code, 403)
+
+    def test_strzalki_zmieniaja_tydzien(self):
+        self.client.force_login(self.admin)
+        dzis = date.today()
+        pon = dzis - timedelta(days=dzis.weekday())
+        nast = pon + timedelta(days=7)
+        r = self.client.get(f'/kalendarz/?rok={nast.year}&miesiac={nast.month}&dzien={nast.day}')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, f'{(nast + timedelta(days=2)):%d.%m}')  # środa wybranego tygodnia
+        
 class SiatkaRytmuTests(TestCase):
     """Krok 4: siatka rytmu (60 min lekcji + przerwa) od początku każdego przedziału;
     zajęta lekcja blokuje 1h + przerwa w obie strony (po 18:00 nie ma 18:30)."""
