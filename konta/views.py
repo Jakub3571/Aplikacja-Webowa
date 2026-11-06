@@ -174,44 +174,60 @@ def _zakresy_dnia(nauczyciel, dzien):
 
 
 def nauczyciel_wolny_o(nauczyciel, dzien, start_lekcji):
-    """Czy nauczyciel może przyjąć lekcję 60 min od start_lekcji:
-    cała lekcja mieści się w jego zaznaczonym zakresie tego dnia, godzina leży na siatce
-    10-min tego zakresu (ta sama co w wolne_godziny_nauczyciela) i nie koliduje z inną
-    lekcją (lekcja zajmuje [start, koniec + przerwa)) ani z oknem przerwy dnia.
+    """Czy nauczyciel może przyjąć lekcję 60 min od start_lekcji — dokładnie te same
+    godziny, które zwraca wolne_godziny_nauczyciela (ta sama siatka, kolizje i przerwy).
     Dzięki temu lista rozwijana i walidacja formularza zawsze pokazują to samo."""
     if not nauczyciel:
         return False
-    koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
-    for s, e in _zakresy_dnia(nauczyciel, dzien):
-        if s <= start_lekcji and koniec <= e:
-            if (start_lekcji - s).total_seconds() % 300 != 0:
-                continue  # nie na siatce 10-min tego zakresu
-            if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji):
-                return False
-            if godzina_w_przerwie(nauczyciel, dzien, start_lekcji.time()):
-                return False
-            return True
-    return False
+    return start_lekcji.strftime('%H:%M') in wolne_godziny_nauczyciela(nauczyciel, dzien)
 
 
 def wolne_godziny_nauczyciela(nauczyciel, dzien):
-    """Godziny startu lekcji dostępne u nauczyciela w danym dniu — pełny zakres CO 5 MIN
-    od początku każdego zaznaczonego zakresu, ale tylko gdy lekcja 60 min się mieści
-    i nie koliduje z inną lekcją ani przerwą. Zajęta lekcja blokuje też przerwę po sobie
-    (lekcja zajmuje [start, koniec + przerwa)), więc np. lekcja 11:00-12:00 przy przerwie
-    5 min zajmuje też 12:00-12:05, a dalej liczymy co 5 min (12:05, 12:10, ...).
-    Używane wszędzie, gdzie wybiera się godzinę: Krok 4 formularza ucznia, kreator
-    cykliczny, dodawanie przedmiotu — i przez walidację (nauczyciel_wolny_o)."""
+    """Godziny startu lekcji dostępne u nauczyciela w danym dniu.
+
+    Siatka rytmu: od początku każdego zaznaczonego przedziału co (60 min lekcji
+    + przerwa nauczyciela), o ile lekcja mieści się w przedziale — np. przedział
+    11:00–19:00 przy przerwie 5 min daje 11:00, 12:05, 13:10, ...; osobne
+    przedziały dają własne początki (6:05, 7:15, ...).
+    Dodatkowo łańcuchy wokół zajętych lekcji: przed lekcją można wstawić slot
+    kończący się z przerwą tuż przed nią (np. 12:55 przed 14:00), a po lekcji
+    pierwszy slot to koniec + przerwa (np. 15:05 po 14:00), dalej rytmem.
+    Wszystko przechodzi jeszcze przez kolizje (lekcja zajmuje [start, koniec +
+    przerwa)) i okno przerwy dnia. Używane wszędzie, gdzie wybiera się godzinę:
+    Krok 4 formularza ucznia, kreator cykliczny, dodawanie przedmiotu — i przez
+    walidację (nauczyciel_wolny_o)."""
     wynik = []
     if not nauczyciel:
         return wynik
+    przerwa = nauczyciel.przerwa or 5
+    krok = timedelta(minutes=GODZINA_LEKCJI + przerwa)
+    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+    lekcje_dnia = [
+        timezone.localtime(l.data).replace(tzinfo=None)
+        for l in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien, odwolana=False)
+        if lekcja_jest_u_nauczyciela(l, nazwa_nauczyciela)
+    ]
     for s, e in _zakresy_dnia(nauczyciel, dzien):
-        kursor = s
-        while kursor + timedelta(minutes=GODZINA_LEKCJI) <= e:
-            if not kolizja_lekcji_nauczyciela(nauczyciel, dzien, kursor):
-                if not godzina_w_przerwie(nauczyciel, dzien, kursor.time()):
-                    wynik.append(kursor.strftime('%H:%M'))
-            kursor += timedelta(minutes=5)
+        kandydaci = set()
+        t = s
+        while t + timedelta(minutes=GODZINA_LEKCJI) <= e:
+            kandydaci.add(t)
+            t += krok
+        for l_start in lekcje_dnia:
+            l_koniec = l_start + timedelta(minutes=GODZINA_LEKCJI)
+            przed = l_start - krok
+            if s <= przed and przed + timedelta(minutes=GODZINA_LEKCJI) <= e:
+                kandydaci.add(przed)
+            t = l_koniec + timedelta(minutes=przerwa)
+            while t + timedelta(minutes=GODZINA_LEKCJI) <= e:
+                kandydaci.add(t)
+                t += krok
+        for start in sorted(kandydaci):
+            if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start, przerwa_min=przerwa):
+                continue
+            if godzina_w_przerwie(nauczyciel, dzien, start.time()):
+                continue
+            wynik.append(start.strftime('%H:%M'))
     return sorted(set(wynik))
 
 
@@ -1548,12 +1564,12 @@ def kalendarz_lekcji(request, uczen_id):
         lekcja = Lekcja.objects.filter(pk=lekcja_id, uczen=uczen, data__date=wybrany_dzien, **filtr_karta).first()
         if lekcja:
             start_czas = timezone.localtime(lekcja.data).time()
-            kolidujace = inne_lekcje_nauczyciela(nauczyciel, uczen, wybrany_dzien, start_czas)
-            if kolidujace:
+            start_dt = datetime.combine(wybrany_dzien, start_czas)
+            if nauczyciel and kolizja_lekcji_nauczyciela(nauczyciel, wybrany_dzien, start_dt):
                 messages.error(
                     request,
-                    f'Nie można przywrócić zajęć {lekcja.data:%H:%M} — korepetytor ma już wtedy '
-                    f'inną lekcję (uczeń {kolidujace[0].uczen.imie_ucznia}).',
+                    f'Nie można przywrócić zajęć {lekcja.data:%H:%M} — korepetytor ma już wtedy lekcję '
+                    f'(także tego ucznia). Sprawdź kalendarz i wybierz inny termin.',
                 )
             else:
                 lekcja.odwolana = False
@@ -1619,20 +1635,26 @@ def kalendarz_lekcji(request, uczen_id):
                 ).delete()
             messages.success(request, f'Lekcja {etykieta} {wybrany_dzien:%d.%m.%Y} została usunięta.')
         else:
-            kolidujace = inne_lekcje_nauczyciela(nauczyciel, uczen, wybrany_dzien, start_czas)
-            if kolidujace:
-                imie = kolidujace[0].uczen.imie_ucznia
-                messages.error(
-                    request,
-                    f'Nie można dodać lekcji {etykieta} — {nauczyciel.imie} {nauczyciel.nazwisko} '
-                    f'ma już wtedy lekcję (uczeń {imie}). Wybierz inną godzinę.',
-                )
-            elif godzina_w_przerwie(nauczyciel, wybrany_dzien, start_czas):
-                messages.error(
-                    request,
-                    f'Nie można dodać lekcji {etykieta} — ta godzina wypada w przerwie dnia '
-                    f'{nauczyciel.imie} {nauczyciel.nazwisko}. Wybierz inną godzinę.',
-                )
+            start_dt = datetime.combine(wybrany_dzien, start_czas)
+            if nauczyciel and etykieta not in wolne_godziny_nauczyciela(nauczyciel, wybrany_dzien):
+                if kolizja_lekcji_nauczyciela(nauczyciel, wybrany_dzien, start_dt):
+                    messages.error(
+                        request,
+                        f'Nie można dodać lekcji {etykieta} — {nauczyciel.imie} {nauczyciel.nazwisko} '
+                        f'ma już wtedy lekcję (także tego ucznia). Wybierz inną godzinę.',
+                    )
+                elif godzina_w_przerwie(nauczyciel, wybrany_dzien, start_czas):
+                    messages.error(
+                        request,
+                        f'Nie można dodać lekcji {etykieta} — ta godzina wypada w przerwie dnia '
+                        f'{nauczyciel.imie} {nauczyciel.nazwisko}. Wybierz inną godzinę.',
+                    )
+                else:
+                    messages.error(
+                        request,
+                        f'Nie można dodać lekcji {etykieta} — poza godzinami pracy korepetytora '
+                        f'lub niezgodnie z jego rytmem zajęć. Wybierz godzinę z listy wolnych terminów.',
+                    )
             else:
                 Lekcja.objects.create(uczen=uczen, przedmiot_karta=karta, data=data_lekcji)
                 if nauczyciel:
@@ -1648,7 +1670,6 @@ def kalendarz_lekcji(request, uczen_id):
             reverse('kalendarz_lekcji', args=[uczen.id])
             + f'?rok={rok}&miesiac={miesiac}&dzien={wybrany_dzien.day}{karta_param}'
         )
-
     lekcje_dnia = []
     if wybrany_dzien:
         for lekcja in Lekcja.objects.filter(uczen=uczen, data__date=wybrany_dzien, **filtr_karta).order_by('data'):
@@ -2239,6 +2260,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
         utworzone = 0
         pominiete_konflikt = 0
         pominiete_przerwa = 0
+        pominiete_poza_grafikiem = 0
         for dzien_tygodnia, godzina_txt in sloty:
             godzina = datetime.strptime(godzina_txt, '%H:%M').time()
             dzien = od_dnia
@@ -2247,12 +2269,14 @@ def umow_lekcje_cykliczna(request, uczen_id):
                     not co_2_tygodnie or (dzien - od_dnia).days % 14 == 0
                     ):
                     data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
-                    kolidujace = inne_lekcje_nauczyciela(nauczyciel, uczen, dzien, godzina)
-                    w_przerwie = godzina_w_przerwie(nauczyciel, dzien, godzina)
-                    if kolidujace:
-                        pominiete_konflikt += 1
-                    elif w_przerwie:
-                        pominiete_przerwa += 1
+                    start_dt = datetime.combine(dzien, godzina)
+                    if nauczyciel and godzina_txt not in wolne_godziny_nauczyciela(nauczyciel, dzien):
+                        if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_dt):
+                            pominiete_konflikt += 1
+                        elif godzina_w_przerwie(nauczyciel, dzien, godzina):
+                            pominiete_przerwa += 1
+                        else:
+                            pominiete_poza_grafikiem += 1
                     else:
                         if karta:
                             Lekcja.objects.get_or_create(uczen=uczen, data=data_lekcji, przedmiot_karta=karta)
@@ -2268,10 +2292,11 @@ def umow_lekcje_cykliczna(request, uczen_id):
                             )
                         utworzone += 1
                 dzien += timedelta(days=1)
-        if pominiete_konflikt or pominiete_przerwa:
+        if pominiete_konflikt or pominiete_przerwa or pominiete_poza_grafikiem:
             komunikaty = []
             if pominiete_konflikt:
                 komunikaty.append(f'{pominiete_konflikt} terminów z konfliktem (nauczyciel ma już wtedy lekcję)')
+            if pominiete_poza_grafikiem: komunikaty.append(f'{pominiete_poza_grafikiem} terminów poza godzinami pracy korepetytora')
             if pominiete_przerwa:
                 komunikaty.append(f'{pominiete_przerwa} terminów w przerwie dnia nauczyciela')
             messages.warning(
