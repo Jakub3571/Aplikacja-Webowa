@@ -713,7 +713,39 @@ class LekcjeCykliczneTests(TestCase):
         self.assertContains(r, 'Pominięto')
         godziny = {timezone.localtime(l.data).strftime('%H:%M') for l in Lekcja.objects.filter(uczen=self.uczen)}
         self.assertEqual(len(godziny), 1)
-
+    def test_cykliczna_dla_przedmiotu_dodatkowego_przez_karta(self):
+        # karta przedmiotu dodatkowego u INNEGO nauczyciela + cykliczna przez ?karta=ID:
+        # lekcje powstają z przedmiot_karta i blokują grafik tego nauczyciela
+        anna = Nauczyciel.objects.create(imie='Anna', nazwisko='Nowak', email='a@n.pl')
+        karta = PrzedmiotUcznia.objects.create(
+            uczen=self.uczen, przedmiot='fizyka', poziom='podstawowka', korepetytor='Anna Nowak',
+        )
+        dzis = date.today()
+        d = dzis
+        while d <= date(2027, 6, 30):
+            if d.weekday() == dzis.weekday():
+                Dostepnosc.objects.create(
+                    nauczyciel=anna, data_od=d, data_do=d,
+                    godzina_od=time(16, 0), godzina_do=time(20, 0),
+                )
+            d += timedelta(days=1)
+        self.client.force_login(self.pracownik)
+        r = self.client.post(
+            f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/?karta={karta.id}',
+            {
+                'okres': 'miesiac',
+                'data_poczatkowa': dzis.isoformat(),
+                'slot_dzien': [str(dzis.weekday())],
+                'slot_godzina': ['17:05'],
+                'link_meet': '',
+            },
+            follow=True,
+        )
+        self.assertEqual(r.status_code, 200)
+        lekcje = Lekcja.objects.filter(uczen=self.uczen, przedmiot_karta=karta)
+        self.assertTrue(lekcje.exists())
+        self.assertTrue(Dostepnosc.objects.filter(nauczyciel=anna, godzina_od=time(17, 5)).exists())
+        self.assertFalse(Lekcja.objects.filter(uczen=self.uczen, przedmiot_karta__isnull=True).exists())
     def test_pracownik_nie_umowi_cyklicznej_cudzemu_uczniowi(self):
         obcy = Uczen.objects.create(
             pierwsza_lekcja='2026-10-07T17:00',

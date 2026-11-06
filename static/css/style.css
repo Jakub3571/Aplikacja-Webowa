@@ -829,6 +829,7 @@ body {
   .kalendarz-dzien-naglowek { font-size: 0.7rem; }
 }
 
-/* === Kalendarz zbiorczy na cały ekran === */
-.opakowanie.opakowanie-pelny { max-width: none; }
-.opakowanie-pelny .kalendarz-komorka { height: 9rem; }
+/* === Kalendarz zbiorczy: karta na szerokość kontenera (równo z paskiem zakładek) === */
+.karta.karta-kalendarz { max-width: none; margin-top: 1rem; }
+.kalendarz-wiersz { min-width: 0; }
+.kalendarz-komorka { min-width: 0; }

@@ -28,7 +28,7 @@
   {% endif %}
   <a class="powrot" href="{% url 'lekcje' %}">← Wróć do listy uczniów</a>
 </section>
-
+<a class="przycisk-kalendarz" href="{% url 'lekcja_cykliczna' uczen.id %}{% if karta %}?karta={{ karta.id }}{% endif %}">🔁 Lekcja cykliczna{% if karta %} ({{ karta.przedmiot }}){% endif %}</a>
 <div class="kalendarz-uklad">
   <section class="karta">
     <div class="kalendarz-naglowek">
