@@ -3,7 +3,7 @@
 {% block tytul %}Panel pracowniczy{% endblock %}
 
 {% block tresc %}
-<div class="opakowanie">
+<div class="opakowanie {% if request.resolver_match.url_name == 'kalendarz_zbiorczy' %}opakowanie-pelny{% endif %}">
   <header class="pasek">
     <span>👤 {% if user.nauczyciel_id %}Mój kalendarz{% else %}Panel pracowniczy{% endif %}</span>
     <nav>

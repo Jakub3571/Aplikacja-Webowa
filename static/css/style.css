@@ -828,3 +828,7 @@ body {
   .chip { font-size: 0.62rem; }
   .kalendarz-dzien-naglowek { font-size: 0.7rem; }
 }
+
+/* === Kalendarz zbiorczy na cały ekran === */
+.opakowanie.opakowanie-pelny { max-width: none; }
+.opakowanie-pelny .kalendarz-komorka { height: 9rem; }
