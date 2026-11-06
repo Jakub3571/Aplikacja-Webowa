@@ -98,7 +98,54 @@ def nauczyciel_z_korepetytora(korepetytor):
         return None
     imie, nazwisko = korepetytor.split(' ', 1)
     return Nauczyciel.objects.filter(imie__iexact=imie.strip(), nazwisko__iexact=nazwisko.strip()).first()
+def _nauczyciel_lekcji(lekcja, uczen):
+    """Nauczyciel prowadzący daną lekcję: z karty przedmiotu dodatkowego
+    albo główny korepetytor ucznia."""
+    korepetytor_lekcji = (
+        lekcja.przedmiot_karta.korepetytor if lekcja.przedmiot_karta_id else uczen.korepetytor
+    )
+    return nauczyciel_z_korepetytora(korepetytor_lekcji)
 
+
+def zwolnij_blokady_ucznia(uczen):
+    """Zwalnia zablokowane godziny u WSZYSTKICH korepetytorów ucznia —
+    głównego przedmiotu i kart przedmiotów dodatkowych."""
+    for lekcja in Lekcja.objects.filter(uczen=uczen).select_related('przedmiot_karta'):
+        nauczyciel = _nauczyciel_lekcji(lekcja, uczen)
+        if not nauczyciel:
+            continue
+        start = timezone.localtime(lekcja.data)
+        Dostepnosc.objects.filter(
+            nauczyciel=nauczyciel,
+            data_od=start.date(),
+            godzina_od=start.time(),
+        ).delete()
+
+
+def odtworz_blokady_ucznia(uczen):
+    """Odtwarza blokady godzin u wszystkich korepetytorów ucznia dla przyszłych
+    lekcji. Zwraca (odtworzone, pominięte_kolizje)."""
+    odtworzone = 0
+    pominiete_kolizje = 0
+    for lekcja in (
+        Lekcja.objects.filter(uczen=uczen, data__gte=timezone.now()).select_related('przedmiot_karta')
+    ):
+        nauczyciel = _nauczyciel_lekcji(lekcja, uczen)
+        if not nauczyciel:
+            continue
+        start = timezone.localtime(lekcja.data)
+        if inne_lekcje_nauczyciela(nauczyciel, uczen, start.date(), start.time()):
+            pominiete_kolizje += 1
+            continue
+        Dostepnosc.objects.get_or_create(
+            nauczyciel=nauczyciel,
+            data_od=start.date(),
+            data_do=start.date(),
+            godzina_od=start.time(),
+            godzina_do=(datetime.combine(date(2000, 1, 1), start.time()) + timedelta(minutes=GODZINA_LEKCJI)).time(),
+        )
+        odtworzone += 1
+    return odtworzone, pominiete_kolizje
 def lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela):
     """Czy dana lekcja należy do zajęć podanego nauczyciela?
     Lekcja głównego przedmiotu: wg pola 'korepetytor' ucznia.
@@ -109,30 +156,25 @@ def lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela):
 
 
 def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None):
-    """Czy lekcja (60 min od start_lekcji) koliduje z istniejącą lekcją nauczyciela
-    lub wypada w okienku przerwy po innej lekcji.
+    """Czy lekcja (60 min od start_lekcji) koliduje z istniejącą lekcją nauczyciela.
 
-    Przerwa to stałe okno po KAŻDEJ lekcji (np. 5 min): lekcja efektywnie
-    zajmuje [start, koniec + przerwa). Dwie lekcje kolidują, gdy te przedziały się pokrywają.
-    Uwzględnia wszystkie przedmioty nauczyciela (główny i dodatkowe uczniów).
+    Lekcja efektywnie zajmuje [start, koniec + przerwa) — dwie lekcje kolidują,
+    gdy te przedziały zachodzą na siebie, czyli między lekcjami musi zmieścić się
+    PEŁNA przerwa. Uwzględnia wszystkie przedmioty nauczyciela, także lekcje
+    TEGO SAMEGO ucznia — dlatego po lekcji 18:00 nie da się ustawić 18:30.
     """
     if not nauczyciel:
         return False
     if przerwa_min is None:
         przerwa_min = nauczyciel.przerwa or 5
     nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
-    koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI)
+    moj_koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI + przerwa_min)
     for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien, odwolana=False):
         if not lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela):
             continue
         l_start = timezone.localtime(lekcja.data).replace(tzinfo=None)
-        l_koniec = l_start + timedelta(minutes=GODZINA_LEKCJI)
-        # 1) lekcje nie mogą na siebie nachodzić (bez przerwy)
-        if l_start < koniec and start_lekcji < l_koniec:
-            return True
-        # 2) nasza lekcja zaczyna się w oknie przerwy po tamtej lekcji:
-        #    [l_koniec, l_koniec + przerwa)
-        if przerwa_min and l_koniec <= start_lekcji < l_koniec + timedelta(minutes=przerwa_min):
+        l_koniec = l_start + timedelta(minutes=GODZINA_LEKCJI + przerwa_min)
+        if l_start < moj_koniec and start_lekcji < l_koniec:
             return True
     return False
 
@@ -783,15 +825,7 @@ def usun_ucznia(request, uczen_id):
     if not czy_szef(request.user):
         raise PermissionDenied
     if request.method == 'POST':
-        nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
-        if nauczyciel:
-            for lekcja in Lekcja.objects.filter(uczen=uczen):
-                start = timezone.localtime(lekcja.data)
-                Dostepnosc.objects.filter(
-                    nauczyciel=nauczyciel,
-                    data_od=start.date(),
-                    godzina_od=start.time(),
-                ).delete()
+        zwolnij_blokady_ucznia(uczen)
         imie = f'{uczen.imie_ucznia} {uczen.nazwisko_rodzica}'
         uczen.delete()
         messages.success(request, f'Uczeń {imie} został usunięty wraz z lekcjami.')
@@ -852,15 +886,7 @@ def zakoncz_ucznia(request, uczen_id):
     if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
         raise PermissionDenied
     if request.method == 'POST':
-        nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
-        if nauczyciel:
-            for lekcja in Lekcja.objects.filter(uczen=uczen):
-                start = timezone.localtime(lekcja.data)
-                Dostepnosc.objects.filter(
-                    nauczyciel=nauczyciel,
-                    data_od=start.date(),
-                    godzina_od=start.time(),
-                ).delete()
+        zwolnij_blokady_ucznia(uczen)
         uczen.zakonczona = True
         uczen.save(update_fields=['zakonczona'])
         imie = f'{uczen.imie_ucznia} {uczen.nazwisko_rodzica}'
@@ -884,26 +910,7 @@ def przywroc_ucznia(request, uczen_id):
         lekcja__uczen=uczen,
         lekcja__data__gte=timezone.now(),
     ).delete()
-    # odtwarzamy blokady godzin u korepetytora — pomijamy terminy, które ktoś zajął w międzyczasie
-    nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
-    odtworzone = 0
-    pominięte_kolizje = 0
-    if nauczyciel:
-        przyszle = Lekcja.objects.filter(uczen=uczen, data__gte=timezone.now())
-        for lekcja in przyszle:
-            start = timezone.localtime(lekcja.data)
-            # kolizja liczy tylko cudze lekcje — lekcje tego ucznia nie przeszkadzają
-            if inne_lekcje_nauczyciela(nauczyciel, uczen, start.date(), start.time()):
-                pominięte_kolizje += 1
-                continue
-            Dostepnosc.objects.get_or_create(
-                nauczyciel=nauczyciel,
-                data_od=start.date(),
-                data_do=start.date(),
-                godzina_od=start.time(),
-                godzina_do=(datetime.combine(date(2000, 1, 1), start.time()) + timedelta(minutes=GODZINA_LEKCJI)).time(),
-            )
-            odtworzone += 1
+    odtworzone, pominięte_kolizje = odtworz_blokady_ucznia(uczen)
     komunikat = f'Uczeń {imie} przywrócony z archiwum.'
     if odtworzone:
         komunikat += f' Odtworzono {odtworzone} blokad godzin u korepetytora.'

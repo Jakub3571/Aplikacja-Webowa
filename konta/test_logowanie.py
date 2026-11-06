@@ -1270,8 +1270,7 @@ class PoprawkiSzefaTests(TestCase):
         self.client.force_login(self.user)
         r = self.client.get(f'/korepetytorzy/dane/?nauczyciel={self.nauczyciel.id}&data={self.dzien.isoformat()}')
         self.assertEqual(r.status_code, 200)
-        # siatka rytmu 65 min (60 lekcja + 5 przerwy) od 11:00; 12:05+60 wychodzi poza 13:00
-        self.assertEqual(godziny, ['11:00'])
+        godziny = [g['godzina'] for g in r.json()['godziny']]
         # siatka rytmu 65 min (60 lekcja + 5 przerwy) od 11:00; 12:05+60 wychodzi poza 13:00
         self.assertEqual(godziny, ['11:00'])
 
