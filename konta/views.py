@@ -255,6 +255,9 @@ def wolne_godziny_nauczyciela(nauczyciel, dzien):
         while t + timedelta(minutes=GODZINA_LEKCJI) <= e:
             kandydaci.add(t)
             t += krok
+        if s < e:
+            # koniec przedziału też może być startem lekcji („do 20:00” = można też o 20:00)
+            kandydaci.add(e)
         for l_start in lekcje_dnia:
             l_koniec = l_start + timedelta(minutes=GODZINA_LEKCJI)
             przed = l_start - krok

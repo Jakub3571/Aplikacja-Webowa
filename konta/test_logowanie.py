@@ -1304,7 +1304,7 @@ class PoprawkiSzefaTests(TestCase):
         self.assertEqual(r.status_code, 200)
         godziny = [g['godzina'] for g in r.json()['godziny']]
         # siatka rytmu 65 min (60 lekcja + 5 przerwy) od 11:00; 12:05+60 wychodzi poza 13:00
-        self.assertEqual(godziny, ['11:00'])
+        self.assertEqual(godziny, ['11:00', '13:00'])
 
 
     def test_cykliczna_kwadracik_co_2_tygodnie(self):
@@ -1464,8 +1464,11 @@ class SiatkaRytmuTests(TestCase):
     def test_siatka_rytmu_od_poczatku_zakresu(self):
         # przedział 10:00-14:00, przerwa 5 min -> rytm 65 min: 10:00, 11:05, 12:10
         wolne = self.wolne(self.n, self.dzien)
-        self.assertEqual(wolne, ['10:00', '11:05', '12:10'])
+        self.assertEqual(wolne, ['10:00', '11:05', '12:10', '14:00'])
 
+    def test_koniec_zakresu_jako_start_lekcji(self):
+        # „do 14:00” oznacza, że lekcję można ustawić też na 14:00
+        self.assertTrue(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(14, 0))))
     def test_zajeta_lekcja_blokuje_1h_plus_przerwa(self):
         u = Uczen.objects.create(
             pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 0))),
@@ -1482,6 +1485,7 @@ class SiatkaRytmuTests(TestCase):
         self.assertNotIn('12:00', wolne)
         self.assertIn('12:05', wolne)
         self.assertIn('12:10', wolne)
+        self.assertIn('14:00', wolne) # koniec zakresu włącznie
         self.assertTrue(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(12, 5))))
         self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(11, 0))))
         self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(11, 30))))
