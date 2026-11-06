@@ -796,6 +796,35 @@ body {
   display: inline-block;
 }
 
-/* === Kalendarz zbiorczy (wszyscy nauczyciele, tylko do odczytu) === */
-.zbiorczy-nauczyciel { margin-bottom: 1.5rem; }
-.zbiorczy-nauczyciel h3 { margin-bottom: 0.75rem; }
+/* === Kalendarz zbiorczy miesięczny (siatka jak zwykły kalendarz, tylko odczyt) === */
+.kalendarz-siata { display: flex; flex-direction: column; gap: 4px; }
+.kalendarz-wiersz { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.kalendarz-wiersz-naglowki { position: sticky; top: 0; }
+.kalendarz-dzien-naglowek { font-weight: 600; text-align: center; padding: 0.25rem; font-size: 0.85rem; }
+.kalendarz-komorka {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  height: 7.5rem;
+  overflow-y: auto;
+  padding: 0.25rem;
+  background: #fff;
+}
+.kalendarz-komorka.poza-miesiacem { background: #f1f5f9; color: #94a3b8; }
+.kalendarz-komorka.dzisiaj { border: 2px solid var(--akcent, #2563eb); }
+.kalendarz-numer { font-weight: 700; font-size: 0.85rem; margin-bottom: 0.15rem; }
+.kalendarz-wpisy { display: flex; flex-direction: column; gap: 2px; }
+.chip {
+  font-size: 0.7rem;
+  border-radius: 4px;
+  padding: 1px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chip-wolny { background: #e5e7eb; color: #374151; }
+.chip-lekcja { background: #bbf7d0; color: #14532d; }
+@media (max-width: 900px) {
+  .kalendarz-komorka { height: 6rem; }
+  .chip { font-size: 0.62rem; }
+  .kalendarz-dzien-naglowek { font-size: 0.7rem; }
+}
