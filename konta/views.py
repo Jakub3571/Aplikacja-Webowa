@@ -2114,9 +2114,13 @@ def kalendarz_zbiorczy(request):
     Siatka jak zwykły kalendarz (7 kolumn, dni miesiąca); w każdym kafelku dnia
     chipy z nauczycielami: szary = wolny (godziny pracy), zielony = zajęta lekcja
     (godzina, nauczyciel, uczeń, przedmiot). Kafelki mają własny suwak (nie rozciągają się).
-    Strzałki ‹ › zmieniają miesiąc. Aktualizuje się na bieżąco z bazy.
-    Dostęp: pracownicy biura; konto nauczyciela → 403."""
+    Strzałki ‹ › zmieniają miesiąc; klik w numer dnia rozwija pełną listę zajęć tego dnia
+    (pogrupowane po korepetytorach: godzina, uczeń, przedmiot, poziom).
+    Kolory: zielony = lekcja nowa/jednorazowa, jasnoniebieski = cykliczna, szary = wolny.
+    Dostęp: TYLKO szef i koordynator (nauczyciel i zwykły pracownik → 403)."""
     if getattr(request.user, 'nauczyciel_id', None):
+        raise PermissionDenied
+    if not (czy_szef(request.user) or czy_koordynator(request.user)):
         raise PermissionDenied
     dzis = date.today()
     try:
@@ -2174,6 +2178,7 @@ def kalendarz_zbiorczy(request):
                         start = timezone.localtime(lekcja.data)
                         wpisy.append({
                             'typ': 'lekcja',
+                            'cykliczna': lekcja.uczen.zajecia_cykliczne,
                             'godzina': start.strftime('%H:%M'),
                             'tekst': (
                                 f"{start.strftime('%H:%M')}–{(start + timedelta(minutes=GODZINA_LEKCJI)).strftime('%H:%M')} "
@@ -2200,9 +2205,44 @@ def kalendarz_zbiorczy(request):
                 'wpisy': wpisy,
             })
         tygodnie.append(dni)
+    # kliknięty dzień — pełna lista zajęć tego dnia pogrupowana po korepetytorach
+    wybrany_dzien = None
+    dzien_param = request.GET.get('dzien')
+    if dzien_param:
+        try:
+            wybrany_dzien = date(rok, miesiac, int(dzien_param))
+        except ValueError:
+            wybrany_dzien = None
+    szczegoly = []
+    if wybrany_dzien:
+        for n in nauczyciele:
+            nazwa = f'{n.imie} {n.nazwisko}'.strip().lower()
+            lekcje_d = sorted(lekcje_dni.get((n.id, wybrany_dzien), []), key=lambda l: l.data)
+            zakresy = zakresy_dni.get((n.id, wybrany_dzien), [])
+            if not lekcje_d and not zakresy:
+                continue
+            lekcje_listy = []
+            for lekcja in lekcje_d:
+                start = timezone.localtime(lekcja.data)
+                karta_l = lekcja.przedmiot_karta
+                lekcje_listy.append({
+                    'godzina': start.strftime('%H:%M'),
+                    'koniec': (start + timedelta(minutes=GODZINA_LEKCJI)).strftime('%H:%M'),
+                    'uczen': f'{lekcja.uczen.imie_ucznia} {lekcja.uczen.nazwisko_rodzica}',
+                    'przedmiot': karta_l.przedmiot if karta_l else lekcja.uczen.przedmiot,
+                    'poziom': karta_l.poziom if karta_l else lekcja.uczen.poziom,
+                    'cykliczna': lekcja.uczen.zajecia_cykliczne,
+                })
+            szczegoly.append({
+                'nauczyciel': n,
+                'lekcje': lekcje_listy,
+                'zakresy': [f'{s.strftime("%H:%M")}–{e.strftime("%H:%M")}' for s, e in zakresy],
+            })
 
     return render(request, 'konta/kalendarz_zbiorczy.html', {
         'tygodnie': tygodnie,
+        'wybrany_dzien': wybrany_dzien,
+        'szczegoly': szczegoly,
         'dni_nazwy': ['poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota', 'niedziela'],
         'nazwa_miesiaca': MIESIACE[miesiac - 1],
         'rok': rok,
@@ -2212,6 +2252,7 @@ def kalendarz_zbiorczy(request):
         'nastepny_rok': nastepny_rok,
         'nastepny_miesiac': nastepny_miesiac,
     })
+
 
 @login_required
 def kreator_dyspozycyjnosc(request):

@@ -833,3 +833,13 @@ body {
 .karta.karta-kalendarz { max-width: none; margin-top: 1rem; }
 .kalendarz-wiersz { min-width: 0; }
 .kalendarz-komorka { min-width: 0; }
+
+/* === Kalendarz zbiorczy: kolory lekcji i rozwinięcie dnia === */
+.chip-lekcja-cykliczna { background: #bfdbfe; color: #1e3a8a; }
+.kalendarz-komorka.wybrany { border: 2px solid var(--akcent, #2563eb); background: #eff6ff; }
+a.kalendarz-numer { color: inherit; text-decoration: none; font-weight: 700; }
+a.kalendarz-numer:hover { color: var(--akcent, #2563eb); }
+.kalendarz-dzien-szczegoly { margin-top: 1rem; }
+.kalendarz-dzien-szczegoly h4 { margin: 0.75rem 0 0.25rem; }
+.lista-lekcji-dnia { list-style: none; padding: 0; margin: 0 0 0.5rem; display: flex; flex-direction: column; gap: 3px; }
+.lista-lekcji-dnia .chip { font-size: 0.8rem; white-space: normal; }

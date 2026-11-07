@@ -1451,34 +1451,56 @@ class KalendarzZbiorczyTests(TestCase):
             godzina_od=time(9, 0), godzina_do=time(12, 0),
         )
 
-    def test_szef_i_pracownik_widza_siatke_miesiaca(self):
-        for user in (self.admin, self.pracownik):
+    def test_szef_i_koordynator_widza_siatke_miesiaca(self):
+        koordynator = Pracownik.objects.create_user('koord', 'k@f.pl', 'Sup3rHaslo!')
+        koordynator.stanowisko = 'koordynator'
+        koordynator.save()
+        for user in (self.admin, koordynator):
             self.client.force_login(user)
             r = self.client.get('/kalendarz/')
             self.assertEqual(r.status_code, 200)
+            self.assertContains(r, 'karta-kalendarz')
             self.assertContains(r, 'Kalendarz')
             self.assertContains(r, 'poniedziałek')
-            self.assertContains(r, 'Kasia Nowak')       # zielony chip lekcji (uczeń)
-            self.assertContains(r, 'Jan Kowalski')      # nauczyciel przy lekcji
+            self.assertContains(r, 'Kasia Nowak')
+            self.assertContains(r, 'Jan Kowalski')
             self.assertContains(r, '17:00')
             self.assertContains(r, 'chip-lekcja')
-            self.assertContains(r, 'Anna Nowak wolny')  # szary chip wolnego nauczyciela
+            self.assertContains(r, 'Anna Nowak wolny')
             self.assertContains(r, '09:00–12:00')
             self.assertContains(r, 'chip-wolny')
 
-    def test_nauczyciel_ma_403(self):
-        self.client.force_login(self.teacher_user)
+    def test_pracownik_ma_403(self):
+        # osoba umawiająca NIE ma dostępu do zbiorczego kalendarza
+        self.client.force_login(self.pracownik)
         r = self.client.get('/kalendarz/')
         self.assertEqual(r.status_code, 403)
 
-    def test_strzalki_zmieniaja_miesiac(self):
+    def test_klik_w_dzien_rozwija_pelna_liste(self):
         self.client.force_login(self.admin)
-        r = self.client.get('/kalendarz/?rok=2026&miesiac=12')
+        dzis = date.today()
+        r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'grudzień 2026')
-        r = self.client.get('/kalendarz/?rok=2026&miesiac=1')
-        self.assertContains(r, 'styczeń 2026')
+        self.assertContains(r, 'pełna lista zajęć')
+        self.assertContains(r, 'Jan Kowalski')
+        self.assertContains(r, 'lekcja z Kasia Nowak')
+        self.assertContains(r, 'matematyka')
+        self.assertContains(r, 'podstawowka')
+        self.assertContains(r, '17:00')
 
+    def test_lekcja_cykliczna_ma_jasnoniebieski_chip(self):
+        self.client.force_login(self.admin)
+        dzis = date.today()
+        self.uczen.zajecia_cykliczne = True
+        self.uczen.save(update_fields=['zajecia_cykliczne'])
+        r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
+        self.assertContains(r, '<li class="chip chip-lekcja-cykliczna">')
+        self.uczen.zajecia_cykliczne = False
+        self.uczen.save(update_fields=['zajecia_cykliczne'])
+        r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
+        self.assertContains(r, '<li class="chip chip-lekcja">')
+        self.assertNotContains(r, '<li class="chip chip-lekcja-cykliczna">')
+        
 class PrzypomnieniaJutroTests(TestCase):
     """Digest „jutro”: jeden mail do rodziców (lista jutrzejszych lekcji)
     i po jednym mailu do każdego korepetytora — tylko raz dziennie na osobę."""

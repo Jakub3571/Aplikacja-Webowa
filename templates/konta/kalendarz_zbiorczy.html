@@ -13,7 +13,9 @@
     Tylko do odczytu — zmiany robisz w „Mój tydzień” nauczyciela lub w kalendarzu ucznia.
     Każdy kafelek dnia ma własny suwak, gdy się nie mieści.
     <span class="chip chip-wolny">szary: korepetytor wolny (godziny pracy)</span>
-    <span class="chip chip-lekcja">zielony: zajęta lekcja (godzina · nauczyciel · uczeń · przedmiot)</span>
+    <span class="chip chip-lekcja">zielony: lekcja nowa (jednorazowa)</span>
+    <span class="chip chip-lekcja-cykliczna">jasnoniebieski: lekcja cykliczna</span>
+    Kliknij numer dnia, żeby rozwinąć pełną listę zajęć tego dnia.
   </p>
 
   <div class="kalendarz-siata">
@@ -23,11 +25,11 @@
     {% for tydzien in tygodnie %}
     <div class="kalendarz-wiersz">
       {% for dzien in tydzien %}
-      <div class="kalendarz-komorka {% if not dzien.w_miesiacu %}poza-miesiacem{% endif %}{% if dzien.dzisiaj %} dzisiaj{% endif %}">
-        <div class="kalendarz-numer">{{ dzien.data.day }}</div>
+      <div class="kalendarz-komorka {% if not dzien.w_miesiacu %}poza-miesiacem{% endif %}{% if dzien.dzisiaj %} dzisiaj{% endif %}{% if dzien.data == wybrany_dzien %} wybrany{% endif %}">
+        <a class="kalendarz-numer" href="?rok={{ rok }}&miesiac={{ miesiac }}&dzien={{ dzien.data.day }}" title="Pokaż pełną listę zajęć tego dnia">{{ dzien.data.day }}</a>
         <div class="kalendarz-wpisy">
           {% for wpis in dzien.wpisy %}
-          <div class="chip {% if wpis.typ == 'lekcja' %}chip-lekcja{% else %}chip-wolny{% endif %}" title="{{ wpis.tekst }}">{{ wpis.tekst }}</div>
+          <div class="chip {% if wpis.typ == 'lekcja' %}{% if wpis.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}" title="{{ wpis.tekst }}">{{ wpis.tekst }}</div>
           {% endfor %}
         </div>
       </div>
@@ -36,4 +38,25 @@
     {% endfor %}
   </div>
 </section>
+  {% if wybrany_dzien %}
+  <section class="karta karta-kalendarz kalendarz-dzien-szczegoly">
+    <h3>📅 {{ wybrany_dzien|date:"d.m.Y" }} — pełna lista zajęć</h3>
+    {% for blok in szczegoly %}
+    <h4>{{ blok.nauczyciel.imie }} {{ blok.nauczyciel.nazwisko }}</h4>
+    {% if blok.lekcje %}
+    <ul class="lista-lekcji-dnia">
+      {% for l in blok.lekcje %}
+      <li class="chip {% if l.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}">
+        {{ l.godzina }} lekcja z {{ l.uczen }} — {{ l.przedmiot }} ({{ l.poziom }})
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="podpowiedz">wolny tego dnia: {{ blok.zakresy|join:", " }}</p>
+    {% endif %}
+    {% empty %}
+    <p>Brak zajęć i dostępności tego dnia.</p>
+    {% endfor %}
+  </section>
+  {% endif %}
 {% endblock %}
