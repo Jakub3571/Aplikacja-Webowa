@@ -726,8 +726,6 @@ def edytuj_ucznia(request, uczen_id):
                     korepetytor=korepetytor,
                     link_meet=link,
                 )
-                if nauczyciel:
-                    data_aware = timezone.make_aware(start_lekcji)
                 lekcja = None
                 if nauczyciel:
                     data_aware = timezone.make_aware(start_lekcji)
@@ -740,14 +738,7 @@ def edytuj_ucznia(request, uczen_id):
                         godzina_do=(datetime.combine(date(2000, 1, 1), czas) + timedelta(minutes=GODZINA_LEKCJI)).time(),
                     )
                 # potwierdzenie do rodzica z DANYMI Z KARTY (przedmiot dodatkowy, nie główny)
-                wyslij_potwierdzenie_rodzicowi(request, uczen, karta=karta, lekcja=lekcja)  
-                Dostepnosc.objects.get_or_create(
-                        nauczyciel=nauczyciel,
-                        data_od=data_lekcji,
-                        data_do=data_lekcji,
-                        godzina_od=czas,
-                        godzina_do=(datetime.combine(date(2000, 1, 1), czas) + timedelta(minutes=GODZINA_LEKCJI)).time(),
-                    )
+                wyslij_potwierdzenie_rodzicowi(request, uczen, karta=karta, lekcja=lekcja)
                 messages.success(
                     request,
                     f'Dodano przedmiot {przedmiot} ({poziom}) — korepetytor: {korepetytor}, '
