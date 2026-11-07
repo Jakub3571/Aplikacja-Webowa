@@ -325,3 +325,22 @@ class PrzypomnienieLekcji(models.Model):
         verbose_name = 'przypomnienie lekcji'
         verbose_name_plural = 'przypomnienia lekcji'
         unique_together = [('lekcja',)]
+
+
+
+class PrzypomnienieDzienne(models.Model):
+    """Znacznik zbiorczego przypomnienia „jutro” — jedna wiadomość na osobę na dzień
+    (uczeń/rodzic albo nauczyciel), żeby CRON nie wysłał drugi raz tego samego dnia."""
+
+    typ = models.CharField('typ', max_length=20)  # 'uczen' albo 'nauczyciel'
+    ref_id = models.PositiveIntegerField('id osoby')
+    data = models.DateField('dzień zajęć')
+    wyslano = models.DateTimeField('wysłano', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'przypomnienie dzienne'
+        verbose_name_plural = 'przypomnienia dzienne'
+        unique_together = [('typ', 'ref_id', 'data')]
+
+    def __str__(self):
+        return f'{self.typ} #{self.ref_id} na {self.data:%d.%m.%Y}'

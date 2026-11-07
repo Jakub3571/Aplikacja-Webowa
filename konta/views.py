@@ -728,8 +728,20 @@ def edytuj_ucznia(request, uczen_id):
                 )
                 if nauczyciel:
                     data_aware = timezone.make_aware(start_lekcji)
-                    Lekcja.objects.get_or_create(uczen=uczen, data=data_aware, przedmiot_karta=karta)
+                lekcja = None
+                if nauczyciel:
+                    data_aware = timezone.make_aware(start_lekcji)
+                    lekcja, _ = Lekcja.objects.get_or_create(uczen=uczen, data=data_aware, przedmiot_karta=karta)
                     Dostepnosc.objects.get_or_create(
+                        nauczyciel=nauczyciel,
+                        data_od=data_lekcji,
+                        data_do=data_lekcji,
+                        godzina_od=czas,
+                        godzina_do=(datetime.combine(date(2000, 1, 1), czas) + timedelta(minutes=GODZINA_LEKCJI)).time(),
+                    )
+                # potwierdzenie do rodzica z DANYMI Z KARTY (przedmiot dodatkowy, nie główny)
+                wyslij_potwierdzenie_rodzicowi(request, uczen, karta=karta, lekcja=lekcja)  
+                Dostepnosc.objects.get_or_create(
                         nauczyciel=nauczyciel,
                         data_od=data_lekcji,
                         data_do=data_lekcji,
@@ -2242,39 +2254,47 @@ def wyslij_link_meet_uczniowi(request, uczen):
     except Exception as e:
         zapisz_blad_maila('link_do_zajec_rodzic', e)
 
-def wyslij_potwierdzenie_rodzicowi(request, uczen):
-    """Wysyła rodzicowi potwierdzenie zapisu: przedmiot, korepetytor,
-    data i godzina 1. lekcji oraz link Meet (jeśli nauczyciel go ma).
+def wyslij_potwierdzenie_rodzicowi(request, uczen, karta=None, lekcja=None):
+    """Wysyła rodzicowi potwierdzenie umówienia: przedmiot, poziom, korepetytor,
+    1. lekcja i link Meet. Dla przedmiotu DODATKOWEGO (karta) bierze dane z karty —
+    w mailu jest wtedy faktycznie umówiony przedmiot (np. angielski), nie główny.
     Odpowiedź na maila trafia do osoby, która umówiła ucznia."""
     odbiorcy = odbiorcy_meet(uczen)
     if not odbiorcy:
         return
+    if karta:
+        przedmiot = karta.przedmiot
+        poziom = karta.poziom
+        korepetytor = karta.korepetytor
+        link_meet = karta.link_meet or uczen.link_meet
+        pierwsza = timezone.localtime(lekcja.data) if lekcja else timezone.localtime(uczen.pierwsza_lekcja)
+    else:
+        przedmiot = uczen.przedmiot
+        poziom = uczen.poziom
+        korepetytor = uczen.korepetytor
+        link_meet = uczen.link_meet
+        pierwsza = timezone.localtime(uczen.pierwsza_lekcja)
     tresc = (
         'Dzień dobry,\n\n'
-        f'potwierdzamy zapis {uczen.imie_ucznia} na korepetycje.\n\n'
-        f'Przedmiot: {uczen.przedmiot} (poziom: {uczen.poziom})\n'
-        f'Korepetytor: {uczen.korepetytor}\n'
-        f'Pierwsza lekcja: {uczen.pierwsza_lekcja:%d.%m.%Y o godz. %H:%M}\n'
+        'Dziękuję za umówienie się na korepetycje 😊\n\n'
+        f'Przedmiot: {przedmiot}\n'
+        f'Poziom: {poziom}\n'
+        f'Korepetytor: {korepetytor}\n'
+        f'Pierwsza lekcja: {pierwsza:%d.%m.%Y o godz. %H:%M}\n'
     )
-    if uczen.link_meet:
-        tresc += (
-            '\nLink do zajęć (stały — ten sam przy każdej lekcji):\n'
-            f'{uczen.link_meet}\n'
-        )
+    if link_meet:
+        tresc += f'\nLink do zajęć online:\n{link_meet}\n'
     else:
         tresc += '\nLink do zajęć online otrzymacie osobno, gdy będzie dostępny.\n'
     tresc += (
-        '\nW razie pytań prosimy o odpowiedź na tego maila.\n\n'
-        f'Pozdrawiamy,\n{uczen.kto_umowil}\n'
+        '\nW razie pytań proszę o wiadomość na messengerze.\n\n'
+        f'Pozdrawiam,\n{uczen.kto_umowil}\n'
     )
     tworca_email = getattr(uczen.umowil, 'email', '') or ''
     try:
         from django.core.mail import EmailMessage
         mail = EmailMessage(
-            subject=(
-                f'Zapis na korepetycje — {uczen.imie_ucznia} ({uczen.przedmiot}), '
-                f'1. lekcja {uczen.pierwsza_lekcja:%d.%m.%Y %H:%M}'
-            ),
+            subject=f'Umówienie na korepetycje — {uczen.imie_ucznia} ({przedmiot})',
             body=tresc,
             to=odbiorcy,
         )
@@ -2283,32 +2303,6 @@ def wyslij_potwierdzenie_rodzicowi(request, uczen):
         mail.send()
     except Exception as e:
         zapisz_blad_maila('potwierdzenie_rodzica', e)
-
-def wyslij_zaproszenie_meet(uczen, adresat='glowny'):
-    """Wysyła e-mail do rodzica z linkiem do lekcji cyklicznej na Google Meet."""
-    odbiorcy = odbiorcy_meet(uczen, adresat)
-    if not uczen.link_meet or not odbiorcy:
-        return
-    tresc = (
-        'Dzień dobry,\n\n'
-        f'umawiamy cykliczne zajęcia dla {uczen.imie_ucznia} '
-        f'(przedmiot: {uczen.przedmiot}, korepetytor: {uczen.korepetytor}).\n\n'
-        'Zapraszamy na spotkania przez Google Meet — ponieważ zajęcia są cykliczne,\n'
-        'ten link jest STAŁY i będzie obowiązywał przy każdej lekcji do końca roku szkolnego:\n\n'
-        f'{uczen.link_meet}\n\n'
-        'Prosimy zapisać go — to samo zaproszenie będzie używane zawsze.\n\n'
-        'Pozdrawiamy,\n'
-        f'{uczen.kto_umowil}\n'
-    )
-    try:
-        send_mail(
-            f'Zaproszenie na zajęcia — {uczen.imie_ucznia} (stały link Google Meet)',
-            tresc,
-            None,
-            odbiorcy,
-        )
-    except Exception as e:
-        zapisz_blad_maila('zaproszenie_meet_rodzic', e)
 
 @login_required
 def umow_lekcje_cykliczna(request, uczen_id):

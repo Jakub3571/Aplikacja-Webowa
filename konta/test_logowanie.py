@@ -142,7 +142,44 @@ class DodawanieUczniaTests(TestCase):
         self.assertEqual(Uczen.objects.count(), 1)
         uczen = Uczen.objects.first()
         self.assertEqual(uczen.kto_umowil, 'test')
-
+    def test_mail_potwierdzenia_ma_ustawiony_przedmiot_i_poziom(self):
+        # mail po umówieniu ma przedmiot i poziom z formularza (np. angielski), nie „zawsze matma”
+        PrzedmiotNauczyciela.objects.create(
+            nauczyciel=self.nauczyciel, przedmiot='angielski', poziom='srednia rozszerzenie',
+        )
+        self.client.force_login(self.user)
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel,
+            data_od=date(2026, 10, 5), data_do=date(2026, 10, 5),
+            godzina_od='16:00', godzina_do='19:00',
+        )
+        dane = {
+            'data_pierwszej_lekcji': '2026-10-05',
+            'godzina_pierwszej_lekcji': '16:00',
+            'przedmiot': 'angielski',
+            'poziom': 'srednia rozszerzenie',
+            'imie_ucznia': 'Kasia',
+            'nazwisko_rodzica': 'Nowak',
+            'rodzic': 'Ewa Nowak',
+            'telefon_glowny': '600100200',
+            'email_glowny': 'ewa@f.pl',
+            'telefon_dodatkowy': '',
+            'email_dodatkowy': '',
+            'korepetytor': 'Jan Kowalski',
+            'notatka_od_rodzica': '',
+            'auto_wyslij_meet': 'on',
+        }
+        r = self.client.post('/uczniowie/', dane, follow=True)
+        self.assertEqual(r.status_code, 200)
+        maile = [m for m in mail.outbox if m.subject.startswith('Umówienie na korepetycje')]
+        self.assertEqual(len(maile), 1)
+        tresc = maile[0].body
+        self.assertIn('Dziękuję za umówienie się na korepetycje', tresc)
+        self.assertIn('Przedmiot: angielski', tresc)
+        self.assertIn('Poziom: srednia rozszerzenie', tresc)
+        self.assertIn('Pierwsza lekcja: 05.10.2026 o godz. 16:00', tresc)
+        self.assertIn('messengerze', tresc)
+        self.assertNotIn('matematyka', tresc)
     def test_korepetytor_filtruje_się_po_przedmiocie(self):
         inny = Nauczyciel.objects.create(
             imie='Anna', nazwisko='Nowak', email='anna@n.pl',
@@ -1442,6 +1479,60 @@ class KalendarzZbiorczyTests(TestCase):
         r = self.client.get('/kalendarz/?rok=2026&miesiac=1')
         self.assertContains(r, 'styczeń 2026')
 
+class PrzypomnieniaJutroTests(TestCase):
+    """Digest „jutro”: jeden mail do rodziców (lista jutrzejszych lekcji)
+    i po jednym mailu do każdego korepetytora — tylko raz dziennie na osobę."""
+
+    def setUp(self):
+        self.admin = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.jan = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='jan@firma.pl')
+        self.anna = Nauczyciel.objects.create(imie='Anna', nazwisko='Nowak', email='anna@firma.pl')
+        self.jutro = timezone.localtime(timezone.now()).date() + timedelta(days=1)
+        self.uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime.combine(self.jutro, time(8, 0))),
+            przedmiot='matematyka', poziom='podstawowka', szkola='SP1',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600', email_glowny='ewa@f.pl', telefon_dodatkowy='', email_dodatkowy='',
+            korepetytor='Jan Kowalski', kto_umowil='admin', umowil=self.admin,
+            link_meet='https://meet.google.com/abc-defg-hij',
+        )
+        self.karta = PrzedmiotUcznia.objects.create(
+            uczen=self.uczen, przedmiot='fizyka', poziom='podstawowka', korepetytor='Anna Nowak',
+        )
+        Lekcja.objects.create(uczen=self.uczen, data=timezone.make_aware(datetime.combine(self.jutro, time(8, 0))))
+        Lekcja.objects.create(
+            uczen=self.uczen,
+            data=timezone.make_aware(datetime.combine(self.jutro, time(10, 15))),
+            przedmiot_karta=self.karta,
+        )
+
+    def test_digest_jutro_rodzice_i_nauczyciele(self):
+        call_command('wyslij_przypomnienia_jutro')
+        # 1 mail do rodziców + po 1 do każdego nauczyciela = 3
+        self.assertEqual(len(mail.outbox), 3)
+        mail_rodzica = [m for m in mail.outbox if m.to == ['ewa@f.pl']][0]
+        self.assertIn(f'{self.jutro:%d.%m.%Y}', mail_rodzica.subject)
+        self.assertIn('08:00', mail_rodzica.body)
+        self.assertIn('matematyka z Jan', mail_rodzica.body)
+        self.assertIn('10:15', mail_rodzica.body)
+        self.assertIn('fizyka z Anna', mail_rodzica.body)
+        self.assertIn('https://meet.google.com/abc-defg-hij', mail_rodzica.body)
+        mail_jana = [m for m in mail.outbox if m.to == ['jan@firma.pl']][0]
+        self.assertIn('Kasia Nowak', mail_jana.body)
+        self.assertIn('08:00', mail_jana.body)
+        mail_anny = [m for m in mail.outbox if m.to == ['anna@firma.pl']][0]
+        self.assertIn('10:15', mail_anny.body)
+        # drugi raz tego samego dnia — już nie wysyła (znacznik)
+        call_command('wyslij_przypomnienia_jutro')
+        self.assertEqual(len(mail.outbox), 3)
+
+    def test_archiwum_ucznia_nie_dostaje_digestu(self):
+        self.uczen.zakonczona = True
+        self.uczen.save(update_fields=['zakonczona'])
+        call_command('wyslij_przypomnienia_jutro')
+        self.assertEqual(len(mail.outbox), 2)  # tylko nauczyciele
+        self.assertFalse(any(m.to == ['ewa@f.pl'] for m in mail.outbox))
+
 class SiatkaRytmuTests(TestCase):
     """Krok 4: siatka rytmu (60 min lekcji + przerwa) od początku każdego przedziału;
     zajęta lekcja blokuje 1h + przerwa w obie strony (po 18:00 nie ma 18:30)."""
@@ -1555,6 +1646,19 @@ class DodatkowyPrzedmiotZGrafikiemTests(TestCase):
         self.assertTrue(Dostepnosc.objects.filter(
             nauczyciel=self.n, data_od=self.dzien, godzina_od=self.czas(11, 0),
         ).exists())
+
+
+    def test_mail_potwierdzenia_przy_dodatkowym_przedmiocie_ma_jego_przedmiot(self):
+        # dodanie przedmiotu dodatkowego (fizyka) -> mail do rodzica z fizyką, nie z głównym przedmiotem
+        self.client.force_login(self.user)
+        r = self.client.post(f'/uczniowie/{self.uczen.id}/edytuj/', self._dane('2026-11-09', '11:00'), follow=True)
+        self.assertEqual(r.status_code, 200)
+        maile = [m for m in mail.outbox if m.subject.startswith('Umówienie na korepetycje')]
+        self.assertEqual(len(maile), 1)
+        self.assertIn('Przedmiot: fizyka', maile[0].body)
+        self.assertIn('Poziom: podstawowka', maile[0].body)
+        self.assertNotIn('matematyka', maile[0].body)
+
 
     def test_zajeta_godzina_nie_tworzy_przedmiotu(self):
         inny = Uczen.objects.create(
