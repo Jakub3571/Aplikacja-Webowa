@@ -1500,7 +1500,20 @@ class KalendarzZbiorczyTests(TestCase):
         r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
         self.assertContains(r, '<li class="chip chip-lekcja">')
         self.assertNotContains(r, '<li class="chip chip-lekcja-cykliczna">')
+    def test_nauczyciel_ma_403(self):
+        self.client.force_login(self.teacher_user)
+        r = self.client.get('/kalendarz/')
+        self.assertEqual(r.status_code, 403)
+
+    def test_strzalki_zmieniaja_miesiac(self):
+        self.client.force_login(self.admin)
+        r = self.client.get('/kalendarz/?rok=2026&miesiac=12')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'grudzień 2026')
+        r = self.client.get('/kalendarz/?rok=2026&miesiac=1')
+        self.assertContains(r, 'styczeń 2026')
         
+                
 class PrzypomnieniaJutroTests(TestCase):
     """Digest „jutro”: jeden mail do rodziców (lista jutrzejszych lekcji)
     i po jednym mailu do każdego korepetytora — tylko raz dziennie na osobę."""
