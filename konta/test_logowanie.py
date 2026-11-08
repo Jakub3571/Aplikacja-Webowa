@@ -1476,6 +1476,14 @@ class KalendarzZbiorczyTests(TestCase):
         r = self.client.get('/kalendarz/')
         self.assertEqual(r.status_code, 403)
 
+    def test_caly_kafelek_dnia_jest_klikalny(self):
+        # cały kwadracik dnia to link (nie tylko numer daty)
+        self.client.force_login(self.admin)
+        r = self.client.get('/kalendarz/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, '<a class="kalendarz-komorka')
+        self.assertContains(r, 'dzien=')
+        
     def test_klik_w_dzien_rozwija_pelna_liste(self):
         self.client.force_login(self.admin)
         dzis = date.today()
@@ -1512,8 +1520,8 @@ class KalendarzZbiorczyTests(TestCase):
         self.assertContains(r, 'grudzień 2026')
         r = self.client.get('/kalendarz/?rok=2026&miesiac=1')
         self.assertContains(r, 'styczeń 2026')
-        
-                
+
+
 class PrzypomnieniaJutroTests(TestCase):
     """Digest „jutro”: jeden mail do rodziców (lista jutrzejszych lekcji)
     i po jednym mailu do każdego korepetytora — tylko raz dziennie na osobę."""

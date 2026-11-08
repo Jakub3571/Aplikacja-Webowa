@@ -25,14 +25,14 @@
     {% for tydzien in tygodnie %}
     <div class="kalendarz-wiersz">
       {% for dzien in tydzien %}
-      <div class="kalendarz-komorka {% if not dzien.w_miesiacu %}poza-miesiacem{% endif %}{% if dzien.dzisiaj %} dzisiaj{% endif %}{% if dzien.data == wybrany_dzien %} wybrany{% endif %}">
-        <a class="kalendarz-numer" href="?rok={{ rok }}&miesiac={{ miesiac }}&dzien={{ dzien.data.day }}" title="Pokaż pełną listę zajęć tego dnia">{{ dzien.data.day }}</a>
+      <a class="kalendarz-komorka {% if not dzien.w_miesiacu %}poza-miesiacem{% endif %}{% if dzien.dzisiaj %} dzisiaj{% endif %}{% if dzien.data == wybrany_dzien %} wybrany{% endif %}" href="?rok={{ rok }}&miesiac={{ miesiac }}&dzien={{ dzien.data.day }}" title="Pokaż pełną listę zajęć tego dnia">
+        <span class="kalendarz-numer">{{ dzien.data.day }}</span>
         <div class="kalendarz-wpisy">
           {% for wpis in dzien.wpisy %}
           <div class="chip {% if wpis.typ == 'lekcja' %}{% if wpis.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}" title="{{ wpis.tekst }}">{{ wpis.tekst }}</div>
           {% endfor %}
         </div>
-      </div>
+      </a>
       {% endfor %}
     </div>
     {% endfor %}

@@ -843,3 +843,9 @@ a.kalendarz-numer:hover { color: var(--akcent, #2563eb); }
 .kalendarz-dzien-szczegoly h4 { margin: 0.75rem 0 0.25rem; }
 .lista-lekcji-dnia { list-style: none; padding: 0; margin: 0 0 0.5rem; display: flex; flex-direction: column; gap: 3px; }
 .lista-lekcji-dnia .chip { font-size: 0.8rem; white-space: normal; }
+
+
+
+/* cały kafelek dnia klikalny */
+a.kalendarz-komorka { display: block; color: inherit; text-decoration: none; cursor: pointer; }
+a.kalendarz-komorka:hover { border-color: var(--akcent, #2563eb); background: #eff6ff; }
