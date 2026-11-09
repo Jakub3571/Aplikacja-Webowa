@@ -849,3 +849,10 @@ a.kalendarz-numer:hover { color: var(--akcent, #2563eb); }
 /* cały kafelek dnia klikalny */
 a.kalendarz-komorka { display: block; color: inherit; text-decoration: none; cursor: pointer; }
 a.kalendarz-komorka:hover { border-color: var(--akcent, #2563eb); background: #eff6ff; }
+
+
+/* rozwinięty kafelek dnia: rośnie tylko trochę, lista w kolumnie, suwak w środku */
+.kalendarz-komorka.wybrany { height: 15rem; background: #eff6ff; }
+.kalendarz-komorka-szczegoly { margin-top: 3px; border-top: 1px dashed #cbd5e1; padding-top: 3px; display: flex; flex-direction: column; gap: 2px; }
+.komorka-nauczyciel { font-size: 0.65rem; font-weight: 700; margin-top: 2px; }
+.chip-szczegoly { font-size: 0.68rem; white-space: normal; text-align: left; }  

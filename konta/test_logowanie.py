@@ -1484,17 +1484,19 @@ class KalendarzZbiorczyTests(TestCase):
         self.assertContains(r, '<a class="kalendarz-komorka')
         self.assertContains(r, 'dzien=')
         
-    def test_klik_w_dzien_rozwija_pelna_liste(self):
+    def test_klik_w_dzien_rozwija_kafelek_w_srodku(self):
+        # klik w dzień rozwija TEN kafelek (lista w środku, w kolumnie), bez sekcji pod siatką
         self.client.force_login(self.admin)
         dzis = date.today()
         r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'pełna lista zajęć')
-        self.assertContains(r, 'Jan Kowalski')
+        self.assertContains(r, 'kalendarz-komorka-szczegoly')
+        self.assertContains(r, 'wybrany')
         self.assertContains(r, 'lekcja z Kasia Nowak')
         self.assertContains(r, 'matematyka')
         self.assertContains(r, 'podstawowka')
         self.assertContains(r, '17:00')
+        self.assertNotContains(r, 'kalendarz-dzien-szczegoly')
 
     def test_lekcja_cykliczna_ma_jasnoniebieski_chip(self):
         self.client.force_login(self.admin)
@@ -1502,12 +1504,12 @@ class KalendarzZbiorczyTests(TestCase):
         self.uczen.zajecia_cykliczne = True
         self.uczen.save(update_fields=['zajecia_cykliczne'])
         r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
-        self.assertContains(r, '<li class="chip chip-lekcja-cykliczna">')
+        self.assertContains(r, 'chip-szczegoly chip-lekcja-cykliczna')
         self.uczen.zajecia_cykliczne = False
         self.uczen.save(update_fields=['zajecia_cykliczne'])
         r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
-        self.assertContains(r, '<li class="chip chip-lekcja">')
-        self.assertNotContains(r, '<li class="chip chip-lekcja-cykliczna">')
+        self.assertContains(r, 'chip-szczegoly chip-lekcja"')
+        self.assertNotContains(r, 'chip-szczegoly chip-lekcja-cykliczna')
     def test_nauczyciel_ma_403(self):
         self.client.force_login(self.teacher_user)
         r = self.client.get('/kalendarz/')
