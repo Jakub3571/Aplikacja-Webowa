@@ -3,11 +3,39 @@
 {% block tytul %}Kalendarz — Panel pracowniczy{% endblock %}
 
 {% block panel %}
+{% if wybrany_dzien %}
+<section class="karta karta-kalendarz kalendarz-dzien-widok">
+  <div class="kalendarz-naglowek">
+    <a class="strzalka strzalka-wroc" href="?rok={{ rok }}&miesiac={{ miesiac }}" title="Wróć do widoku miesiąca">&#8617;</a>
+    <a class="strzalka" href="?rok={{ poprzedni_dzien.year }}&miesiac={{ poprzedni_dzien.month }}&dzien={{ poprzedni_dzien.day }}">&larr;</a>
+    <h2>📅 {{ wybrany_dzien|date:"d.m.Y" }} ({{ wybrany_dzien|date:"D" }})</h2>
+    <a class="strzalka" href="?rok={{ nastepny_dzien.year }}&miesiac={{ nastepny_dzien.month }}&dzien={{ nastepny_dzien.day }}">&rarr;</a>
+  </div>
+  <p class="podpowiedz">
+    <span class="chip chip-wolny">szary: korepetytor wolny (godziny pracy)</span>
+    <span class="chip chip-lekcja">zielony: lekcja nowa (jednorazowa)</span>
+    <span class="chip chip-lekcja-cykliczna">jasnoniebieski: lekcja cykliczna</span>
+  </p>
+  <div class="dzien-godziny">
+    {% for g in godziny_dnia %}
+    <div class="dzien-wiersz-godzina">
+      <div class="dzien-godzina-etykieta">{{ g.etykieta }}</div>
+      <div class="dzien-godzina-tresc">
+        {% for wpis in g.wpisy %}
+        <span class="chip chip-dzien {% if wpis.typ == 'lekcja' %}{% if wpis.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}">{{ wpis.tekst }}</span>
+        {% empty %}
+        <span class="dzien-pusto">—</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% else %}
 <section class="karta karta-kalendarz">
   <div class="kalendarz-naglowek">
-    {% if wybrany_dzien %}<a class="strzalka strzalka-wroc" href="?rok={{ rok }}&miesiac={{ miesiac }}" title="Wróć do widoku miesiąca">&#8617;</a>{% endif %}
     <a class="strzalka" href="?rok={{ poprzedni_rok }}&miesiac={{ poprzedni_miesiac }}">&larr;</a>
-    <h2>📅 Kalendarz: {{ nazwa_miesiaca }} {{ rok }}{% if wybrany_dzien %} — {{ wybrany_dzien|date:"d.m" }}{% endif %}</h2>
+    <h2>📅 Kalendarz: {{ nazwa_miesiaca }} {{ rok }}</h2>
     <a class="strzalka" href="?rok={{ nastepny_rok }}&miesiac={{ nastepny_miesiac }}">&rarr;</a>
   </div>
   <p class="podpowiedz">
@@ -16,7 +44,7 @@
     <span class="chip chip-wolny">szary: korepetytor wolny (godziny pracy)</span>
     <span class="chip chip-lekcja">zielony: lekcja nowa (jednorazowa)</span>
     <span class="chip chip-lekcja-cykliczna">jasnoniebieski: lekcja cykliczna</span>
-    Kliknij kafelek dnia, żeby rozwinąć pełną listę zajęć tego dnia w środku kafelka.
+    Kliknij kafelek dnia, żeby wejść w ten dzień i zobaczyć wszystkie zajęcia.
   </p>
 
   <div class="kalendarz-siata">
@@ -26,29 +54,18 @@
     {% for tydzien in tygodnie %}
     <div class="kalendarz-wiersz">
       {% for dzien in tydzien %}
-      <a class="kalendarz-komorka {% if not dzien.w_miesiacu %}poza-miesiacem{% endif %}{% if dzien.dzisiaj %} dzisiaj{% endif %}{% if dzien.data == wybrany_dzien %} wybrany{% endif %}" href="?rok={{ rok }}&miesiac={{ miesiac }}&dzien={{ dzien.data.day }}" title="Pokaż pełną listę zajęć tego dnia">
+      <a class="kalendarz-komorka {% if not dzien.w_miesiacu %}poza-miesiacem{% endif %}{% if dzien.dzisiaj %} dzisiaj{% endif %}" href="?rok={{ rok }}&miesiac={{ miesiac }}&dzien={{ dzien.data.day }}" title="Wejdź w ten dzień — pełna lista zajęć">
         <span class="kalendarz-numer">{{ dzien.data.day }}</span>
         <div class="kalendarz-wpisy">
           {% for wpis in dzien.wpisy %}
           <div class="chip {% if wpis.typ == 'lekcja' %}{% if wpis.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}" title="{{ wpis.tekst }}">{{ wpis.tekst }}</div>
           {% endfor %}
-          {% if dzien.data == wybrany_dzien %}
-          {% if dzien.data == wybrany_dzien %}
-          <div class="kalendarz-komorka-szczegoly">
-            {% for g in godziny_dnia %}
-            <div class="komorka-godzina">
-              <span class="komorka-godzina-etykieta">{{ g.etykieta }}</span>
-              {% for wpis in g.wpisy %}
-              <span class="chip chip-szczegoly {% if wpis.typ == 'lekcja' %}{% if wpis.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}">{{ wpis.tekst }}</span>
-              {% endfor %}
-            </div>
-            {% endfor %}
-          </div>
-          {% endif %}
+        </div>
       </a>
       {% endfor %}
     </div>
     {% endfor %}
   </div>
 </section>
+{% endif %}
 {% endblock %}

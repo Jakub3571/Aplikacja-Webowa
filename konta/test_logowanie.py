@@ -1484,22 +1484,24 @@ class KalendarzZbiorczyTests(TestCase):
         self.assertContains(r, '<a class="kalendarz-komorka')
         self.assertContains(r, 'dzien=')
         
-    def test_klik_w_dzien_rozwija_kafelek_w_srodku(self):
-        # klik w dzień rozwija TEN kafelek (lista w środku, w kolumnie), bez sekcji pod siatką
+    def test_klik_w_dzien_przechodzi_do_pelnego_widoku_dnia(self):
+        # klik w kafelek dnia = pełny widok dnia (godzina po godzinie), ze strzałką wróć
         self.client.force_login(self.admin)
         dzis = date.today()
         r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'kalendarz-komorka-szczegoly')
-        self.assertContains(r, 'wybrany')
-        self.assertContains(r, 'komorka-godzina')
-        self.assertContains(r, 'strzalka-wroc') 
-        self.assertContains(r, 'lekcja z Kasia Nowak')
+        self.assertContains(r, 'kalendarz-dzien-widok')
+        self.assertContains(r, 'dzien-wiersz-godzina')
+        self.assertContains(r, 'strzalka-wroc')
+        self.assertContains(r, 'z Kasia Nowak')
+        self.assertContains(r, 'Jan Kowalski')
         self.assertContains(r, 'matematyka')
         self.assertContains(r, 'podstawowka')
         self.assertContains(r, '17:00')
-        self.assertNotContains(r, 'kalendarz-dzien-szczegoly')
+        self.assertNotContains(r, 'kalendarz-siata')
         r2 = self.client.get('/kalendarz/')
+        self.assertContains(r2, 'kalendarz-siata')
+        self.assertNotContains(r2, 'kalendarz-dzien-widok')
         self.assertNotContains(r2, 'strzalka-wroc')
 
     def test_lekcja_cykliczna_ma_jasnoniebieski_chip(self):
@@ -1508,12 +1510,12 @@ class KalendarzZbiorczyTests(TestCase):
         self.uczen.zajecia_cykliczne = True
         self.uczen.save(update_fields=['zajecia_cykliczne'])
         r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
-        self.assertContains(r, 'chip-szczegoly chip-lekcja-cykliczna')
+        self.assertContains(r, 'chip-dzien chip-lekcja-cykliczna')
         self.uczen.zajecia_cykliczne = False
         self.uczen.save(update_fields=['zajecia_cykliczne'])
         r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
-        self.assertContains(r, 'chip-szczegoly chip-lekcja"')
-        self.assertNotContains(r, 'chip-szczegoly chip-lekcja-cykliczna')
+        self.assertContains(r, 'chip-dzien chip-lekcja"')
+        self.assertNotContains(r, 'chip-dzien chip-lekcja-cykliczna')
     def test_nauczyciel_ma_403(self):
         self.client.force_login(self.teacher_user)
         r = self.client.get('/kalendarz/')

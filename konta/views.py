@@ -2249,18 +2249,23 @@ def kalendarz_zbiorczy(request):
                         wpisy_g.append({
                             'typ': 'lekcja',
                             'cykliczna': l['cykliczna'],
-                            'tekst': (
-                                f"{l['godzina']} lekcja z {l['uczen']} — {l['przedmiot']} ({l['poziom']}) "
-                                f"· {blok['nauczyciel'].imie} {blok['nauczyciel'].nazwisko}"
+                             'tekst': (
+                                f"{l['godzina']}–{l['koniec']} · {blok['nauczyciel'].imie} {blok['nauczyciel'].nazwisko} "
+                                f"z {l['uczen']} — {l['przedmiot']} ({l['poziom']})"
                             ),
                         })
             godziny_dnia.append({'etykieta': etykieta, 'wpisy': wpisy_g})
-
+    poprzedni_dzien = nastepny_dzien = None
+    if wybrany_dzien:
+        poprzedni_dzien = wybrany_dzien - timedelta(days=1)
+        nastepny_dzien = wybrany_dzien + timedelta(days=1)
     return render(request, 'konta/kalendarz_zbiorczy.html', {
         'tygodnie': tygodnie,
         'wybrany_dzien': wybrany_dzien,
         'szczegoly': szczegoly,
         'godziny_dnia': godziny_dnia,
+        'poprzedni_dzien': poprzedni_dzien,
+        'nastepny_dzien': nastepny_dzien,
         'dni_nazwy': ['poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota', 'niedziela'],
         'nazwa_miesiaca': MIESIACE[miesiac - 1],
         'rok': rok,
