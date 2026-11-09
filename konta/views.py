@@ -2230,10 +2230,37 @@ def kalendarz_zbiorczy(request):
                 'zakresy': [f'{s.strftime("%H:%M")}–{e.strftime("%H:%M")}' for s, e in zakresy],
             })
 
+    # rozwinięty dzień z podziałem na godziny (jak w zwykłym kalendarzu)
+    godziny_dnia = []
+    if wybrany_dzien:
+        for h in range(6, 21):
+            etykieta = f'{h:02d}:00'
+            wpisy_g = []
+            for blok in szczegoly:
+                for z in blok['zakresy']:
+                    if z.split('–')[0] == etykieta:
+                        wpisy_g.append({
+                            'typ': 'wolny',
+                            'cykliczna': False,
+                            'tekst': f"{blok['nauczyciel'].imie} {blok['nauczyciel'].nazwisko} wolny: {z}",
+                        })
+                for l in blok['lekcje']:
+                    if l['godzina'] == etykieta:
+                        wpisy_g.append({
+                            'typ': 'lekcja',
+                            'cykliczna': l['cykliczna'],
+                            'tekst': (
+                                f"{l['godzina']} lekcja z {l['uczen']} — {l['przedmiot']} ({l['poziom']}) "
+                                f"· {blok['nauczyciel'].imie} {blok['nauczyciel'].nazwisko}"
+                            ),
+                        })
+            godziny_dnia.append({'etykieta': etykieta, 'wpisy': wpisy_g})
+
     return render(request, 'konta/kalendarz_zbiorczy.html', {
         'tygodnie': tygodnie,
         'wybrany_dzien': wybrany_dzien,
         'szczegoly': szczegoly,
+        'godziny_dnia': godziny_dnia,
         'dni_nazwy': ['poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota', 'niedziela'],
         'nazwa_miesiaca': MIESIACE[miesiac - 1],
         'rok': rok,

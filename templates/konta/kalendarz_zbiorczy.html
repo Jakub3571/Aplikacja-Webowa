@@ -5,8 +5,9 @@
 {% block panel %}
 <section class="karta karta-kalendarz">
   <div class="kalendarz-naglowek">
+    {% if wybrany_dzien %}<a class="strzalka strzalka-wroc" href="?rok={{ rok }}&miesiac={{ miesiac }}" title="Wróć do widoku miesiąca">&#8617;</a>{% endif %}
     <a class="strzalka" href="?rok={{ poprzedni_rok }}&miesiac={{ poprzedni_miesiac }}">&larr;</a>
-    <h2>📅 Kalendarz: {{ nazwa_miesiaca }} {{ rok }}</h2>
+    <h2>📅 Kalendarz: {{ nazwa_miesiaca }} {{ rok }}{% if wybrany_dzien %} — {{ wybrany_dzien|date:"d.m" }}{% endif %}</h2>
     <a class="strzalka" href="?rok={{ nastepny_rok }}&miesiac={{ nastepny_miesiac }}">&rarr;</a>
   </div>
   <p class="podpowiedz">
@@ -32,18 +33,18 @@
           <div class="chip {% if wpis.typ == 'lekcja' %}{% if wpis.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}" title="{{ wpis.tekst }}">{{ wpis.tekst }}</div>
           {% endfor %}
           {% if dzien.data == wybrany_dzien %}
+          {% if dzien.data == wybrany_dzien %}
           <div class="kalendarz-komorka-szczegoly">
-            {% for blok in szczegoly %}
-            <div class="komorka-nauczyciel">{{ blok.nauczyciel.imie }} {{ blok.nauczyciel.nazwisko }}</div>
-            {% for l in blok.lekcje %}
-            <div class="chip chip-szczegoly {% if l.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}">{{ l.godzina }} lekcja z {{ l.uczen }} — {{ l.przedmiot }} ({{ l.poziom }})</div>
-            {% empty %}
-            <div class="chip chip-wolny">wolny: {{ blok.zakresy|join:", " }}</div>
-            {% endfor %}
+            {% for g in godziny_dnia %}
+            <div class="komorka-godzina">
+              <span class="komorka-godzina-etykieta">{{ g.etykieta }}</span>
+              {% for wpis in g.wpisy %}
+              <span class="chip chip-szczegoly {% if wpis.typ == 'lekcja' %}{% if wpis.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}">{{ wpis.tekst }}</span>
+              {% endfor %}
+            </div>
             {% endfor %}
           </div>
           {% endif %}
-        </div>
       </a>
       {% endfor %}
     </div>

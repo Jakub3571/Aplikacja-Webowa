@@ -1492,11 +1492,15 @@ class KalendarzZbiorczyTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'kalendarz-komorka-szczegoly')
         self.assertContains(r, 'wybrany')
+        self.assertContains(r, 'komorka-godzina')
+        self.assertContains(r, 'strzalka-wroc') 
         self.assertContains(r, 'lekcja z Kasia Nowak')
         self.assertContains(r, 'matematyka')
         self.assertContains(r, 'podstawowka')
         self.assertContains(r, '17:00')
         self.assertNotContains(r, 'kalendarz-dzien-szczegoly')
+        r2 = self.client.get('/kalendarz/')
+        self.assertNotContains(r2, 'strzalka-wroc')
 
     def test_lekcja_cykliczna_ma_jasnoniebieski_chip(self):
         self.client.force_login(self.admin)

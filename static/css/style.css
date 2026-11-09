@@ -856,3 +856,10 @@ a.kalendarz-komorka:hover { border-color: var(--akcent, #2563eb); background: #e
 .kalendarz-komorka-szczegoly { margin-top: 3px; border-top: 1px dashed #cbd5e1; padding-top: 3px; display: flex; flex-direction: column; gap: 2px; }
 .komorka-nauczyciel { font-size: 0.65rem; font-weight: 700; margin-top: 2px; }
 .chip-szczegoly { font-size: 0.68rem; white-space: normal; text-align: left; }  
+
+
+/* rozwinięty kafelek: podział na godziny + strzałka wróć */
+.kalendarz-komorka.wybrany { height: 17rem; }
+.strzalka-wroc { font-size: 1.1rem; }
+.komorka-godzina { display: flex; flex-wrap: wrap; gap: 2px; align-items: baseline; border-bottom: 1px dotted #e2e8f0; padding: 1px 0; }
+.komorka-godzina-etykieta { font-size: 0.62rem; color: #64748b; min-width: 2.1rem; font-weight: 700; }
