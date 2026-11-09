@@ -206,7 +206,7 @@ def _zakresy_dnia(nauczyciel, dzien):
     dzięki temu pojedynczy „krzywy” slot (np. 11:10–12:10 po umówionej lekcji)
     nie rozbija sąsiednich zakresów i kolejna lekcja dalej mieści się w całości."""
     zakresy = []
-    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien).order_by('godzina_od'):
+    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__lte=dzien, data_do__gte=dzien).order_by('godzina_od'):
         s = datetime.combine(dzien, termin.godzina_od)
         e = datetime.combine(dzien, termin.godzina_do)
         if zakresy and s <= zakresy[-1][1]:
@@ -280,7 +280,6 @@ def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
         while (
             i + 1 < len(sloty)
             and (start_bloku + timedelta(minutes=dlugosc)).strftime('%H:%M') == sloty[i + 1]
-            and dlugosc < 60
         ):
             dlugosc += 30
             i += 1
@@ -465,7 +464,7 @@ def korepetytorzy_dane(request):
         except ValueError:
             dzien_tmp = None
         if dzien_tmp:
-            nt = Nauczyciel.objects.filter(pk=nauczyciel_id, aktywny=True).first()
+            nt = Nauczyciel.objects.filter(pk=nauczyciel_id).first()
             if nt:
                 # dni tygodnia, w które nauczyciel w ogóle pracuje (kolejne 60 dni)
                 dni_pracy = sorted({
