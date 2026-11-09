@@ -2477,7 +2477,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
                                 godzina_od=godzina,
                                 godzina_do=(datetime.combine(date(2000, 1, 1), godzina) + timedelta(minutes=GODZINA_LEKCJI)).time(),
                             )
-                        utworzone += 1
+
                 dzien += timedelta(days=1)
         if pominiete_konflikt or pominiete_przerwa or pominiete_poza_grafikiem:
             komunikaty = []
