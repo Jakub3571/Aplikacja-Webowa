@@ -13,18 +13,19 @@
     · umówił(a): {{ uczen.kto_umowil }}
   </p>
 
-  {% if przedmioty_ucznia %}
-  <p class="podpowiedz">
-    Umawiasz stałe lekcje dla przedmiotu:
-    {% if karta %}<a class="przycisk-kalendarz" href="?">główny ({{ uczen.przedmiot }})</a>{% endif %}
+  <fieldset class="wybor-nauczyciela">
+    <legend>U którego korepetytora ustawiasz zajęcia cykliczne (uczeń: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}):</legend>
+    <label class="wybor-nauczyciela-opcja">
+      <input type="radio" name="karta" value="" {% if not karta %}checked{% endif %}>
+      {{ uczen.przedmiot }} — {{ uczen.korepetytor }} (przedmiot główny)
+    </label>
     {% for kartap in przedmioty_ucznia %}
-      {% if kartap.id == karta.id %}
-      <strong class="przycisk-kalendarz">{{ kartap.przedmiot }} ({{ kartap.korepetytor }})</strong>
-      {% else %}
-      <a class="przycisk-kalendarz" href="?karta={{ kartap.id }}">{{ kartap.przedmiot }} ({{ kartap.korepetytor }})</a>
-      {% endif %}
+    <label class="wybor-nauczyciela-opcja">
+      <input type="radio" name="karta" value="{{ kartap.id }}" {% if karta and kartap.id == karta.id %}checked{% endif %}>
+      {{ kartap.przedmiot }} — {{ kartap.korepetytor }}
+    </label>
     {% endfor %}
-  </p>
+  </fieldset>
   {% endif %}
 
   <p class="podpowiedz">
@@ -33,7 +34,7 @@
   </p>
   <form method="post" class="formularz">
     {% csrf_token %}
-    {% if karta %}<input type="hidden" name="karta" value="{{ karta.id }}">{% endif %}
+
 
     <label>Terminy tygodniowe <span class="gwiazdka">*</span></label>
     <div id="sloty-tygodniowe" data-nauczyciel="{{ nauczyciel_id }}" data-uczen="{{ uczen.id }}" data-start="{{ dzisiaj }}">
@@ -106,7 +107,8 @@
     // po wybraniu dnia tygodnia — lista godzin tylko z wolnych terminów korepetytora
     function nastepnaData(dzienTygodnia, od) {
       var d = new Date(od + 'T00:00:00');
-      var diff = (dzienTygodnia - d.getDay() + 7) % 7;
+      var jsDay = (dzienTygodnia + 1) % 7;
+      var diff = (jsDay - d.getDay() + 7) % 7;
       d.setDate(d.getDate() + diff);
       var miesiac = ('0' + (d.getMonth() + 1)).slice(-2);
       var dzien = ('0' + d.getDate()).slice(-2);
@@ -146,6 +148,11 @@
         .catch(function () {});
     }
     kontenerSlotow.addEventListener('change', function (e) {
+          document.querySelectorAll('input[name="karta"]').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        window.location.search = radio.value ? ('?karta=' + radio.value) : '?';
+      });
+    });
       if (e.target && e.target.name === 'slot_dzien') {
         odswiezGodzinyWiersza(e.target.closest('.wiersz-przedmiotu'));
       }

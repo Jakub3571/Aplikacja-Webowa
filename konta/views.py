@@ -470,14 +470,18 @@ def korepetytorzy_dane(request):
             nt = Nauczyciel.objects.filter(pk=nauczyciel_id).first()
             if nt:
                 # dni tygodnia, w które nauczyciel w ogóle pracuje (kolejne 60 dni)
-                dni_pracy = sorted({
-                    d.weekday()
-                    for d in Dostepnosc.objects.filter(
-                        nauczyciel=nt,
-                        data_od__gte=date.today(),
-                        data_od__lt=date.today() + timedelta(days=60),
-                    ).values_list('data_od', flat=True)
-                })
+                dni_pracy = set()
+                for termin in Dostepnosc.objects.filter(
+                    nauczyciel=nt,
+                    data_od__lt=date.today() + timedelta(days=60),
+                    data_do__gte=date.today(),
+                ):
+                    d = max(termin.data_od, date.today())
+                    koniec = min(termin.data_do, date.today() + timedelta(days=60))
+                    while d <= koniec:
+                        dni_pracy.add(d.weekday())
+                        d += timedelta(days=1)
+                dni_pracy = sorted(dni_pracy)
                 godziny = wolne_godziny_nauczyciela(nt, dzien_tmp, pomijaj_uczen_id=pomijaj_uczen_id)
                 if not godziny:
                     for i in range(1, 9):
@@ -554,7 +558,11 @@ def uczniowie(request):
     """Zakładka uczniowie: lista, formularz dodawania i dostępność nauczycieli.
     Zwykły pracownik widzi tylko uczniów, których sam umówił.
     Konto nauczyciela nie ma tu wstępu (widzi tylko swój kalendarz)."""
-    if getattr(request.user, 'nauczyciel_id', None):
+    if (
+        getattr(request.user, 'nauczyciel_id', None)
+        and str(request.user.nauczyciel_id) != request.GET.get('nauczyciel', '')
+    ):
+        return JsonResponse({'blad': 'Brak uprawnień.'}, status=403)
         raise PermissionDenied
     if czy_szef(request.user) or czy_koordynator(request.user):
         uczniowie_lista = list(Uczen.objects.all())
@@ -2375,9 +2383,13 @@ def umow_lekcje_cykliczna(request, uczen_id):
     if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
         raise PermissionDenied
 
-    # aktywny przedmiot: główny lub dodatkowy (karta)
+    # aktywny przedmiot: główny lub dodatkowy (karta); przy POST bierzemy wybór
+    # z formularza (radio name="karta"), a nie ze starego ?karta= w adresie
     karta = None
-    karta_id = request.GET.get('karta') or request.POST.get('karta')
+    if request.method == 'POST' and 'karta' in request.POST:
+        karta_id = request.POST.get('karta', '')
+    else:
+        karta_id = request.GET.get('karta', '')
     if karta_id:
         karta = uczen.przedmioty_ucznia.filter(pk=karta_id).first()
         if not karta:
