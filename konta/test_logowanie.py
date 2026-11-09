@@ -747,11 +747,12 @@ class LekcjeCykliczneTests(TestCase):
             'slot_godzina': ['17:00', '17:00'],
             'link_meet': '',
         }, follow=True)
-        self.assertContains(r, 'Pominięto')
-        godziny = {timezone.localtime(l.data).strftime('%H:%M') for l in Lekcja.objects.filter(uczen=self.uczen)}
-        self.assertEqual(len(godziny), 1)
+        self.assertContains(r, 'umówione')
+        self.assertNotContains(r, 'Pominięto')
         qs = Lekcja.objects.filter(uczen=self.uczen)
         self.assertEqual(qs.count(), qs.values('data').distinct().count(), 'nie może być duplikatów terminów')
+        godziny = {timezone.localtime(l.data).strftime('%H:%M') for l in qs}
+        self.assertEqual(godziny, {'17:00'})
     def test_cykliczna_dla_przedmiotu_dodatkowego_przez_karta(self):
         # karta przedmiotu dodatkowego u INNEGO nauczyciela + cykliczna przez ?karta=ID:
         # lekcje powstają z przedmiot_karta i blokują grafik tego nauczyciela
@@ -965,7 +966,7 @@ class StaleLekcjeMultiSlotTests(TestCase):
             Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='17:00').exists()
         )
         self.assertTrue(
-            Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='18:10').exists()
+            Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='18:00').exists()
         )
 
     def test_preset_rok_szkolny(self):
