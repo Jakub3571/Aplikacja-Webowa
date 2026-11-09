@@ -16,7 +16,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Max
 from django.utils import timezone
 
-from konta.models import Lekcja, Uczen
+from konta.models import Dostepnosc, Lekcja, Uczen
 from konta.views import GODZINA_LEKCJI, godzina_w_przerwie, kolizja_lekcji_nauczyciela, nauczyciel_z_korepetytora
 
 
@@ -43,16 +43,20 @@ class Command(BaseCommand):
 
             # wzorce slotów: (dzień tygodnia, godzina) z ostatnich 4 tygodni przed ostatnią lekcją
             poczatek_okna = ostatnia_local.date() - timedelta(days=28)
-            wzorce = set()
+            wzorce = {}
             for lekcja in Lekcja.objects.filter(uczen=uczen, data__gte=poczatek_okna):
                 start = timezone.localtime(lekcja.data)
-                wzorce.add((start.weekday(), start.time()))
+                wzorce.setdefault((start.weekday(), start.time()), set()).add(start.date())
 
             nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
             nowy = False
             for dzien in [ostatnia_local.date() + timedelta(days=i) for i in range(1, 91)]:
-                for dzien_tygodnia, godzina in wzorce:
+                for (dzien_tygodnia, godzina), daty_wzorca in wzorce.items():
                     if dzien.weekday() != dzien_tygodnia or dzien > granica:
+                        continue
+                    daty_posortowane = sorted(daty_wzorca)
+                    co_14_dni = any((b - a).days == 14 for a, b in zip(daty_posortowane, daty_posortowane[1:]))
+                    if co_14_dni and (dzien - daty_posortowane[-1]).days % 14 != 0:
                         continue
                     data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
                     if Lekcja.objects.filter(uczen=uczen, data=data_lekcji).exists():
@@ -65,6 +69,14 @@ class Command(BaseCommand):
                             pominiete += 1
                             continue
                     Lekcja.objects.create(uczen=uczen, data=data_lekcji)
+                    if nauczyciel:
+                        Dostepnosc.objects.get_or_create(
+                            nauczyciel=nauczyciel,
+                            data_od=dzien,
+                            data_do=dzien,
+                            godzina_od=godzina,
+                            godzina_do=(datetime.combine(date(2000, 1, 1), godzina) + timedelta(minutes=GODZINA_LEKCJI)).time(),
+                        )
                     nowy = True
                     utworzone += 1
             if nowy:

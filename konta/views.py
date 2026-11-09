@@ -155,13 +155,12 @@ def lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela):
     return (lekcja.uczen.korepetytor or '').strip().lower() == nazwa_nauczyciela
 
 
-def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None):
+def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None, pomijaj_uczen_id=None):
     """Czy lekcja (60 min od start_lekcji) koliduje z istniejącą lekcją nauczyciela.
 
     Lekcja efektywnie zajmuje [start, koniec + przerwa) — dwie lekcje kolidują,
-    gdy te przedziały zachodzą na siebie, czyli między lekcjami musi zmieścić się
-    PEŁNA przerwa. Uwzględnia wszystkie przedmioty nauczyciela, także lekcje
-    TEGO SAMEGO ucznia — dlatego po lekcji 18:00 nie da się ustawić 18:30.
+    gdy te przedziały zachodzą na siebie. Uwzględnia wszystkie przedmioty nauczyciela.
+    pomijaj_uczen_id: lekcje TEGO ucznia nie blokują (cykliczne — pierwsza lekcja już istnieje).
     """
     if not nauczyciel:
         return False
@@ -170,6 +169,8 @@ def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None
     nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
     moj_koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI + przerwa_min)
     for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien, odwolana=False):
+        if pomijaj_uczen_id and lekcja.uczen_id == pomijaj_uczen_id:
+            continue
         if not lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela):
             continue
         l_start = timezone.localtime(lekcja.data).replace(tzinfo=None)
@@ -224,51 +225,25 @@ def nauczyciel_wolny_o(nauczyciel, dzien, start_lekcji):
     return start_lekcji.strftime('%H:%M') in wolne_godziny_nauczyciela(nauczyciel, dzien)
 
 
-def wolne_godziny_nauczyciela(nauczyciel, dzien):
-    """Godziny startu lekcji dostępne u nauczyciela w danym dniu.
-
-    Siatka rytmu: od początku każdego zaznaczonego przedziału co (60 min lekcji
-    + przerwa nauczyciela), o ile lekcja mieści się w przedziale — np. przedział
-    11:00–19:00 przy przerwie 5 min daje 11:00, 12:05, 13:10, ...; osobne
-    przedziały dają własne początki (6:05, 7:15, ...).
-    Dodatkowo łańcuchy wokół zajętych lekcji: przed lekcją można wstawić slot
-    kończący się z przerwą tuż przed nią (np. 12:55 przed 14:00), a po lekcji
-    pierwszy slot to koniec + przerwa (np. 15:05 po 14:00), dalej rytmem.
-    Wszystko przechodzi jeszcze przez kolizje (lekcja zajmuje [start, koniec +
-    przerwa)) i okno przerwy dnia. Używane wszędzie, gdzie wybiera się godzinę:
-    Krok 4 formularza ucznia, kreator cykliczny, dodawanie przedmiotu — i przez
-    walidację (nauczyciel_wolny_o)."""
+def wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=None):
+    """Godziny startu lekcji dostępne u nauczyciela — PEŁNE GODZINY (co 60 min)
+    od początku każdego przedziału, o ile lekcja mieści się w przedziale.
+    Koniec przedziału WŁĄCZNY („do 20:00” = można też o 20:00).
+    Przerwa między lekcjami nadal obowiązuje (kolizja zajmuje [start, koniec + przerwa))."""
     wynik = []
     if not nauczyciel:
         return wynik
     przerwa = nauczyciel.przerwa or 5
-    krok = timedelta(minutes=GODZINA_LEKCJI + przerwa)
-    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
-    lekcje_dnia = [
-        timezone.localtime(l.data).replace(tzinfo=None)
-        for l in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien, odwolana=False)
-        if lekcja_jest_u_nauczyciela(l, nazwa_nauczyciela)
-    ]
     for s, e in _zakresy_dnia(nauczyciel, dzien):
         kandydaci = set()
         t = s
         while t + timedelta(minutes=GODZINA_LEKCJI) <= e:
             kandydaci.add(t)
-            t += krok
+            t += timedelta(minutes=GODZINA_LEKCJI)
         if s < e:
-            # koniec przedziału też może być startem lekcji („do 20:00” = można też o 20:00)
             kandydaci.add(e)
-        for l_start in lekcje_dnia:
-            l_koniec = l_start + timedelta(minutes=GODZINA_LEKCJI)
-            przed = l_start - krok
-            if s <= przed and przed + timedelta(minutes=GODZINA_LEKCJI) <= e:
-                kandydaci.add(przed)
-            t = l_koniec + timedelta(minutes=przerwa)
-            while t + timedelta(minutes=GODZINA_LEKCJI) <= e:
-                kandydaci.add(t)
-                t += krok
         for start in sorted(kandydaci):
-            if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start, przerwa_min=przerwa):
+            if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start, przerwa_min=przerwa, pomijaj_uczen_id=pomijaj_uczen_id):
                 continue
             if godzina_w_przerwie(nauczyciel, dzien, start.time()):
                 continue
@@ -482,6 +457,8 @@ def korepetytorzy_dane(request):
     godzina_txt = request.GET.get('godzina', '')
     # tryb wolnych godzin JEDNEGO nauczyciela w konkretnym dniu (kreator lekcji cyklicznej)
     nauczyciel_id = request.GET.get('nauczyciel', '')
+    uczen_id_txt = request.GET.get('uczen', '')
+    pomijaj_uczen_id = int(uczen_id_txt) if uczen_id_txt.isdigit() else None
     if nauczyciel_id and data_txt:
         try:
             dzien_tmp = date.fromisoformat(data_txt)
@@ -490,8 +467,20 @@ def korepetytorzy_dane(request):
         if dzien_tmp:
             nt = Nauczyciel.objects.filter(pk=nauczyciel_id, aktywny=True).first()
             if nt:
+                # dni tygodnia, w które nauczyciel w ogóle pracuje (kolejne 60 dni)
+                dni_pracy = sorted({
+                    d.weekday()
+                    for d in Dostepnosc.objects.filter(
+                        nauczyciel=nt,
+                        data_od__gte=date.today(),
+                        data_od__lt=date.today() + timedelta(days=60),
+                    ).values_list('data_od', flat=True)
+                })
                 return JsonResponse({
-                    'godziny': [{'godzina': h} for h in wolne_godziny_nauczyciela(nt, dzien_tmp)]
+                    'godziny': [{'godzina': h} for h in wolne_godziny_nauczyciela(nt, dzien_tmp, pomijaj_uczen_id=pomijaj_uczen_id)],
+                    'data': dzien_tmp.isoformat(),
+                    'dzien_nazwa': DNI_TYGODNIA[dzien_tmp.weekday()],
+                    'dni_pracy': dni_pracy,
                 })
             return JsonResponse({'godziny': []})
     if not przedmiot or not poziom:
@@ -2433,16 +2422,20 @@ def umow_lekcje_cykliczna(request, uczen_id):
         pominiete_przerwa = 0
         pominiete_poza_grafikiem = 0
         for dzien_tygodnia, godzina_txt in sloty:
-            godzina = datetime.strptime(godzina_txt, '%H:%M').time()
+            try:
+                godzina = datetime.strptime(godzina_txt, '%H:%M').time()
+            except ValueError:
+                continue
+            pierwszy_slot = od_dnia + timedelta(days=(dzien_tygodnia - od_dnia.weekday()) % 7)
             dzien = od_dnia
             while dzien <= do_dnia:
                 if dzien.weekday() == dzien_tygodnia and (
-                    not co_2_tygodnie or (dzien - od_dnia).days % 14 == 0
+                    not co_2_tygodnie or (dzien - pierwszy_slot).days % 14 == 0
                     ):
                     data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
                     start_dt = datetime.combine(dzien, godzina)
-                    if nauczyciel and godzina_txt not in wolne_godziny_nauczyciela(nauczyciel, dzien):
-                        if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_dt):
+                    if nauczyciel and godzina_txt not in wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=uczen.id):
+                        if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_dt, pomijaj_uczen_id=uczen.id):
                             pominiete_konflikt += 1
                         elif godzina_w_przerwie(nauczyciel, dzien, godzina):
                             pominiete_przerwa += 1
@@ -2450,9 +2443,11 @@ def umow_lekcje_cykliczna(request, uczen_id):
                             pominiete_poza_grafikiem += 1
                     else:
                         if karta:
-                            Lekcja.objects.get_or_create(uczen=uczen, data=data_lekcji, przedmiot_karta=karta)
+                            _, stworzona = Lekcja.objects.get_or_create(uczen=uczen, data=data_lekcji, przedmiot_karta=karta)
                         else:
-                            Lekcja.objects.get_or_create(uczen=uczen, data=data_lekcji, przedmiot_karta__isnull=True)
+                            _, stworzona = Lekcja.objects.get_or_create(uczen=uczen, data=data_lekcji, przedmiot_karta__isnull=True)
+                        if stworzona:
+                            utworzone += 1
                         if nauczyciel:
                             Dostepnosc.objects.get_or_create(
                                 nauczyciel=nauczyciel,
@@ -2470,11 +2465,18 @@ def umow_lekcje_cykliczna(request, uczen_id):
             if pominiete_poza_grafikiem: komunikaty.append(f'{pominiete_poza_grafikiem} terminów poza godzinami pracy korepetytora')
             if pominiete_przerwa:
                 komunikaty.append(f'{pominiete_przerwa} terminów w przerwie dnia nauczyciela')
-            messages.warning(
-                request,
-                f'Pominięto: ' + ' oraz '.join(komunikaty) + '. '
-                f'Wpisano {utworzone} terminów do {do_dnia:%d.%m.%Y}.',
-            )
+            if utworzone == 0:
+                messages.error(
+                    request,
+                    'Nie wpisałem żadnego terminu — ' + ' oraz '.join(komunikaty)
+                    + '. Sprawdź dostępność korepetytora w „Mój tydzień” (dni, w których pracuje).',
+                )
+            else:
+                messages.warning(
+                    request,
+                    f'Pominięto: ' + ' oraz '.join(komunikaty) + '. '
+                    f'Wpisano {utworzone} terminów do {do_dnia:%d.%m.%Y}.',
+                )
         else:
             messages.success(
                 request,
@@ -2511,7 +2513,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
         'karta': karta,
         'przedmioty_ucznia': list(uczen.przedmioty_ucznia.all()),
         'biezacy_link_meet': (karta.link_meet if karta else uczen.link_meet) or '',
-        'godziny': [f'{h:02d}:{m:02d}' for h in range(6, 24) for m in range(0, 60, 5)],
+        'godziny': [f'{h:02d}:00' for h in range(6, 24)],
         'dzisiaj': date.today().isoformat(),
         'nauczyciel_id': nauczyciel.id if nauczyciel else '',
     })

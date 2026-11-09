@@ -36,7 +36,7 @@
     {% if karta %}<input type="hidden" name="karta" value="{{ karta.id }}">{% endif %}
 
     <label>Terminy tygodniowe <span class="gwiazdka">*</span></label>
-    <div id="sloty-tygodniowe" data-nauczyciel="{{ nauczyciel_id }}" data-start="{{ dzisiaj }}">
+    <div id="sloty-tygodniowe" data-nauczyciel="{{ nauczyciel_id }}" data-uczen="{{ uczen.id }}" data-start="{{ dzisiaj }}">
       <div class="wiersz-przedmiotu">
         <select name="slot_dzien" required>
           <option value="">— dzień —</option>
@@ -48,6 +48,7 @@
           <option value="5">sobota</option>
           <option value="6">niedziela</option>
         </select>
+        <span class="slot-data podpowiedz"></span>
         <select name="slot_godzina" required>
           <option value="">— godzina —</option>
           {% for g in godziny %}
@@ -60,10 +61,7 @@
     <button type="button" id="dodaj-slot">+ Dodaj kolejny termin</button>
     <p class="podpowiedz">Przykład: wtorek 17:20 i czwartek 19:15 = 2 lekcje tygodniowo.</p>
 
-    <label for="id_data_poczatkowa">Pierwsza lekcja od (data) <span class="gwiazdka">*</span></label>
-    <input type="date" name="data_poczatkowa" id="id_data_poczatkowa" value="{{ dzisiaj }}">
-    <p class="podpowiedz">Możesz wpisać też datę z przeszłości — lekcje wpiszemy od tego dnia (przydatne, gdy ustaliliście terminy wcześniej).
-      Zostaw puste, jeżeli ma być od dzisiaj.</p>
+
 
     <label>Obowiązuje do <span class="gwiazdka">*</span></label>
     <select name="okres" required>
@@ -124,21 +122,26 @@
       var nt = kontenerSlotow.dataset.nauczyciel;
       if (!nt || !wyborDnia.value) return;
       var start = kontenerSlotow.dataset.start;
-      var poleStart = document.getElementById('id_data_poczatkowa');
-      if (poleStart && poleStart.value) start = poleStart.value;
       var data = nastepnaData(parseInt(wyborDnia.value, 10), start);
-      fetch('/korepetytorzy/dane/?nauczyciel=' + encodeURIComponent(nt) + '&data=' + encodeURIComponent(data), {
+      fetch('/korepetytorzy/dane/?nauczyciel=' + encodeURIComponent(nt) + '&data=' + encodeURIComponent(data) + '&uczen=' + encodeURIComponent(kontenerSlotow.dataset.uczen || ''), {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
       })
         .then(function (odp) { return odp.json(); })
         .then(function (dane) {
           var biezaca = wyborGodziny.value;
+          var dataTxt = dane.data || data;
+          var dataPl = dataTxt.split('-').reverse().join('.');
+          var etykietaData = wiersz.querySelector('.slot-data');
+          if (etykietaData) etykietaData.textContent = ' (' + dataPl + ')';
           var opcje = '<option value="">— godzina (wolne terminy) —</option>';
           (dane.godziny || []).forEach(function (g) {
             opcje += '<option value="' + g.godzina + '">' + g.godzina + '</option>';
           });
           if (!(dane.godziny || []).length) {
-            opcje = '<option value="">— brak wolnych godzin tego dnia —</option>';
+            var niePracuje = (dane.dni_pracy || []).indexOf(parseInt(wyborDnia.value, 10)) === -1;
+            opcje = '<option value="">— ' + (niePracuje
+              ? 'nauczyciel nie pracuje w ten dzień tygodnia'
+              : 'brak wolnych godzin ' + dataPl) + ' —</option>';
           }
           wyborGodziny.innerHTML = opcje;
           if (biezaca) wyborGodziny.value = biezaca;
@@ -149,6 +152,13 @@
       if (e.target && e.target.name === 'slot_dzien') {
         odswiezGodzinyWiersza(e.target.closest('.wiersz-przedmiotu'));
       }
+    });
+    var poleStart = document.getElementById('id_data_poczatkowa');
+    if (poleStart) {
+      poleStart.addEventListener('change', function () {
+        kontenerSlotow.querySelectorAll('.wiersz-przedmiotu').forEach(odswiezGodzinyWiersza);
+      });
+    }
     });
   }
 </script>
