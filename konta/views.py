@@ -448,7 +448,10 @@ def dostepnosci_nauczycieli():
 def korepetytorzy_dane(request):
     """AJAX: zwraca listę aktywnych korepetytorów dla przedmiotu i poziomu.
     Gdy podano datę i godzinę 1. lekcji — tylko tych, którzy zaznaczyli ten termin w kalendarzu."""
-    if getattr(request.user, 'nauczyciel_id', None):
+    if (
+        getattr(request.user, 'nauczyciel_id', None)
+        and str(request.user.nauczyciel_id) != request.GET.get('nauczyciel', '')
+    ):
         return JsonResponse({'blad': 'Brak uprawnień.'}, status=403)
     przedmiot = request.GET.get('przedmiot', '')
     poziom = request.GET.get('poziom', '')
@@ -475,8 +478,15 @@ def korepetytorzy_dane(request):
                         data_od__lt=date.today() + timedelta(days=60),
                     ).values_list('data_od', flat=True)
                 })
+                godziny = wolne_godziny_nauczyciela(nt, dzien_tmp, pomijaj_uczen_id=pomijaj_uczen_id)
+                if not godziny:
+                    for i in range(1, 9):
+                        godziny += wolne_godziny_nauczyciela(
+                            nt, dzien_tmp + timedelta(weeks=i), pomijaj_uczen_id=pomijaj_uczen_id,
+                        )
+                    godziny = sorted(set(godziny))
                 return JsonResponse({
-                    'godziny': [{'godzina': h} for h in wolne_godziny_nauczyciela(nt, dzien_tmp, pomijaj_uczen_id=pomijaj_uczen_id)],
+                    'godziny': [{'godzina': h} for h in godziny],
                     'data': dzien_tmp.isoformat(),
                     'dzien_nazwa': DNI_TYGODNIA[dzien_tmp.weekday()],
                     'dni_pracy': dni_pracy,
