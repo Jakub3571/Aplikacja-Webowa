@@ -2,7 +2,7 @@
 {% block tytul %}Stałe lekcje — Panel pracowniczy{% endblock %}
 {% block panel %}
 <section class="karta">
-  <h2>🔄 Stałe lekcje: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</h2>
+  <h2>🔁 Stałe lekcje: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</h2>
   <p class="podtytul">
     {% if karta %}
     Przedmiot: {{ karta.przedmiot }} · poziom: {{ karta.poziom }} · korepetytor: {{ karta.korepetytor }}
@@ -26,7 +26,6 @@
     </label>
     {% endfor %}
   </fieldset>
-  {% endif %}
 
   <p class="podpowiedz">
     Wybierz jeden lub więcej terminów tygodniowych — lekcje wpiszą się automatycznie do kalendarza,
@@ -34,7 +33,6 @@
   </p>
   <form method="post" class="formularz">
     {% csrf_token %}
-
 
     <label>Terminy tygodniowe <span class="gwiazdka">*</span></label>
     <div id="sloty-tygodniowe" data-nauczyciel="{{ nauczyciel_id }}" data-uczen="{{ uczen.id }}" data-start="{{ dzisiaj }}">
@@ -60,24 +58,21 @@
       </div>
     </div>
     <button type="button" id="dodaj-slot">+ Dodaj kolejny termin</button>
-    <p class="podpowiedz">Przykład: wtorek 17:20 i czwartek 19:15 = 2 lekcje tygodniowo.</p>
-
-
+    <p class="podpowiedz">Przykład: wtorek 17:00 i czwartek 19:00 = 2 lekcje tygodniowo.</p>
 
     <label>Obowiązuje do <span class="gwiazdka">*</span></label>
     <select name="okres" required>
       <option value="miesiac">do końca tego miesiąca</option>
       <option value="rok" selected>do końca roku szkolnego (30 czerwca)</option>
     </select>
-    <p class="podpowiedz">Lekcje cykliczne zawsze mają określony koniec — wybierz miesiąc, co 2 tygodnie albo rok szkolny. Po tym czasie lekcje przestają się dopisywać.</p>
-        <div class="pole-checkbox">
+    <p class="podpowiedz">Lekcje cykliczne zawsze mają określony koniec — wybierz miesiąc albo rok szkolny (rytm „co 2 tygodnie” ustawiasz osobnym polem niżej). Po tym czasie lekcje przestają się dopisywać.</p>
+    <div class="pole-checkbox">
       <input type="checkbox" name="co_2_tygodnie" id="id_co_2_tygodnie">
       <label for="id_co_2_tygodnie">zajęcia co 2 tygodnie (zamiast co tydzień)</label>
     </div>
     <p class="podpowiedz">Zaznacz, jeśli uczeń ma zajęcia raz na 2 tygodnie — wtedy wpiszą się tylko co 14 dni w wybranym dniu, w ramach wybranego okresu powyżej.</p>
     <p class="podpowiedz">
-      „Na zawsze" wpisuje lekcje na 3 miesiące naprzód i co noc automatycznie je przedłuża — nikt nie musi się logować, żeby odnowić terminy.</p>
-
+      Zajęcia cykliczne przedłużają się same — co noc komenda „odnow_cykliczne” dopisuje kolejne terminy (do 90 dni naprzód), więc nikt nie musi się logować, żeby odnowić zajęcia.</p>
 
     <button type="submit">Umów stałe lekcje</button>
   </form>
@@ -147,23 +142,16 @@
         })
         .catch(function () {});
     }
-    kontenerSlotow.addEventListener('change', function (e) {
-          document.querySelectorAll('input[name="karta"]').forEach(function (radio) {
+    document.querySelectorAll('input[name="karta"]').forEach(function (radio) {
       radio.addEventListener('change', function () {
         window.location.search = radio.value ? ('?karta=' + radio.value) : '?';
       });
     });
+    kontenerSlotow.addEventListener('change', function (e) {
       if (e.target && e.target.name === 'slot_dzien') {
         odswiezGodzinyWiersza(e.target.closest('.wiersz-przedmiotu'));
       }
     });
-    var poleStart = document.getElementById('id_data_poczatkowa');
-    if (poleStart) {
-      poleStart.addEventListener('change', function () {
-        kontenerSlotow.querySelectorAll('.wiersz-przedmiotu').forEach(odswiezGodzinyWiersza);
-      });
-    }
-
   }
 </script>
 {% endblock %}
