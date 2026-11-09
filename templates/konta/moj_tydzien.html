@@ -52,6 +52,7 @@
         </div>
         <button type="button" class="zakres-dodaj przycisk-kalendarz" data-dzien="{{ dzien.data|date:'Y-m-d' }}">＋</button>
 <button type="button" class="zakres-powtorz przycisk-kalendarz" data-dzien="{{ dzien.data|date:'Y-m-d' }}" title="Powtórz ten plan co tydzień do końca roku szkolnego (30 czerwca)">🔄</button>
+<button type="button" class="zakres-cofnij przycisk-kalendarz" data-dzien="{{ dzien.data|date:'Y-m-d' }}" title="Cofnij powtórzenia tego dnia tygodnia (usuń przyszłe tygodnie)">✖</button>
         <div class="zakres-okienko" style="display: none;">
           <div class="zakres-pola">
             <label>pracuję od
@@ -138,6 +139,24 @@
 
       var usun = zdarzenie.target.closest('.zakres-usun');
             var powtorz = zdarzenie.target.closest('.zakres-powtorz');
+            var cofnij = zdarzenie.target.closest('.zakres-cofnij');
+      if (cofnij) {
+        var daneC = new FormData();
+        daneC.append('dzien', cofnij.dataset.dzien);
+        daneC.append('akcja', 'cofnij_powtorzenia');
+        fetch(url, {
+          method: 'POST',
+          body: daneC,
+          headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf() },
+        })
+          .then(function (odp) { return odp.json(); })
+          .then(function (wynik) {
+            if (wynik.blad) { komunikat.textContent = wynik.blad; return; }
+            komunikat.textContent = wynik.komunikat || '';
+            odswiezStrone();
+          });
+        return;
+      }      
       if (powtorz) {
         var dane = new FormData();
         dane.append('dzien', powtorz.dataset.dzien);

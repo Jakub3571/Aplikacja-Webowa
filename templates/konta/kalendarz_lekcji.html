@@ -28,7 +28,16 @@
   {% endif %}
   <a class="powrot" href="{% url 'lekcje' %}">← Wróć do listy uczniów</a>
 </section>
+{% if not jest_nauczycielem %}
 <a class="przycisk-kalendarz" href="{% url 'lekcja_cykliczna' uczen.id %}{% if karta %}?karta={{ karta.id }}{% endif %}">🔁 Lekcja cykliczna{% if karta %} ({{ karta.przedmiot }}){% endif %}</a>
+{% endif %}
+{% if uczen.zajecia_cykliczne and moze_usuwac %}
+<form method="post" style="display:inline-block; margin-left:0.5rem">
+  {% csrf_token %}
+  <input type="hidden" name="anuluj_cykliczne" value="1">
+  <button type="submit" class="przycisk-kalendarz">✖ Anuluj zajęcia cykliczne</button>
+</form>
+{% endif %}
 <div class="kalendarz-uklad">
   <section class="karta">
     <div class="kalendarz-naglowek">

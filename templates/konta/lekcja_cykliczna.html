@@ -13,19 +13,22 @@
     · umówił(a): {{ uczen.kto_umowil }}
   </p>
 
-  <fieldset class="wybor-nauczyciela">
-    <legend>U którego korepetytora ustawiasz zajęcia cykliczne (uczeń: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}):</legend>
-    <label class="wybor-nauczyciela-opcja">
-      <input type="radio" name="karta" value="" {% if not karta %}checked{% endif %}>
-      {{ uczen.przedmiot }} — {{ uczen.korepetytor }} (przedmiot główny)
-    </label>
-    {% for kartap in przedmioty_ucznia %}
-    <label class="wybor-nauczyciela-opcja">
-      <input type="radio" name="karta" value="{{ kartap.id }}" {% if karta and kartap.id == karta.id %}checked{% endif %}>
-      {{ kartap.przedmiot }} — {{ kartap.korepetytor }}
-    </label>
-    {% endfor %}
-  </fieldset>
+  <form method="post" class="formularz">
+    {% csrf_token %}
+
+    <fieldset class="wybor-nauczyciela">
+      <legend>U którego korepetytora ustawiasz zajęcia cykliczne (uczeń: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}):</legend>
+      <label class="wybor-nauczyciela-opcja">
+        <input type="radio" name="karta" value="" {% if not karta %}checked{% endif %}>
+        {{ uczen.przedmiot }} — {{ uczen.korepetytor }} (przedmiot główny)
+      </label>
+      {% for kartap in przedmioty_ucznia %}
+      <label class="wybor-nauczyciela-opcja">
+        <input type="radio" name="karta" value="{{ kartap.id }}" {% if karta and kartap.id == karta.id %}checked{% endif %}>
+        {{ kartap.przedmiot }} — {{ kartap.korepetytor }}
+      </label>
+      {% endfor %}
+    </fieldset>
 
   <p class="podpowiedz">
     Wybierz jeden lub więcej terminów tygodniowych — lekcje wpiszą się automatycznie do kalendarza,
@@ -49,10 +52,7 @@
         </select>
         <span class="slot-data podpowiedz"></span>
         <select name="slot_godzina" required>
-          <option value="">— godzina —</option>
-          {% for g in godziny %}
-          <option value="{{ g }}">{{ g }}</option>
-          {% endfor %}
+          <option value="">— najpierw wybierz dzień tygodnia —</option>
         </select>
         <button type="button" class="przycisk-usun-slot" title="Usuń ten termin">✘</button>
       </div>

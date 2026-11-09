@@ -895,7 +895,11 @@ def archiwum_uczniow(request):
 def zakoncz_ucznia(request, uczen_id):
     """Archiwizuje ucznia: znika z list bieżących, ale zostaje w archiwum (dane i lekcje nietknięte)."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
-    if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
+    if (
+        not czy_szef(request.user)
+        and not czy_koordynator(request.user)
+        and uczen.umowil_id != request.user.id
+    ):
         raise PermissionDenied
     if request.method == 'POST':
         zwolnij_blokady_ucznia(uczen)
@@ -1298,6 +1302,17 @@ def kalendarz_dane(request, nauczyciel_id):
                 )
             docelowy += timedelta(days=7)
         komunikat = f'Plan powtórzono co tydzień do {ostatni_dzien:%d.%m.%Y} ({utworzone} terminów).'
+    elif akcja == 'cofnij_powtorzenia':
+        usuniete = 0
+        for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__gt=dzien_data):
+            if termin.data_od.weekday() == dzien_data.weekday():
+                termin.delete()
+                usuniete += 1
+        for wpis in PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data__gt=dzien_data):
+            if wpis.data.weekday() == dzien_data.weekday():
+                wpis.delete()
+        komunikat = (f'Usunięto {usuniete} przyszłych powtórzeń dnia {dzien_data:%d.%m.%Y} '
+                     f'(ten dzień tygodnia w kolejnych tygodniach).')
     else:
         return JsonResponse({'blad': 'Nieznana akcja.'}, status=400)
 
@@ -1555,6 +1570,32 @@ def kalendarz_lekcji(request, uczen_id):
                 zajete_przez_innych.add((start_lekcji + timedelta(minutes=minuty)).strftime('%H:%M'))
 
     karta_param = f'&karta={karta.id}' if karta else ''
+    if request.method == 'POST' and 'anuluj_cykliczne' in request.POST:
+        if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
+            raise PermissionDenied
+        przyszle = Lekcja.objects.filter(
+            uczen=uczen, data__gte=timezone.now(), odwolana=False, **filtr_karta,
+        )
+        usuniete = przyszle.count()
+        for lekcja in przyszle:
+            if nauczyciel:
+                st = timezone.localtime(lekcja.data)
+                Dostepnosc.objects.filter(
+                    nauczyciel=nauczyciel, data_od=st.date(), godzina_od=st.time(),
+                ).delete()
+        przyszle.delete()
+        if not Lekcja.objects.filter(uczen=uczen, data__gte=timezone.now(), odwolana=False).exists():
+            uczen.zajecia_cykliczne = False
+            uczen.save(update_fields=['zajecia_cykliczne'])
+        messages.success(
+            request,
+            f'Anulowano zajęcia cykliczne — usunięto {usuniete} przyszłych terminów '
+            'i zwolniono godziny korepetytora.',
+        )
+        return redirect(
+            reverse('kalendarz_lekcji', args=[uczen.id])
+            + f'?rok={rok}&miesiac={miesiac}{karta_param}'
+        )
 
     if request.method == 'POST' and 'odwolaj_lekcje' in request.POST and wybrany_dzien:
         lekcja_id = request.POST.get('lekcja_id')
@@ -1721,6 +1762,8 @@ def kalendarz_lekcji(request, uczen_id):
         'kafelki': kafelki,
         'lekcje_dnia': lekcje_dnia,
         'liczba_lekcji': liczba_lekcji,
+        'jest_nauczycielem': bool(getattr(request.user, 'nauczyciel_id', None)),
+        'moze_usuwac': czy_szef(request.user) or uczen.umowil_id == request.user.id,
     })
 
 
