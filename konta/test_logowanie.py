@@ -1515,11 +1515,12 @@ class KalendarzZbiorczyTests(TestCase):
             self.assertContains(r, '09:00–12:00')
             self.assertContains(r, 'chip-wolny')
 
-    def test_pracownik_ma_403(self):
-        # osoba umawiająca NIE ma dostępu do zbiorczego kalendarza
+    def test_pracownik_ma_podglad(self):
+        # każdy zalogowany ma podgląd zbiorczego kalendarza (tylko odczyt)
         self.client.force_login(self.pracownik)
         r = self.client.get('/kalendarz/')
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Kasia Nowak')
 
     def test_caly_kafelek_dnia_jest_klikalny(self):
         # cały kwadracik dnia to link (nie tylko numer daty)
@@ -1561,10 +1562,11 @@ class KalendarzZbiorczyTests(TestCase):
         r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
         self.assertContains(r, 'chip-dzien chip-lekcja"')
         self.assertNotContains(r, 'chip-dzien chip-lekcja-cykliczna')
-    def test_nauczyciel_ma_403(self):
+    def test_nauczyciel_ma_podglad(self):
         self.client.force_login(self.teacher_user)
         r = self.client.get('/kalendarz/')
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Kasia Nowak')
 
     def test_strzalki_zmieniaja_miesiac(self):
         self.client.force_login(self.admin)
