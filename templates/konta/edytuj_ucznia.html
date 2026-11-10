@@ -95,7 +95,7 @@
             <form method="post" style="display:inline;">
               {% csrf_token %}
               <input type="hidden" name="przedmiot_ucznia_id" value="{{ karta.id }}">
-              <button type="submit" name="usun_przedmiot" value="1" title="Usuń przedmiot (razem z lekcjami)">🗑</button>
+              {% if moze_usuwac %}<button type="submit" name="usun_przedmiot" value="1" title="Usuń przedmiot (razem z lekcjami)">🗑</button>{% endif %}
             </form>
           </td>
         </tr>

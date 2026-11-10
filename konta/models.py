@@ -30,6 +30,14 @@ class Pracownik(AbstractUser):
         related_name='konto',
         verbose_name='nauczyciel',
     )
+    utworzyl = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='utworzone_konta',
+        verbose_name='konto założył',
+    )
 
     class Meta:
         verbose_name = 'pracownik'

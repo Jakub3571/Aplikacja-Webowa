@@ -757,6 +757,8 @@ def edytuj_ucznia(request, uczen_id):
 
     # --- dodatkowe przedmioty ucznia: usuwanie ---
     if request.method == 'POST' and 'usun_przedmiot' in request.POST:
+        if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
+            raise PermissionDenied
         karta_id = request.POST.get('przedmiot_ucznia_id')
         karta = PrzedmiotUcznia.objects.filter(pk=karta_id, uczen=uczen).first()
         if karta:
@@ -826,6 +828,7 @@ def edytuj_ucznia(request, uczen_id):
         'form_przedmiotu': FormularzPrzedmiotuUcznia(prefix='przedmiotdod'),
         'uczen': uczen,
         'przedmioty_ucznia': list(uczen.przedmioty_ucznia.all()),
+        'moze_usuwac': czy_szef(request.user) or uczen.umowil_id == request.user.id,
     })
 
 
@@ -895,11 +898,7 @@ def archiwum_uczniow(request):
 def zakoncz_ucznia(request, uczen_id):
     """Archiwizuje ucznia: znika z list bieżących, ale zostaje w archiwum (dane i lekcje nietknięte)."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
-    if (
-        not czy_szef(request.user)
-        and not czy_koordynator(request.user)
-        and uczen.umowil_id != request.user.id
-    ):
+    if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
         raise PermissionDenied
     if request.method == 'POST':
         zwolnij_blokady_ucznia(uczen)
@@ -1010,14 +1009,16 @@ def przelacz_konto(request, user_id):
     return redirect('uzytkownicy')
 
 @login_required
-@tylko_szef
 def usun_konto(request, user_id):
-    """Usuwa konto pracownika NA ZAWSZE — wraz z kartą nauczyciela (jeśli jest).
-    Dostępne tylko dla szefa/admina. Nie można usunąć własnego konta."""
+    """Usuwa konto NA ZAWSZE — może to zrobić szef albo osoba, która założyła konto
+    (nie konto admina, nie własne)."""
     uzytkownik = get_object_or_404(Pracownik, pk=user_id)
     if uzytkownik.id == request.user.id:
         messages.error(request, 'Nie możesz usunąć własnego konta.')
         return redirect('uzytkownicy')
+    if not czy_szef(request.user):
+        if uzytkownik.utworzyl_id != request.user.id or uzytkownik.is_superuser:
+            raise PermissionDenied
     if request.method == 'POST':
         login = uzytkownik.username
         nauczyciel = uzytkownik.nauczyciel
@@ -1961,6 +1962,8 @@ def uzytkownicy(request):
                 'czy_koordynator': czy_koordynator(request.user),
             })
         nowy_uzytkownik = form.zapisz()
+        nowy_uzytkownik.utworzyl = request.user
+        nowy_uzytkownik.save(update_fields=['utworzyl'])
         messages.success(request, 'Użytkownik został dodany.')
 
         # mail powitalny do nowego użytkownika — z Reply-To do twórcy konta
