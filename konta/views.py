@@ -2158,10 +2158,6 @@ def kalendarz_zbiorczy(request):
     (pogrupowane po korepetytorach: godzina, uczeń, przedmiot, poziom).
     Kolory: zielony = lekcja nowa/jednorazowa, jasnoniebieski = cykliczna, szary = wolny.
     Dostęp: TYLKO szef i koordynator (nauczyciel i zwykły pracownik → 403)."""
-    if getattr(request.user, 'nauczyciel_id', None):
-        raise PermissionDenied
-    if not (czy_szef(request.user) or czy_koordynator(request.user)):
-        raise PermissionDenied
     dzis = date.today()
     try:
         rok = int(request.GET.get('rok') or dzis.year)
