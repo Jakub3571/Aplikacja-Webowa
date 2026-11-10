@@ -1009,9 +1009,10 @@ def przelacz_konto(request, user_id):
     return redirect('uzytkownicy')
 
 @login_required
+@tylko_szef
 def usun_konto(request, user_id):
-    """Usuwa konto NA ZAWSZE — może to zrobić szef albo osoba, która założyła konto
-    (nie konto admina, nie własne)."""
+    """Usuwa konto NA ZAWSZE — tylko szef/admin (koordynator nic nie usuwa).
+    Nie można usunąć własnego konta."""
     uzytkownik = get_object_or_404(Pracownik, pk=user_id)
     if uzytkownik.id == request.user.id:
         messages.error(request, 'Nie możesz usunąć własnego konta.')
@@ -2402,14 +2403,31 @@ def wyslij_potwierdzenie_rodzicowi(request, uczen, karta=None, lekcja=None):
         '\nW razie pytań proszę o wiadomość na messengerze.\n\n'
         f'Pozdrawiam,\n{uczen.kto_umowil}\n'
     )
+    from django.utils.html import escape
+    if link_meet:
+        link_html = f'<p>Link do zajęć online:<br><a href="{escape(link_meet)}">{escape(link_meet)}</a></p>'
+    else:
+        link_html = '<p>Link do zajęć online otrzymacie osobno, gdy będzie dostępny.</p>'
+    tresc_html = (
+        '<p>Dzień dobry,</p>'
+        '<p>Dziękuję za umówienie się na korepetycje 😊</p>'
+        f'<p><strong>Przedmiot: {escape(przedmiot)}</strong><br>'
+        f'<strong>Poziom: {escape(poziom)}</strong><br>'
+        f'<strong>Korepetytor: {escape(korepetytor)}</strong><br>'
+        f'<strong>Pierwsza lekcja: {pierwsza:%d.%m.%Y o godz. %H:%M}</strong></p>'
+        + link_html
+        + '<p>W razie pytań proszę o wiadomość na messengerze.</p>'
+        + f'<p>Pozdrawiam,<br>{escape(uczen.kto_umowil)}</p>'
+    )
     tworca_email = getattr(uczen.umowil, 'email', '') or ''
     try:
-        from django.core.mail import EmailMessage
-        mail = EmailMessage(
+        from django.core.mail import EmailMultiAlternatives
+        mail = EmailMultiAlternatives(
             subject=f'Umówienie na korepetycje — {uczen.imie_ucznia} ({przedmiot})',
             body=tresc,
             to=odbiorcy,
         )
+        mail.attach_alternative(tresc_html, 'text/html')
         if tworca_email:
             mail.reply_to = [tworca_email]
         mail.send()

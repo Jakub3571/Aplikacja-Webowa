@@ -203,7 +203,7 @@ pracowniczy{% endblock %} {% block panel %}
                                     title="Edytuj dane konta"
                                     >✏️</a
                                 >
-                                {% endif %} {% if czy_szef or u.utworzyl_id == request.user.id %} {% if u.id != request.user.id %}
+                                {% endif %} {% if czy_szef %} {% if u.id != request.user.id %}
                                 <a
                                     class="przycisk-umowa umowa-tak"
                                     href="{% url 'przelacz_szefa' u.id %}"
@@ -266,7 +266,7 @@ pracowniczy{% endblock %} {% block panel %}
                                     title="Edytuj dane konta"
                                     >✏️</a
                                 >
-                                {% endif %} {% if czy_szef or u.utworzyl_id == request.user.id %} {% if u.id != request.user.id %}
+                                {% endif %} {% if czy_szef %} {% if u.id != request.user.id %}
                                 <a
                                     class="przycisk-umowa umowa-tak"
                                     href="{% url 'przelacz_szefa' u.id %}"
@@ -342,7 +342,7 @@ pracowniczy{% endblock %} {% block panel %}
                                     title="Edytuj dane konta"
                                     >✏️</a
                                 >
-                                {% endif %} {% if czy_szef or u.utworzyl_id == request.user.id %} {% if u.id != request.user.id %}
+                                {% endif %} {% if czy_szef %} {% if u.id != request.user.id %}
                                 <a
                                     class="przycisk-umowa umowa-tak"
                                     href="{% url 'przelacz_szefa' u.id %}"
