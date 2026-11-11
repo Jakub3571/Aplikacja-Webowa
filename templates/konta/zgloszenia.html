@@ -1,10 +1,12 @@
 {% extends 'konta/panel.html' %}
 {% block panel %}
+ <div class="zgloszenia-strona">
 <section class="karta">
+   
   <h2>Zgłoszenia (zażalenia / pomysły)</h2>
   <p class="podpowiedz">Przycisk ✉ w prawym dolnym rogu. „✔ zrealizowane” przenosi do prawej kolumny (widać 30 dni).</p>
 </section>
-<div style="display:flex; gap:1rem; align-items:flex-start;">
+<div class="zgloszenia-kolumny">
   <section class="karta" style="flex:1">
     <h3>Aktywne ({{ aktywne|length }})</h3>
     {% for z in aktywne %}
@@ -31,5 +33,6 @@
     </div>
     {% empty %}<p class="podpowiedz">Brak zrealizowanych w ostatnich 30 dniach.</p>{% endfor %}
   </section>
+</div>
 </div>
 {% endblock %}

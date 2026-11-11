@@ -912,3 +912,10 @@ input[type="checkbox"] {
 fieldset.wybor-nauczyciela label {
   text-align: left;
 }
+
+.zgloszenia-strona .karta { max-width: none; width: 100%; }
+.zgloszenia-strona .zgloszenia-kolumny { display: flex; gap: 1rem; align-items: stretch; }
+.zgloszenia-strona .zgloszenia-kolumny .karta { flex: 1 1 0; }
+@media (max-width: 1100px) {
+  .zgloszenia-strona .zgloszenia-kolumny { flex-direction: column; }
+}
