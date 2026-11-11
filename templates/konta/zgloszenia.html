@@ -15,6 +15,7 @@
       <p class="podpowiedz" style="margin:0 0 0.25rem;">{{ z.autor.get_full_name|default:z.autor.username }} · {{ z.utworzone|date:'d.m.Y H:i' }}{% if z.strona %} · z: {{ z.strona }}{% endif %}</p>
       <form method="post" style="display:inline;">{% csrf_token %}
         <input type="hidden" name="zgloszenie_id" value="{{ z.id }}">
+        
         <button type="submit" name="zrealizuj" value="1" class="przycisk-kalendarz">✔ zrealizowane</button>
       </form>
     </div>
