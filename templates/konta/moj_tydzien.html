@@ -37,7 +37,7 @@
         <div class="dzien-zakresy">
           {% for zakres in dzien.zakresy %}
           <span class="zakres-pigulka">
-            {{ zakres.od }} – {{ zakres.do }}{% if zakres.cykliczny %} 📌{% endif %}
+            {{ zakres.od }} – {{ zakres.do }}{% if zakres.cykliczny %} 📌{% if zakres.okres == 2 %} co 2 tyg.{% endif %}{% endif %}
             {% if dzien.przerwa %} · przerwa {{ dzien.przerwa }} min{% endif %}
             <button type="button" class="zakres-usun" data-dzien="{{ dzien.data|date:'Y-m-d' }}" data-od="{{ zakres.od }}" data-do="{{ zakres.do }}" title="Usuń ten zakres">✖</button>
           </span>
@@ -52,8 +52,8 @@
           {% endfor %}
         </div>
         <button type="button" class="zakres-dodaj przycisk-kalendarz" data-dzien="{{ dzien.data|date:'Y-m-d' }}">＋</button>
-<button type="button" class="zakres-powtorz przycisk-kalendarz" data-dzien="{{ dzien.data|date:'Y-m-d' }}" title="Powtórz ten plan co tydzień do końca roku szkolnego (30 czerwca)">🔄</button>
-<button type="button" class="zakres-cofnij przycisk-kalendarz" data-dzien="{{ dzien.data|date:'Y-m-d' }}" title="Cofnij powtórzenia tego dnia tygodnia (usuń przyszłe tygodnie)">✖</button>
+
+
         <div class="zakres-okienko" style="display: none;">
           <div class="zakres-pola">
             <label>pracuję od
@@ -68,7 +68,13 @@
               </select>
             </label>
             <button type="button" class="przycisk-kalendarz zakres-zapisz">✔ Zapisz</button>
-            <label class="pole-checkbox zakres-cykliczny-label"><input type="checkbox" class="zakres-cykliczny"> 🔁 powtarzaj ten zakres co tydzień (do 30.06)</label>
+            <label>cykliczność zakresu
+              <select class="zakres-cyklicznosc">
+                <option value="0" selected>nie</option>
+                <option value="1">🔁 co tydzień (cały rok)</option>
+                <option value="2">🔁 co 2 tygodnie (cały rok)</option>
+              </select>
+            </label>
             <button type="button" class="przycisk-kalendarz zakres-anuluj">✖ Anuluj</button>
           </div>
           <div class="zakres-pola">
@@ -210,7 +216,8 @@
         dane.append('od', od);
         dane.append('do', do_);
         dane.append('akcja', 'zaznacz_zakres');
-        dane.append('cykliczny', wiersz.querySelector('.zakres-cykliczny') && wiersz.querySelector('.zakres-cykliczny').checked ? '1' : '0');
+        var cykSel = wiersz.querySelector('.zakres-cyklicznosc');
+        dane.append('cyklicznosc', cykSel ? cykSel.value : '0');
         fetch(url, {
           method: 'POST',
           body: dane,

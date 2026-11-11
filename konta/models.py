@@ -235,6 +235,7 @@ class Dostepnosc(models.Model):
     godzina_od = models.TimeField('godzina od')
     godzina_do = models.TimeField('godzina do')
     cykliczny = models.BooleanField('powtarzany co tydzień (🔁)', default=False)
+    cykliczny_okres = models.PositiveSmallIntegerField('okres cykliczności', default=1, choices=((1, 'co tydzień'), (2, 'co 2 tygodnie')))
 
     class Meta:
         verbose_name = 'dostępność'

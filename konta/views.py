@@ -1194,7 +1194,9 @@ def kalendarz_dane(request, nauczyciel_id):
         except ValueError:
             return JsonResponse({'blad': 'Nieprawidłowy zakres godzin.'}, status=400)
         odznaczyc = request.POST.get('tryb') == 'odznacz'
-        cykliczny = request.POST.get('cykliczny') == '1'
+        cyklicznosc_txt = request.POST.get('cyklicznosc', '0')
+        cykliczny = cyklicznosc_txt in ('1', '2')
+        okres = 2 if cyklicznosc_txt == '2' else 1
         kursor = datetime.combine(date(2000, 1, 1), start)
         koniec_dt = datetime.combine(date(2000, 1, 1), koniec_zakresu)
         while kursor < koniec_dt:
@@ -1208,13 +1210,14 @@ def kalendarz_dane(request, nauczyciel_id):
                     godzina_do=slot_koniec,
                 ).delete()
             else:
+                # flaga 🔁 dotyczy TYLKO tego zakresu — pozostałe zakresy dnia mogą mieć inną
                 Dostepnosc.objects.update_or_create(
                     nauczyciel=nauczyciel,
                     data_od=dzien_data,
                     data_do=dzien_data,
                     godzina_od=slot_start,
                     godzina_do=slot_koniec,
-                    defaults={'cykliczny': cykliczny},
+                    defaults={'cykliczny': cykliczny, 'cykliczny_okres': okres},
                 )
             kursor += timedelta(minutes=30)
         komunikat = (
@@ -1222,6 +1225,23 @@ def kalendarz_dane(request, nauczyciel_id):
             if odznaczyc else
             f'Godziny {start:%H:%M}–{koniec_zakresu:%H:%M} — oznaczono jako dostępne.'
         )
+        if cykliczny and not odznaczyc:
+            # cykliczność od razu na cały rok (365 dni), krok 7 lub 14 dni
+            ostatni_dzien = dzien_data + timedelta(days=365)
+            krok = timedelta(days=7 * okres)
+            docelowy = dzien_data + krok
+            skopiowane = 0
+            while docelowy <= ostatni_dzien:
+                for slot in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data, cykliczny=True, godzina_od__gte=start, godzina_do__lte=koniec_zakresu):
+                    Dostepnosc.objects.get_or_create(
+                        nauczyciel=nauczyciel, data_od=docelowy, data_do=docelowy,
+                        godzina_od=slot.godzina_od, godzina_do=slot.godzina_do,
+                        defaults={'cykliczny': True, 'cykliczny_okres': okres},
+                    )
+                    skopiowane += 1
+                docelowy += krok
+            komunikat += (f' Zakres cykliczny ({start:%H:%M}–{koniec_zakresu:%H:%M}) powtórzony '
+                          f'do {ostatni_dzien:%d.%m.%Y} (co {"2 tygodnie" if okres == 2 else "tydzień"}, {skopiowane} terminów).')
     elif akcja == 'wklej_plan':
         try:
             zrodlo = date.fromisoformat(request.POST.get('zrodlo', ''))
@@ -1264,13 +1284,35 @@ def kalendarz_dane(request, nauczyciel_id):
             koniec_zakresu = datetime.strptime(request.POST.get('do', ''), '%H:%M').time()
         except ValueError:
             return JsonResponse({'blad': 'Nieprawidłowy zakres godzin.'}, status=400)
+        # najpierw przyszłe kopie cykliczne tego zakresu (ten sam dzień tygodnia) — ale NIE sloty z lekcjami
+        nazwa_n = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+        zablokowane = 0
+        for termin in Dostepnosc.objects.filter(
+            nauczyciel=nauczyciel, data_od__gt=dzien_data, cykliczny=True,
+            godzina_od__gte=start, godzina_do__lte=koniec_zakresu,
+        ):
+            if termin.data_od.weekday() != dzien_data.weekday():
+                continue
+            ma_lekcje = any(
+                lekcja_jest_u_nauczyciela(l, nazwa_n) and timezone.localtime(l.data).date() == termin.data_od
+                and timezone.localtime(l.data).time() >= termin.godzina_od
+                and timezone.localtime(l.data).time() < termin.godzina_do
+                for l in Lekcja.objects.filter(data__date=termin.data_od, odwolana=False)
+            )
+            if ma_lekcje:
+                zablokowane += 1
+                continue
+            termin.delete()
         Dostepnosc.objects.filter(
             nauczyciel=nauczyciel,
             data_od=dzien_data,
             godzina_od__gte=start,
             godzina_do__lte=koniec_zakresu,
         ).delete()
-        komunikat = f'Godziny {start:%H:%M}–{koniec_zakresu:%H:%M} usunięto.'
+        komunikat = f'Godziny {start:%H:%M}–{koniec_zakresu:%H:%M} usunięto (razem z cyklicznymi powtórzeniami).'
+        if zablokowane:
+            komunikat += (f' UWAGA: {zablokowane} godz. z przyszłych tygodni ma już umówione lekcje '
+                          f'i zostało — zgłoś przełożenie tych zajęć (zakładka Zażalenia ✉).')
     elif akcja == 'wyczysc_dzien':
         usuniete = Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).count()
         Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).delete()
@@ -1289,10 +1331,7 @@ def kalendarz_dane(request, nauczyciel_id):
             return JsonResponse({'blad': 'Ten dzień nie ma żadnych godzin — najpierw wpisz plan.'}, status=400)
         zrodlo_przerwa = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien_data).first()
         # koniec roku szkolnego: 30 czerwca (styczeń–czerwiec = bieżący rok, lipiec–grudzień = następny rok)
-        if dzien_data.month >= 7:
-            ostatni_dzien = date(dzien_data.year + 1, 6, 30)
-        else:
-            ostatni_dzien = date(dzien_data.year, 6, 30)
+        ostatni_dzien = dzien_data + timedelta(days=365) # cykliczność na cały rok
         docelowy = dzien_data + timedelta(days=7)
         utworzone = 0
         while docelowy <= ostatni_dzien:
@@ -2129,11 +2168,15 @@ def moj_tydzien(request, nauczyciel_id=None):
     for dzien in dni_tygodnia:
         zakresy = []
         for s, e in _zakresy_dnia(nauczyciel, dzien):
-            ma_cykliczny = Dostepnosc.objects.filter(
+            cyk_sloty = list(Dostepnosc.objects.filter(
                 nauczyciel=nauczyciel, data_od=dzien, cykliczny=True,
                 godzina_od__gte=s.time(), godzina_do__lte=e.time(),
-            ).exists()
-            zakresy.append({'od': s.strftime('%H:%M'), 'do': e.strftime('%H:%M'), 'cykliczny': ma_cykliczny})
+            ))
+            zakresy.append({
+                'od': s.strftime('%H:%M'), 'do': e.strftime('%H:%M'),
+                'cykliczny': bool(cyk_sloty),
+                'okres': cyk_sloty[0].cykliczny_okres if cyk_sloty else 1,
+            })
         lekcje_listy = []
         for lekcja in sorted(lekcje_dni.get(dzien, []), key=lambda l: l.data):
             lekcje_listy.append({
