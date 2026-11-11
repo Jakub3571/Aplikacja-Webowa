@@ -245,8 +245,6 @@ def wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=None):
         for start in sorted(kandydaci):
             if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start, przerwa_min=przerwa, pomijaj_uczen_id=pomijaj_uczen_id):
                 continue
-            if godzina_w_przerwie(nauczyciel, dzien, start.time()):
-                continue
             wynik.append(start.strftime('%H:%M'))
     return sorted(set(wynik))
 
@@ -482,6 +480,10 @@ def korepetytorzy_dane(request):
                         dni_pracy.add(d.weekday())
                         d += timedelta(days=1)
                 dni_pracy = sorted(dni_pracy)
+                dni_cykliczne = sorted({
+                    t.data_od.weekday()
+                    for t in Dostepnosc.objects.filter(nauczyciel=nt, cykliczny=True, data_od__gte=date.today())
+                })
                 godziny = wolne_godziny_nauczyciela(nt, dzien_tmp, pomijaj_uczen_id=pomijaj_uczen_id)
                 if not godziny:
                     for i in range(1, 9):
@@ -494,6 +496,7 @@ def korepetytorzy_dane(request):
                     'data': dzien_tmp.isoformat(),
                     'dzien_nazwa': DNI_TYGODNIA[dzien_tmp.weekday()],
                     'dni_pracy': dni_pracy,
+                    'dni_cykliczne': dni_cykliczne,
                 })
             return JsonResponse({'godziny': []})
     if not przedmiot or not poziom:
@@ -626,8 +629,6 @@ def uczniowie(request):
                          '— otwórz jego „Mój tydzień” i sprawdź, czy dzień jest dobry')
             elif kolizja_lekcji_nauczyciela(nauczyciel, start_dt.date(), start_dt):
                 powod = 'koliduje z jego inną lekcją (albo przerwą po niej)'
-            elif godzina_w_przerwie(nauczyciel, start_dt.date(), start_dt.time()):
-                powod = 'wypada w przerwie dnia korepetytora'
             else:
                 powod = 'inny powód'
             messages.error(
@@ -1274,8 +1275,14 @@ def kalendarz_dane(request, nauczyciel_id):
         komunikat = f'Wyczyszczono cały dzień {dzien_data:%d.%m.%Y} — usunięto {usuniete} terminów.'
     elif akcja == 'powtorz_tygodniowo':
         zrodlo_sloty = list(
-            Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data)
+            Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data, cykliczny=True)
         )
+        if not zrodlo_sloty:
+            wszystkie = list(Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data))
+            for slot in wszystkie:
+                slot.cykliczny = True
+                slot.save(update_fields=['cykliczny'])
+            zrodlo_sloty = wszystkie
         if not zrodlo_sloty:
             return JsonResponse({'blad': 'Ten dzień nie ma żadnych godzin — najpierw wpisz plan.'}, status=400)
         zrodlo_przerwa = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien_data).first()
@@ -1294,6 +1301,7 @@ def kalendarz_dane(request, nauczyciel_id):
                     data_do=docelowy,
                     godzina_od=slot.godzina_od,
                     godzina_do=slot.godzina_do,
+                    defaults={'cykliczny': True},
                 )
                 utworzone += 1
             if zrodlo_przerwa:
@@ -1306,7 +1314,7 @@ def kalendarz_dane(request, nauczyciel_id):
         komunikat = f'Plan powtórzono co tydzień do {ostatni_dzien:%d.%m.%Y} ({utworzone} terminów).'
     elif akcja == 'cofnij_powtorzenia':
         usuniete = 0
-        for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__gt=dzien_data):
+        for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__gt=dzien_data, cykliczny=True):
             if termin.data_od.weekday() == dzien_data.weekday():
                 termin.delete()
                 usuniete += 1
@@ -1705,12 +1713,7 @@ def kalendarz_lekcji(request, uczen_id):
                         f'Nie można dodać lekcji {etykieta} — {nauczyciel.imie} {nauczyciel.nazwisko} '
                         f'ma już wtedy lekcję (także tego ucznia). Wybierz inną godzinę.',
                     )
-                elif godzina_w_przerwie(nauczyciel, wybrany_dzien, start_czas):
-                    messages.error(
-                        request,
-                        f'Nie można dodać lekcji {etykieta} — ta godzina wypada w przerwie dnia '
-                        f'{nauczyciel.imie} {nauczyciel.nazwisko}. Wybierz inną godzinę.',
-                    )
+
                 else:
                     messages.error(
                         request,
@@ -2122,10 +2125,13 @@ def moj_tydzien(request, nauczyciel_id=None):
         lekcje_dni.setdefault(dzien_lekcji, []).append(lekcja)
     dni = []
     for dzien in dni_tygodnia:
-        zakresy = [
-            {'od': s.strftime('%H:%M'), 'do': e.strftime('%H:%M')}
-            for s, e in _zakresy_dnia(nauczyciel, dzien)
-        ]
+        zakresy = []
+        for s, e in _zakresy_dnia(nauczyciel, dzien):
+            ma_cykliczny = Dostepnosc.objects.filter(
+                nauczyciel=nauczyciel, data_od=dzien, cykliczny=True,
+                godzina_od__gte=s.time(), godzina_do__lte=e.time(),
+            ).exists()
+            zakresy.append({'od': s.strftime('%H:%M'), 'do': e.strftime('%H:%M'), 'cykliczny': ma_cykliczny})
         lekcje_listy = []
         for lekcja in sorted(lekcje_dni.get(dzien, []), key=lambda l: l.data):
             lekcje_listy.append({
@@ -2500,7 +2506,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
             return redirect('lekcja_cykliczna', uczen_id=uczen.id)
         utworzone = 0
         pominiete_konflikt = 0
-        pominiete_przerwa = 0
+
         pominiete_poza_grafikiem = 0
         for dzien_tygodnia, godzina_txt in sloty:
             try:
@@ -2518,8 +2524,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
                     if nauczyciel and godzina_txt not in wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=uczen.id):
                         if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_dt, pomijaj_uczen_id=uczen.id):
                             pominiete_konflikt += 1
-                        elif godzina_w_przerwie(nauczyciel, dzien, godzina):
-                            pominiete_przerwa += 1
+
                         else:
                             pominiete_poza_grafikiem += 1
                     else:
@@ -2539,13 +2544,12 @@ def umow_lekcje_cykliczna(request, uczen_id):
                             )
 
                 dzien += timedelta(days=1)
-        if pominiete_konflikt or pominiete_przerwa or pominiete_poza_grafikiem:
+        if pominiete_konflikt or pominiete_poza_grafikiem:
             komunikaty = []
             if pominiete_konflikt:
                 komunikaty.append(f'{pominiete_konflikt} terminów z konfliktem (nauczyciel ma już wtedy lekcję)')
             if pominiete_poza_grafikiem: komunikaty.append(f'{pominiete_poza_grafikiem} terminów poza godzinami pracy korepetytora')
-            if pominiete_przerwa:
-                komunikaty.append(f'{pominiete_przerwa} terminów w przerwie dnia nauczyciela')
+
             if utworzone == 0:
                 messages.error(
                     request,

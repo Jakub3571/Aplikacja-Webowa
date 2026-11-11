@@ -50,7 +50,7 @@
           <option value="5">sobota</option>
           <option value="6">niedziela</option>
         </select>
-        <span class="slot-data podpowiedz"></span>
+        <span class="slot-data podpowiedz"></span><span class="slot-cykliczny-hint podpowiedz"></span>
         <select name="slot_godzina" required>
           <option value="">— najpierw wybierz dzień tygodnia —</option>
         </select>
@@ -127,6 +127,11 @@
           var dataPl = dataTxt.split('-').reverse().join('.');
           var etykietaData = wiersz.querySelector('.slot-data');
           if (etykietaData) etykietaData.textContent = ' (' + dataPl + ')';
+                  var hint = wiersz.querySelector('.slot-cykliczny-hint');
+        if (hint) {
+          var dc = dane.dni_cykliczne || [];
+          hint.textContent = (dc.indexOf(parseInt(wyborDnia.value, 10)) === -1) ? ' (ten dzień nie jest u korepetytora cykliczny 🔁)' : '';
+        }
           var opcje = '<option value="">— godzina (wolne terminy) —</option>';
           (dane.godziny || []).forEach(function (g) {
             opcje += '<option value="' + g.godzina + '">' + g.godzina + '</option>';

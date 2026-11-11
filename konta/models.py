@@ -234,6 +234,7 @@ class Dostepnosc(models.Model):
     data_do = models.DateField('data do', default=date(2026, 1, 1))
     godzina_od = models.TimeField('godzina od')
     godzina_do = models.TimeField('godzina do')
+    cykliczny = models.BooleanField('powtarzany co tydzień (🔁)', default=False)
 
     class Meta:
         verbose_name = 'dostępność'

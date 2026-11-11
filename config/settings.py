@@ -92,16 +92,22 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 def _wersja_statycznych():
-    """Wersja statyków = aktualny skrót commita Gita. Po każdym deployu zmienia
-    się adres ?v=... w linkach do CSS, więc przeglądarka sama pobiera nowy plik
-    zamiast wyświetlać stary z kesza."""
+    """Wersja statyków = najnowszy mtime plików w static/ i templates/ — zmienia się
+    przy każdej edycji pliku (także bez commita), więc przeglądarka sama pobiera nowy CSS/JS."""
+    najnowszy = 0
+    for katalog in ('static', 'templates'):
+        sciezka = os.path.join(BASE_DIR, katalog)
+        for root, _dirs, files in os.walk(sciezka):
+            for nazwa in files:
+                try:
+                    najnowszy = max(najnowszy, int(os.path.getmtime(os.path.join(root, nazwa))))
+                except OSError:
+                    pass
+    if najnowszy:
+        return str(najnowszy)
     try:
         import subprocess
-        return subprocess.check_output(
-            ['git', 'rev-parse', '--short', 'HEAD'],
-            cwd=BASE_DIR,
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
+        return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=BASE_DIR, stderr=subprocess.DEVNULL).decode().strip()
     except Exception:
         return '1'
 
