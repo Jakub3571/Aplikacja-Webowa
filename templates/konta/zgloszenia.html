@@ -1,0 +1,35 @@
+{% extends 'konta/panel.html' %}
+{% block panel %}
+<section class="karta">
+  <h2>Zgłoszenia (zażalenia / pomysły)</h2>
+  <p class="podpowiedz">Przycisk ✉ w prawym dolnym rogu. „✔ zrealizowane” przenosi do prawej kolumny (widać 30 dni).</p>
+</section>
+<div style="display:flex; gap:1rem; align-items:flex-start;">
+  <section class="karta" style="flex:1">
+    <h3>Aktywne ({{ aktywne|length }})</h3>
+    {% for z in aktywne %}
+    <div style="border-bottom:1px solid #e2e8f0; padding:0.5rem 0;">
+      <p style="margin:0 0 0.25rem;"><strong>[{{ z.kategoria }}]</strong> {{ z.tresc }}</p>
+      <p class="podpowiedz" style="margin:0 0 0.25rem;">{{ z.autor.get_full_name|default:z.autor.username }} · {{ z.utworzone|date:'d.m.Y H:i' }}{% if z.strona %} · z: {{ z.strona }}{% endif %}</p>
+      <form method="post" style="display:inline;">{% csrf_token %}
+        <input type="hidden" name="zgloszenie_id" value="{{ z.id }}">
+        <button type="submit" name="zrealizuj" value="1" class="przycisk-kalendarz">✔ zrealizowane</button>
+      </form>
+    </div>
+    {% empty %}<p class="podpowiedz">Brak aktywnych zgłoszeń.</p>{% endfor %}
+  </section>
+  <section class="karta" style="flex:1">
+    <h3>Zrealizowane (ostatnie 30 dni: {{ zrealizowane|length }})</h3>
+    {% for z in zrealizowane %}
+    <div style="border-bottom:1px solid #e2e8f0; padding:0.5rem 0; opacity:0.85;">
+      <p style="margin:0 0 0.25rem;"><strong>[{{ z.kategoria }}]</strong> {{ z.tresc }}</p>
+      <p class="podpowiedz" style="margin:0 0 0.25rem;">{{ z.autor.get_full_name|default:z.autor.username }} · {{ z.utworzone|date:'d.m.Y H:i' }} · zrobione: {{ z.zrealizowane_kiedy|date:'d.m.Y H:i' }}{% if z.zrealizowane_przez %} przez {{ z.zrealizowane_przez.get_full_name|default:z.zrealizowane_przez.username }}{% endif %}</p>
+      <form method="post" style="display:inline;">{% csrf_token %}
+        <input type="hidden" name="zgloszenie_id" value="{{ z.id }}">
+        <button type="submit" name="przywroc" value="1" class="przycisk-kalendarz">↩ przywróć do aktywnych</button>
+      </form>
+    </div>
+    {% empty %}<p class="podpowiedz">Brak zrealizowanych w ostatnich 30 dniach.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

@@ -23,7 +23,7 @@ from .forms import (
     FormularzZmianyHasla,
     FormularzLekcjiCyklicznej,
 )
-from .models import Dostepnosc, Lekcja, Nauczyciel, Pracownik, PrzedmiotUcznia, PrzerwaDnia, PrzypomnienieLekcji, RaportPlatnosci, Uczen
+from .models import Dostepnosc, Lekcja, Nauczyciel, Pracownik, PrzedmiotUcznia, PrzerwaDnia, PrzypomnienieLekcji, RaportPlatnosci, Uczen, Zgloszenie
 
 MIESIACE = [
     'styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec',
@@ -2657,29 +2657,37 @@ def zazalenie(request):
         kategoria = request.POST.get('kategoria', '')
         notatka = request.POST.get('notatka', '').strip()
         if kategoria in KATEGORIE_ZAZALEN and notatka:
-            u = request.user
-            od = f'{u.get_full_name() or u.username} <{u.email or u.username}>'
-            temat = f'Zażalenie/pomysł [{kategoria}] — {od}'
-            tresc = (
-                f'Od: {od}\n'
-                f'Kategoria: {kategoria}\n'
-                f'Strona: {request.POST.get("strona", "")}\n\n'
-                f'{notatka}\n'
+
+            Zgloszenie.objects.create(
+                autor=request.user, kategoria=kategoria, tresc=notatka,
+                strona=request.POST.get('strona', ''),
             )
-            odbiorcy = list(getattr(settings, 'EMAILE_POWIADOMIEN', []))
-            if odbiorcy:
-                try:
-                    send_mail(temat, tresc, None, odbiorcy)
-                    messages.success(request, 'Zgłoszenie wysłane na maila biura.')
-                except Exception as e:
-                    zapisz_blad_maila('zazalenie', e)
-                    messages.error(request, 'Nie udało się wysłać maila — spróbuj ponownie.')
-            else:
-                messages.error(request, 'Brak skonfigurowanej skrzynki biura (EMAILE_POWIADOMIEN).')
-        else:
-            messages.error(request, 'Wybierz kategorię i napisz treść zgłoszenia.')
-        return redirect(request.META.get('HTTP_REFERER') or 'pulpit')
-    return redirect('pulpit')
+            messages.success(request, 'Zgłoszenie zapisane.')
+@login_required
+def zgloszenia(request):
+    """Zakładka Zgłoszenia — TYLKO szef/koordynator. Aktywne / zrealizowane (30 dni)."""
+    if not (czy_szef(request.user) or czy_koordynator(request.user)):
+        raise PermissionDenied
+    if request.method == 'POST':
+        zg = get_object_or_404(Zgloszenie, pk=request.POST.get('zgloszenie_id'))
+        if 'zrealizuj' in request.POST:
+            zg.zrealizowane = True
+            zg.zrealizowane_kiedy = timezone.now()
+            zg.zrealizowane_przez = request.user
+            zg.save(update_fields=['zrealizowane', 'zrealizowane_kiedy', 'zrealizowane_przez'])
+            messages.success(request, 'Zgłoszenie oznaczone jako zrealizowane.')
+        elif 'przywroc' in request.POST:
+            zg.zrealizowane = False
+            zg.zrealizowane_kiedy = None
+            zg.zrealizowane_przez = None
+            zg.save(update_fields=['zrealizowane', 'zrealizowane_kiedy', 'zrealizowane_przez'])
+            messages.success(request, 'Zgłoszenie wróciło do aktywnych.')
+        return redirect('zgloszenia')
+    granica = timezone.now() - timedelta(days=30)
+    return render(request, 'konta/zgloszenia.html', {
+        'aktywne': Zgloszenie.objects.filter(zrealizowane=False).select_related('autor'),
+        'zrealizowane': Zgloszenie.objects.filter(zrealizowane=True, zrealizowane_kiedy__gte=granica).select_related('autor', 'zrealizowane_przez'),
+    })
 
 @login_required
 def zmiana_hasla(request):

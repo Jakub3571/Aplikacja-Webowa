@@ -45,7 +45,26 @@ class Pracownik(AbstractUser):
 
     def __str__(self):
         return f'{self.get_full_name() or self.username}'
+    
+class Zgloszenie(models.Model):
+    """Zażalenie/pomysł wysłane przyciskiem ✉ (prawy dolny róg) — ląduje w zakładce Zgłoszenia."""
+    KATEGORIE = (('aplikacja', 'aplikacja'), ('zajęcia', 'zajęcia'), ('pracownik', 'pracownik'), ('pomysły', 'pomysły'))
+    autor = models.ForeignKey(Pracownik, on_delete=models.CASCADE, related_name='zgloszenia', verbose_name='autor')
+    kategoria = models.CharField('kategoria', max_length=20, choices=KATEGORIE)
+    tresc = models.TextField('treść')
+    strona = models.CharField('strona', max_length=200, blank=True)
+    utworzone = models.DateTimeField('utworzone', auto_now_add=True)
+    zrealizowane = models.BooleanField('zrealizowane', default=False)
+    zrealizowane_kiedy = models.DateTimeField('zrealizowane kiedy', null=True, blank=True)
+    zrealizowane_przez = models.ForeignKey(Pracownik, on_delete=models.SET_NULL, null=True, blank=True, related_name='zrealizowane_zgloszenia', verbose_name='zrealizowane przez')
 
+    class Meta:
+        verbose_name = 'zgłoszenie'
+        verbose_name_plural = 'zgłoszenia'
+        ordering = ['-utworzone']
+
+    def __str__(self):
+        return f'[{self.kategoria}] {self.tresc[:40]}'
 
 class Uczen(models.Model):
     """Karta ucznia z danymi lekcji, kontaktu do rodzica i notatkami."""
