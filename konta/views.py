@@ -2599,6 +2599,38 @@ def umow_lekcje_cykliczna(request, uczen_id):
         'nauczyciel_id': nauczyciel.id if nauczyciel else '',
     })
 
+KATEGORIE_ZAZALEN = ['aplikacja', 'zajęcia', 'pracownik', 'pomysły']
+
+
+@login_required
+def zazalenie(request):
+    if request.method == 'POST':
+        kategoria = request.POST.get('kategoria', '')
+        notatka = request.POST.get('notatka', '').strip()
+        if kategoria in KATEGORIE_ZAZALEN and notatka:
+            u = request.user
+            od = f'{u.get_full_name() or u.username} <{u.email or u.username}>'
+            temat = f'Zażalenie/pomysł [{kategoria}] — {od}'
+            tresc = (
+                f'Od: {od}\n'
+                f'Kategoria: {kategoria}\n'
+                f'Strona: {request.POST.get("strona", "")}\n\n'
+                f'{notatka}\n'
+            )
+            odbiorcy = list(getattr(settings, 'EMAILE_POWIADOMIEN', []))
+            if odbiorcy:
+                try:
+                    send_mail(temat, tresc, None, odbiorcy)
+                    messages.success(request, 'Zgłoszenie wysłane na maila biura.')
+                except Exception as e:
+                    zapisz_blad_maila('zazalenie', e)
+                    messages.error(request, 'Nie udało się wysłać maila — spróbuj ponownie.')
+            else:
+                messages.error(request, 'Brak skonfigurowanej skrzynki biura (EMAILE_POWIADOMIEN).')
+        else:
+            messages.error(request, 'Wybierz kategorię i napisz treść zgłoszenia.')
+        return redirect(request.META.get('HTTP_REFERER') or 'pulpit')
+    return redirect('pulpit')
 
 @login_required
 def zmiana_hasla(request):

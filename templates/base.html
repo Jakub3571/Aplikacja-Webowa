@@ -68,5 +68,34 @@
 		<footer class="stopka">
 			<p href="https://example.com">@Jakub Ciszewski</p>
 		</footer>
+{% if user.is_authenticated %}
+<button type="button" id="przycisk-zazalenia" class="przycisk-kalendarz">✉ Zażalenia / pomysły</button>
+<div id="okno-zazalenia" class="karta" style="display:none">
+  <h3>Zażalenie / pomysł</h3>
+  <form method="post" action="{% url 'zazalenia' %}" class="formularz">
+    {% csrf_token %}
+    <input type="hidden" name="strona" value="{{ request.get_full_path }}">
+    <label>W jakiej sprawie:</label>
+    <label class="wybor-nauczyciela-opcja"><input type="radio" name="kategoria" value="aplikacja" required> aplikacja</label>
+    <label class="wybor-nauczyciela-opcja"><input type="radio" name="kategoria" value="zajęcia"> zajęcia</label>
+    <label class="wybor-nauczyciela-opcja"><input type="radio" name="kategoria" value="pracownik"> pracownik</label>
+    <label class="wybor-nauczyciela-opcja"><input type="radio" name="kategoria" value="pomysły"> pomysły</label>
+    <label for="id_notatka">Notatka:</label>
+    <textarea name="notatka" id="id_notatka" rows="4" required placeholder="Opisz zgłoszenie..."></textarea>
+    <button type="submit">Wyślij</button>
+  </form>
+</div>
+<script>
+  (function () {
+    var b = document.getElementById('przycisk-zazalenia');
+    var o = document.getElementById('okno-zazalenia');
+    if (b && o) {
+      b.addEventListener('click', function () {
+        o.style.display = (o.style.display === 'none') ? 'block' : 'none';
+      });
+    }
+  })();
+</script>
+{% endif %}
 	</body>
 </html>
