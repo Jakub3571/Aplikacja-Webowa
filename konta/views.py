@@ -1194,6 +1194,7 @@ def kalendarz_dane(request, nauczyciel_id):
         except ValueError:
             return JsonResponse({'blad': 'Nieprawidłowy zakres godzin.'}, status=400)
         odznaczyc = request.POST.get('tryb') == 'odznacz'
+        cykliczny = request.POST.get('cykliczny') == '1'
         kursor = datetime.combine(date(2000, 1, 1), start)
         koniec_dt = datetime.combine(date(2000, 1, 1), koniec_zakresu)
         while kursor < koniec_dt:
@@ -1207,12 +1208,13 @@ def kalendarz_dane(request, nauczyciel_id):
                     godzina_do=slot_koniec,
                 ).delete()
             else:
-                Dostepnosc.objects.get_or_create(
+                Dostepnosc.objects.update_or_create(
                     nauczyciel=nauczyciel,
                     data_od=dzien_data,
                     data_do=dzien_data,
                     godzina_od=slot_start,
                     godzina_do=slot_koniec,
+                    defaults={'cykliczny': cykliczny},
                 )
             kursor += timedelta(minutes=30)
         komunikat = (

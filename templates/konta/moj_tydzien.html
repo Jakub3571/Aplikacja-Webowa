@@ -68,6 +68,7 @@
               </select>
             </label>
             <button type="button" class="przycisk-kalendarz zakres-zapisz">✔ Zapisz</button>
+            <label class="pole-checkbox zakres-cykliczny-label"><input type="checkbox" class="zakres-cykliczny"> 🔁 powtarzaj ten zakres co tydzień (do 30.06)</label>
             <button type="button" class="przycisk-kalendarz zakres-anuluj">✖ Anuluj</button>
           </div>
           <div class="zakres-pola">
@@ -209,6 +210,7 @@
         dane.append('od', od);
         dane.append('do', do_);
         dane.append('akcja', 'zaznacz_zakres');
+        dane.append('cykliczny', wiersz.querySelector('.zakres-cykliczny') && wiersz.querySelector('.zakres-cykliczny').checked ? '1' : '0');
         fetch(url, {
           method: 'POST',
           body: dane,
