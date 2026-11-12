@@ -1992,6 +1992,8 @@ def uzytkownicy(request):
         raise PermissionDenied
     lista = Pracownik.objects.all().order_by('username')
     form = FormularzUzytkownika(request.POST or None, bez_admina=not czy_szef(request.user))
+    if request.method == 'POST' and not form.is_valid():
+        messages.error(request, 'Nie udało się dodać użytkownika — popraw błędy w formularzu (czerwona ramka u góry).')
     if request.method == 'POST' and form.is_valid():
         # koordynator nie może tworzyć konta admina
         if not czy_szef(request.user) and form.cleaned_data.get('rola') == 'admin':
@@ -2006,7 +2008,11 @@ def uzytkownicy(request):
                 'czy_szef': False,
                 'czy_koordynator': czy_koordynator(request.user),
             })
-        nowy_uzytkownik = form.zapisz()
+        try:
+            nowy_uzytkownik = form.zapisz()
+        except Exception as e:
+            messages.error(request, f'Nie udało się utworzyć konta ({e}).')
+            return redirect('uzytkownicy')
         nowy_uzytkownik.utworzyl = request.user
         nowy_uzytkownik.save(update_fields=['utworzyl'])
         messages.success(request, 'Użytkownik został dodany.')

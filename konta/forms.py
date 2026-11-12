@@ -270,6 +270,11 @@ class FormularzUzytkownika(forms.ModelForm):
                 raise forms.ValidationError('Nauczyciel musi mieć min. jeden przedmiot.')
             pary = set()
             for w in pelne:
+                try:
+                    from decimal import Decimal, InvalidOperation
+                    Decimal((w['stawka'] or '0').replace(',', '.'))
+                except (InvalidOperation, ValueError):
+                    raise forms.ValidationError(f"Stawka dla przedmiotu „{w['przedmiot']}” musi być liczbą (np. 100 lub 99,50).")
                 para = (w['przedmiot'], w['poziom'])
                 if para in pary:
                     raise forms.ValidationError(
@@ -308,7 +313,8 @@ class FormularzUzytkownika(forms.ModelForm):
             for w in self.wiersze_przedmiotow:
                 if not w['przedmiot']:
                     continue
-                stawka = w['stawka'].replace(',', '.') or '0'
+                from decimal import Decimal
+                stawka = Decimal((w['stawka'] or '0').replace(',', '.'))
                 PrzedmiotNauczyciela.objects.update_or_create(
                     nauczyciel=nauczyciel,
                     przedmiot=w['przedmiot'],
