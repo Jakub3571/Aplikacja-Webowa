@@ -919,3 +919,16 @@ fieldset.wybor-nauczyciela label {
 @media (max-width: 1100px) {
   .zgloszenia-strona .zgloszenia-kolumny { flex-direction: column; }
 }
+
+
+.zgloszenia-link { position: relative; font-weight: 600; }
+.badge-czerwony {
+  display: inline-block;
+  background: #dc2626;
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.4;
+}

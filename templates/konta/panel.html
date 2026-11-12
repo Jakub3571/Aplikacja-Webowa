@@ -7,6 +7,9 @@
   <header class="pasek">
     <span>👤 {% if user.nauczyciel_id %}Mój kalendarz{% else %}Panel pracowniczy{% endif %}</span>
     <nav>
+      {% if ZGŁOSZENIA_AKTYWNE is not None %}
+      <a href="{% url 'zgloszenia' %}" class="zgloszenia-link">✉ Zgłoszenia{% if ZGŁOSZENIA_AKTYWNE > 0 %} <span class="badge-czerwony">{{ ZGŁOSZENIA_AKTYWNE }}</span>{% endif %}</a>
+      {% endif %}
       <a href="{% url 'zmiana_hasla' %}">Zmień hasło</a>
       <a href="{% url 'wyloguj' %}">Wyloguj się</a>
     </nav>
@@ -29,7 +32,7 @@
     <a href="{% url 'kalendarz_zbiorczy' %}" class="{% if request.resolver_match.url_name == 'kalendarz_zbiorczy' %}aktywna{% endif %}">Kalendarz</a>
     <a href="{% url 'platnosci' %}" class="{% if request.resolver_match.url_name == 'platnosci' %}aktywna{% endif %}">Płatności</a>
     <a href="{% url 'uzytkownicy' %}" class="{% if request.resolver_match.url_name == 'uzytkownicy' %}aktywna{% endif %}">Użytkownicy</a>
-    <a href="{% url 'zgloszenia' %}" class="{% if request.resolver_match.url_name == 'zgloszenia' %}aktywna{% endif %}">Zgłoszenia</a>
+   
     {% else %}
     <a href="{% url 'uczniowie' %}" class="{% if request.resolver_match.url_name == 'uczniowie' %}aktywna{% endif %}">Uczniowie</a>
     <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">Lekcje</a>
@@ -39,7 +42,7 @@
     <a href="{% url 'pulpit' %}" class="{% if request.resolver_match.url_name == 'pulpit' %}aktywna{% endif %}">Start</a>
     <a href="{% url 'platnosci' %}" class="{% if request.resolver_match.url_name == 'platnosci' %}aktywna{% endif %}">Płatności</a>
     <a href="{% url 'uzytkownicy' %}" class="{% if request.resolver_match.url_name == 'uzytkownicy' %}aktywna{% endif %}">Użytkownicy</a>
-    <a href="{% url 'zgloszenia' %}" class="{% if request.resolver_match.url_name == 'zgloszenia' %}aktywna{% endif %}">Zgłoszenia</a>
+   
     {% endif %}
     {% endif %}
   </nav>
