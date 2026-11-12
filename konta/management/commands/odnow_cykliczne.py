@@ -37,9 +37,9 @@ class Command(BaseCommand):
             ostatnia_local = timezone.localtime(ostatnia)
             # horizon: 90 dni naprzód od najpóźniejszej lekcji (lekcje "na zawsze"
             # są przedłużane automatycznie, gdy tylko komenda uruchomi się z CRON-a)
-            granica = ostatnia_local.date() + timedelta(days=90)
+            granica = ostatnia_local.date() + timedelta(days=365)
             if granica <= dzis:
-                granica = dzis + timedelta(days=90)
+                granica = dzis + timedelta(days=365)
 
             # wzorce slotów: (dzień tygodnia, godzina) z ostatnich 4 tygodni przed ostatnią lekcją
             poczatek_okna = ostatnia_local.date() - timedelta(days=28)
@@ -50,7 +50,7 @@ class Command(BaseCommand):
 
             nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
             nowy = False
-            for dzien in [ostatnia_local.date() + timedelta(days=i) for i in range(1, 91)]:
+            for dzien in [ostatnia_local.date() + timedelta(days=i) for i in range(1, 366)]:
                 for (dzien_tygodnia, godzina), daty_wzorca in wzorce.items():
                     if dzien.weekday() != dzien_tygodnia or dzien > granica:
                         continue

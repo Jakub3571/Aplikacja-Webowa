@@ -2532,10 +2532,20 @@ def umow_lekcje_cykliczna(request, uczen_id):
         co_2_tygodnie = request.POST.get('co_2_tygodnie') == 'on'
         link_meet = request.POST.get('link_meet', '').strip()
         try:
-            data_poczatkowa = date.fromisoformat(request.POST.get('data_poczatkowa', ''))
+            data_poczatkowa = date.fromisoformat(request.POST.get('data_od', '') or request.POST.get('data_poczatkowa', ''))
         except ValueError:
             data_poczatkowa = date.today()
-        od_dnia, do_dnia = okres_dat(okres, data_poczatkowa)
+        try:
+            data_koncowa = date.fromisoformat(request.POST.get('data_do', ''))
+        except ValueError:
+            data_koncowa = None
+        if data_koncowa and data_koncowa < data_poczatkowa:
+            messages.error(request, 'Data „do” nie może być wcześniejsza niż data „od”.')
+            return redirect('lekcja_cykliczna', uczen_id=uczen.id)
+        if data_koncowa:
+            od_dnia, do_dnia = data_poczatkowa, data_koncowa
+        else:
+            od_dnia, do_dnia = okres_dat(okres, data_poczatkowa)
         sloty_raw = request.POST.getlist('slot_dzien')
         godziny_raw = request.POST.getlist('slot_godzina')
         sloty = []
@@ -2645,6 +2655,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
         'biezacy_link_meet': (karta.link_meet if karta else uczen.link_meet) or '',
         'godziny': [f'{h:02d}:00' for h in range(6, 24)],
         'dzisiaj': date.today().isoformat(),
+        'domyslny_koniec': (date.today() + timedelta(days=92)).isoformat(),
         'nauczyciel_id': nauczyciel.id if nauczyciel else '',
     })
 

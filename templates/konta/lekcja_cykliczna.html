@@ -58,21 +58,14 @@
       </div>
     </div>
     <button type="button" id="dodaj-slot">+ Dodaj kolejny termin</button>
-    <p class="podpowiedz">Przykład: wtorek 17:00 i czwartek 19:00 = 2 lekcje tygodniowo.</p>
-
-    <label>Obowiązuje do <span class="gwiazdka">*</span></label>
-    <select name="okres" required>
-      <option value="miesiac">do końca tego miesiąca</option>
-      <option value="rok" selected>do końca roku szkolnego (30 czerwca)</option>
-    </select>
-    <p class="podpowiedz">Lekcje cykliczne zawsze mają określony koniec — wybierz miesiąc albo rok szkolny (rytm „co 2 tygodnie” ustawiasz osobnym polem niżej). Po tym czasie lekcje przestają się dopisywać.</p>
-    <div class="pole-checkbox">
-      <input type="checkbox" name="co_2_tygodnie" id="id_co_2_tygodnie">
-      <label for="id_co_2_tygodnie">zajęcia co 2 tygodnie (zamiast co tydzień)</label>
+    <label>Zakres zajęć (od – do) <span class="gwiazdka">*</span></label>
+    <div class="zakres-daty" style="display:flex; gap:0.5rem; align-items:center;">
+      <input type="date" name="data_od" id="id_data_od" required value="{{ dzisiaj }}">
+      <span>–</span>
+      <input type="date" name="data_do" id="id_data_do" required value="{{ domyslny_koniec }}">
     </div>
-    <p class="podpowiedz">Zaznacz, jeśli uczeń ma zajęcia raz na 2 tygodnie — wtedy wpiszą się tylko co 14 dni w wybranym dniu, w ramach wybranego okresu powyżej.</p>
-    <p class="podpowiedz">
-      Zajęcia cykliczne przedłużają się same — co noc komenda „odnow_cykliczne” dopisuje kolejne terminy (do 90 dni naprzód), więc nikt nie musi się logować, żeby odnowić zajęcia.</p>
+    <p class="podpowiedz" id="zakres-podpowiedz"></p>
+    <p class="podpowiedz">Wpisz własny zakres — np. do matury (maj) albo „na 3 miesiące”. Format: (dzień).(data) – (dzień).(data), np. Wt. 11.11.2026 – Pt. 29.05.2027. Po tym terminie lekcje przestają się dopisywać.</p>
 
     <button type="submit">Umów stałe lekcje</button>
   </form>
@@ -158,5 +151,23 @@
       }
     });
   }
+  (function () {
+    var DNI = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So'];
+    function fmt(v) {
+      if (!v) return '';
+      var p = v.split('-');
+      var dt = new Date(+p[0], +p[1] - 1, +p[2]);
+      return DNI[dt.getDay()] + '. ' + p[2] + '.' + p[1] + '.' + p[0];
+    }
+    function aktualizuj() {
+      var a = document.getElementById('id_data_od');
+      var b = document.getElementById('id_data_do');
+      var h = document.getElementById('zakres-podpowiedz');
+      if (h && a && b) h.textContent = fmt(a.value) + ' – ' + fmt(b.value);
+    }
+    var a = document.getElementById('id_data_od');
+    var b = document.getElementById('id_data_do');
+    if (a && b) { a.addEventListener('change', aktualizuj); b.addEventListener('change', aktualizuj); aktualizuj(); }
+  })();
 </script>
 {% endblock %}
