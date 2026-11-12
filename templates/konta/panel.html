@@ -7,12 +7,12 @@
   <header class="pasek">
     <span>👤 {% if user.nauczyciel_id %}Mój kalendarz{% else %}Panel pracowniczy{% endif %}</span>
     <nav>
-      {% if ZGŁOSZENIA_AKTYWNE is not None %}
-      <a href="{% url 'zgloszenia' %}" class="zgloszenia-link">✉ Zgłoszenia{% if ZGŁOSZENIA_AKTYWNE > 0 %} <span class="badge-czerwony">{{ ZGŁOSZENIA_AKTYWNE }}</span>{% endif %}</a>
-      {% endif %}
       <a href="{% url 'zmiana_hasla' %}">Zmień hasło</a>
       <a href="{% url 'wyloguj' %}">Wyloguj się</a>
     </nav>
+    {% if ZGŁOSZENIA_AKTYWNE is not None %}
+    <a href="{% url 'zgloszenia' %}" class="zgloszenia-float" title="Aktywne zgłoszenia">✉ Zgłoszenia{% if ZGŁOSZENIA_AKTYWNE > 0 %} <span class="badge-czerwony">{{ ZGŁOSZENIA_AKTYWNE }}</span>{% endif %}</a>
+    {% endif %}
   </header>
 
   {% if user.nauczyciel_id %}

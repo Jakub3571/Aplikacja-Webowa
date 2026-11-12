@@ -932,3 +932,18 @@ fieldset.wybor-nauczyciela label {
   font-weight: 700;
   line-height: 1.4;
 }
+
+.zgloszenia-float {
+  position: fixed;
+  top: 0.6rem;
+  right: 0.4rem;
+  z-index: 1200;
+  background: var(--karta, #fff);
+  border: 1px solid var(--ramka, #e2e8f0);
+  border-radius: 8px;
+  padding: 0.2rem 0.6rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  text-decoration: none;
+  color: inherit;
+}
