@@ -2669,7 +2669,7 @@ def zazalenie(request):
     return redirect('pulpit')
 @login_required
 def zgloszenia(request):
-    """Zakładka Zgłoszenia — TYLKO szef/koordynator. Aktywne / zrealizowane (30 dni)."""
+    """Zakładka Zgłoszenia — TYLKO szef/koordynator. Aktywne / zrealizowane (do końca miesiąca)."""
     if not (czy_szef(request.user) or czy_koordynator(request.user)):
         raise PermissionDenied
     if request.method == 'POST':
@@ -2687,10 +2687,11 @@ def zgloszenia(request):
             zg.save(update_fields=['zrealizowane', 'zrealizowane_kiedy', 'zrealizowane_przez'])
             messages.success(request, 'Zgłoszenie wróciło do aktywnych.')
         return redirect('zgloszenia')
-    granica = timezone.now() - timedelta(days=30)
+    dzis = timezone.localdate()
+    granica = date(dzis.year, dzis.month, 1)
     return render(request, 'konta/zgloszenia.html', {
         'aktywne': Zgloszenie.objects.filter(zrealizowane=False).select_related('autor'),
-        'zrealizowane': Zgloszenie.objects.filter(zrealizowane=True, zrealizowane_kiedy__gte=granica).select_related('autor', 'zrealizowane_przez'),
+        'zrealizowane': Zgloszenie.objects.filter(zrealizowane=True, zrealizowane_kiedy__date__gte=granica).select_related('autor', 'zrealizowane_przez'),
     })
 
 @login_required
