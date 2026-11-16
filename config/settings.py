@@ -170,6 +170,6 @@ DEFAULT_FROM_EMAIL = os.environ.get('DJANGO_EMAIL_FROM', 'panel@example.com')
 # Gdy konto wróci (lub założymy nowe/płatne), wpisz tu adresy odbiorców powiadomień.
 EMAILE_POWIADOMIEN = [
     a.strip() for a in os.environ.get(
-        'EMAILE_POWIADOMIEN', 'biuro.nowoczesnekorepetycje@gmail.com'
+        'EMAILE_POWIADOMIEN', 'biuro.nowoczesne.korepetycje@gmail.com'
     ).split(',') if a.strip()
 ]
