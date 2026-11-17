@@ -838,7 +838,7 @@ def usun_ucznia(request, uczen_id):
     """Usuwa ucznia wraz z jego lekcjami i zwalnia zablokowane godziny u korepetytora.
     TYLKO szef — koordynatorzy i osoby umawiające mogą edytować, ale nie usuwać."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
-    if (request.user.username or '').strip().lower() != 'cms':
+    if not czy_szef(request.user):
         raise PermissionDenied
     if request.method == 'POST':
         zwolnij_blokady_ucznia(uczen)
@@ -2745,7 +2745,7 @@ def api_content(request):
 @login_required
 def cms_strony(request):
     """Edycja treści strony publicznej (tylko szef). Zapisuje content.json obok ~/strona."""
-    if not czy_szef(request.user):
+    if (request.user.username or '').strip().lower() != 'cms':
         raise PermissionDenied
     import os as _os
     plik = getattr(settings, 'NK_CONTENT_JSON', '/home/NowoczesneKorepetycje/strona/content.json')
