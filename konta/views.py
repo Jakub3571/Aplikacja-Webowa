@@ -2745,7 +2745,7 @@ def api_content(request):
 @login_required
 def cms_strony(request):
     """Edycja treści strony publicznej (tylko szef). Zapisuje content.json obok ~/strona."""
-    if (request.user.username or '').strip().lower() != 'cms':
+    if not czy_szef(request.user):
         raise PermissionDenied
     import os as _os
     plik = getattr(settings, 'NK_CONTENT_JSON', '/home/NowoczesneKorepetycje/strona/content.json')
