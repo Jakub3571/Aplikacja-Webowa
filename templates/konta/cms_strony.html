@@ -1,22 +1,32 @@
 {% extends 'konta/panel.html' %}
 {% block panel %}
-<section class="karta" style="max-width:none">
-  <h2>Treści strony publicznej (CMS)</h2>
-  <p class="podpowiedz">Szef zmienia tu liczby na stronie głównej, ceny w cenniku i nagłówek. Zapis = plik <code>content.json</code> obok strony; strona czyta go przez <code>/api/content</code>. Po zapisie odśwież stronę główną (F5).</p>
+<div class="zgloszenia-strona">
+<section class="karta">
+  <h2>🌐 Strona WWW — edytor treści</h2>
+  <p class="podpowiedz">Osobna strona tylko do treści strony publicznej. Zapis nadpisuje <code>content.json</code> (same dane — wygląd strony zostaje taki sam). Po zapisie odśwież stronę główną (F5). Sekcje:
+    <a href="#sekcja-statystyki">Statystyki</a> ·
+    <a href="#sekcja-ceny">Ceny</a> ·
+    <a href="#sekcja-teksty">Teksty głównej</a> ·
+    <a href="#sekcja-opinie">Opinie</a>
+  </p>
   <form method="post" class="formularz">
     {% csrf_token %}
-    <h3>Liczby na stronie głównej</h3>
+    <h3 id="sekcja-statystyki">📊 Statystyki na stronie głównej</h3>
     <label>Korepetytorzy <input type="number" name="stat_tutors" value="{{ content.stats.tutors }}"></label>
     <label>Uczniowie <input type="number" name="stat_students" value="{{ content.stats.students }}"></label>
     <label>% zostaje po pierwszej lekcji <input type="number" name="stat_retention" value="{{ content.stats.retention }}"></label>
-    <h3>Ceny (zł / 60 min, rozdzielone spacją)</h3>
+    <h3 id="sekcja-ceny">💰 Ceny w cenniku (zł / 60 min, rozdzielone spacją)</h3>
     {% for slug, ceny in content.prices.items %}
     <label>{{ slug }} <input type="text" name="cena_{{ slug }}" value="{{ ceny|join:' ' }}"></label>
     {% endfor %}
-    <h3>Nagłówek strony głównej</h3>
-    <label>Tytuł (puste = bez zmian) <input type="text" name="copy_home-headline" value="{{ headline }}"></label>
+    <h3 id="sekcja-teksty">✏️ Teksty strony głównej</h3>
+    <label>Tytuł (puste = bez zmian; „część1 | część2” = dwie linie) <input type="text" name="copy_home-headline" value="{{ headline }}"></label>
     <label>Wstęp <textarea name="copy_home-intro" rows="3">{{ intro }}</textarea></label>
-    <button type="submit">Zapisz treści</button>
+    <h3 id="sekcja-opinie">⭐ Opinie (karuzela na głównej)</h3>
+    <p class="podpowiedz">Jedna opinia na linię, format: <code>URL-obrazka | opis</code></p>
+    <textarea name="reviews" rows="6" style="width:100%">{{ reviews_txt }}</textarea>
+    <button type="submit">💾 Zapisz wszystkie treści</button>
   </form>
 </section>
+</div>
 {% endblock %}

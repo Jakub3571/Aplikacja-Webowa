@@ -2759,6 +2759,15 @@ def cms_strony(request):
                     messages.error(request, f'Cena dla „{slug}” musi być liczbą (np. „90 110 170”).')
         dane['copy']['home-headline'] = request.POST.get('copy_home-headline', '').strip()
         dane['copy']['home-intro'] = request.POST.get('copy_home-intro', '').strip()
+        opinie = []
+        for linia in request.POST.get('reviews', '').splitlines():
+            linia = linia.strip()
+            if not linia:
+                continue
+            url, _, alt = linia.partition('|')
+            if url.strip():
+                opinie.append({'url': url.strip(), 'alt': alt.strip()})
+        dane['reviews'] = opinie
         try:
             with open(plik, 'w', encoding='utf-8') as f:
                 _json.dump(dane, f, ensure_ascii=False, indent=2)
@@ -2771,6 +2780,7 @@ def cms_strony(request):
         'content': dane,
         'headline': dane.get('copy', {}).get('home-headline', ''),
         'intro': dane.get('copy', {}).get('home-intro', ''),
+        'reviews_txt': '\n'.join(f"{r.get('url','')}|{r.get('alt','')}" for r in dane.get('reviews', [])),
     })
 def zazalenie(request):
     if request.method == 'POST':
