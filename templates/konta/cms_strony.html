@@ -1,0 +1,22 @@
+{% extends 'konta/panel.html' %}
+{% block panel %}
+<section class="karta" style="max-width:none">
+  <h2>Treści strony publicznej (CMS)</h2>
+  <p class="podpowiedz">Szef zmienia tu liczby na stronie głównej, ceny w cenniku i nagłówek. Zapis = plik <code>content.json</code> obok strony; strona czyta go przez <code>/api/content</code>. Po zapisie odśwież stronę główną (F5).</p>
+  <form method="post" class="formularz">
+    {% csrf_token %}
+    <h3>Liczby na stronie głównej</h3>
+    <label>Korepetytorzy <input type="number" name="stat_tutors" value="{{ content.stats.tutors }}"></label>
+    <label>Uczniowie <input type="number" name="stat_students" value="{{ content.stats.students }}"></label>
+    <label>% zostaje po pierwszej lekcji <input type="number" name="stat_retention" value="{{ content.stats.retention }}"></label>
+    <h3>Ceny (zł / 60 min, rozdzielone spacją)</h3>
+    {% for slug, ceny in content.prices.items %}
+    <label>{{ slug }} <input type="text" name="cena_{{ slug }}" value="{{ ceny|join:' ' }}"></label>
+    {% endfor %}
+    <h3>Nagłówek strony głównej</h3>
+    <label>Tytuł (puste = bez zmian) <input type="text" name="copy_home-headline" value="{{ headline }}"></label>
+    <label>Wstęp <textarea name="copy_home-intro" rows="3">{{ intro }}</textarea></label>
+    <button type="submit">Zapisz treści</button>
+  </form>
+</section>
+{% endblock %}

@@ -67,6 +67,7 @@ urlpatterns = [
     path('api/contact/', views.api_contact, name='api_contact'),
     path('api/content', views.api_content, name='api_content_ns'),
     path('api/content/', views.api_content, name='api_content'),
+    path('cms-strony/', views.cms_strony, name='cms_strony'),
 ]
 
 handler403 = 'konta.views.brak_dostepu'

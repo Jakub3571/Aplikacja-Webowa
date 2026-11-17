@@ -2702,10 +2702,76 @@ def api_contact(request):
     return _JsonResponse({'ok': True})
 
 
-def api_content(request):
-    """Pusty kontent CMS — strona pokazuje własną kopię statyczną."""
-    return _JsonResponse({'copy': {}, 'stats': {}, 'images': {}, 'prices': {}, 'subjects': [], 'pages': [], 'reviews': []})
+def _domyslny_content():
+    return {
+        'copy': {'home-headline': '', 'home-intro': ''},
+        'stats': {'tutors': 40, 'students': 500, 'retention': 93},
+        'images': {},
+        'prices': {
+            'matematyka': [90, 110, 170], 'angielski': [90, 110], 'hiszpanski': [90],
+            'biologia': [90], 'chemia': [90], 'fizyka': [90], 'polski': [90, 110], 'geografia': [90, 110],
+        },
+        'subjects': [], 'pages': [], 'reviews': [],
+    }
 
+
+def _content_ze_salda():
+    import os as _os
+    plik = getattr(settings, 'NK_CONTENT_JSON', '/home/NowoczesneKorepetycje/strona/content.json')
+    try:
+        with open(plik, encoding='utf-8') as f:
+            dane = _json.load(f)
+        if isinstance(dane, dict):
+            return dane
+    except Exception:
+        pass
+    return _domyslny_content()
+
+
+def api_content(request):
+    """Kontent CMS dla strony publicznej (cms.js woła /api/content)."""
+    return _JsonResponse(_content_ze_salda())
+
+
+@login_required
+def cms_strony(request):
+    """Edycja treści strony publicznej (tylko szef). Zapisuje content.json obok ~/strona."""
+    if not czy_szef(request.user):
+        raise PermissionDenied
+    import os as _os
+    plik = getattr(settings, 'NK_CONTENT_JSON', '/home/NowoczesneKorepetycje/strona/content.json')
+    if request.method == 'POST':
+        dane = _content_ze_salda()
+        dane.setdefault('stats', {})
+        dane.setdefault('prices', {})
+        dane.setdefault('copy', {})
+        for k in ('tutors', 'students', 'retention'):
+            try:
+                dane['stats'][k] = int(request.POST.get('stat_' + k, dane['stats'].get(k, 0)))
+            except (TypeError, ValueError):
+                pass
+        for slug in ('matematyka', 'angielski', 'hiszpanski', 'biologia', 'chemia', 'fizyka', 'polski', 'geografia'):
+            txt = request.POST.get('cena_' + slug, '').strip()
+            if txt:
+                try:
+                    dane['prices'][slug] = [int(x) for x in txt.split() if x.strip()]
+                except ValueError:
+                    messages.error(request, f'Cena dla „{slug}” musi być liczbą (np. „90 110 170”).')
+        dane['copy']['home-headline'] = request.POST.get('copy_home-headline', '').strip()
+        dane['copy']['home-intro'] = request.POST.get('copy_home-intro', '').strip()
+        try:
+            with open(plik, 'w', encoding='utf-8') as f:
+                _json.dump(dane, f, ensure_ascii=False, indent=2)
+            messages.success(request, 'Treści strony zapisane. Odśwież stronę główną (F5).')
+        except Exception as e:
+            messages.error(request, f'Nie udało się zapisać pliku: {e}')
+        return redirect('cms_strony')
+    dane = _content_ze_salda()
+    return render(request, 'konta/cms_strony.html', {
+        'content': dane,
+        'headline': dane.get('copy', {}).get('home-headline', ''),
+        'intro': dane.get('copy', {}).get('home-intro', ''),
+    })
 def zazalenie(request):
     if request.method == 'POST':
         kategoria = request.POST.get('kategoria', '')
