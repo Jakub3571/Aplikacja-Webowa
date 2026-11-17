@@ -2772,7 +2772,7 @@ def cms_strony(request):
     if request.method == 'POST':
         dane = _content_ze_salda()
         if 'wyczysc_wszystko' in request.POST:
-            dane['copy'] = {k: v for k, v in dane.get('copy', {}).items() if k in ('home-headline', 'home-intro')}
+            dane['copy'] = {}
             dane['steps'] = {}
             dane['faq'] = {}
             messages.info(request, 'Przywrócono domyślne teksty wszystkich stron.')
@@ -2819,10 +2819,11 @@ def cms_strony(request):
                 else:
                     dane['copy'].pop(f'{slug}-{pole}', None)
             for key, info in _sloty_dostepne(slug).items():
-              orig = info['text'] if isinstance(info, dict) else info
-            if v and v != orig:
+                orig = info['text'] if isinstance(info, dict) else info
+                v = request.POST.get(f'slot_{slug}__{key}', '').strip()
+                if v and v != orig:
                     dane['copy'][key] = v
-            else:
+                else:
                     dane['copy'].pop(key, None)
             kroki = []
             for linia in request.POST.getlist(f'kroki_{slug}'):
@@ -2853,14 +2854,21 @@ def cms_strony(request):
         disp = _sloty_dostepne(slug)
         nadpisania = {k: v for k, v in dane.get('copy', {}).items()
                       if k.startswith(slug + '-') and k not in (f'{slug}-headline', f'{slug}-intro')}
-        sloty_list = [{'key': k, 'value': nadpisania.get(k, orig), 'original': orig} for k, orig in disp.items()]
-        
+        sloty_list = []
+        for k, info in disp.items():
+            orig = info['text'] if isinstance(info, dict) else info
+            sloty_list.append({
+                'key': k,
+                'value': nadpisania.get(k, orig),
+                'original': orig,
+                'section': info.get('section', '') if isinstance(info, dict) else '',
+                'tag': ''.join(c for c in k.split('-')[-1] if c.isalpha()),
+            })
         strony.append({
             'slug': slug, 'etykieta': etykieta,
             'headline': dane.get('copy', {}).get(f'{slug}-headline', ''),
             'intro': dane.get('copy', {}).get(f'{slug}-intro', ''),
             'sloty_list': sloty_list,
-            'tag': ''.join(c for c in k.split('-')[-1] if c.isalpha()),
             'kroki_list': [f"{k['title']}|{k['text']}" for k in dane.get('steps', {}).get(slug, [])],
             'faq_list': [f"{f['q']}|{f['a']}" for f in dane.get('faq', {}).get(slug, [])],
         })
