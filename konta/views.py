@@ -838,7 +838,7 @@ def usun_ucznia(request, uczen_id):
     """Usuwa ucznia wraz z jego lekcjami i zwalnia zablokowane godziny u korepetytora.
     TYLKO szef — koordynatorzy i osoby umawiające mogą edytować, ale nie usuwać."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
-    if not czy_szef(request.user):
+    if (request.user.username or '').strip().lower() != 'cms':
         raise PermissionDenied
     if request.method == 'POST':
         zwolnij_blokady_ucznia(uczen)

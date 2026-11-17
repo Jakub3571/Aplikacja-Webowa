@@ -1,13 +1,29 @@
-{% extends 'konta/panel.html' %}
-{% block panel %}
-<div class="zgloszenia-strona">
+{% extends 'base.html' %}
+{% block tytul %}CMS — Strona WWW{% endblock %}
+{% block tresc %}
+<style>
+  body { background: #f0f5f1; }
+  .cms-top { display:flex; justify-content:space-between; align-items:center; padding:1rem 1.5rem; background:#164e38; color:#fff; }
+  .cms-top strong { font-size:1.1rem; }
+  .cms-top a { color:#dcebdd; }
+  .cms-wrap { max-width: 900px; margin: 1.5rem auto; padding: 0 1rem; }
+  .cms-wrap .karta { max-width: none; }
+  .cms-sekcje a { margin-right: .75rem; }
+</style>
+<header class="cms-top">
+  <strong>🌐 CMS — edycja strony nowoczesnekorepetycje.pl</strong>
+  <span><a href="{% url 'logowanie' %}">← panel</a> · <a href="{% url 'wyloguj' %}">wyloguj</a></span>
+</header>
+<div class="cms-wrap">
 <section class="karta">
-  <h2>🌐 Strona WWW — edytor treści</h2>
-  <p class="podpowiedz">Osobna strona tylko do treści strony publicznej. Zapis nadpisuje <code>content.json</code> (same dane — wygląd strony zostaje taki sam). Po zapisie odśwież stronę główną (F5). Sekcje:
-    <a href="#sekcja-statystyki">Statystyki</a> ·
-    <a href="#sekcja-ceny">Ceny</a> ·
-    <a href="#sekcja-teksty">Teksty głównej</a> ·
-    <a href="#sekcja-opinie">Opinie</a>
+  <h2>Edytor treści strony WWW</h2>
+  <p class="podpowiedz">Zmieniasz tylko dane (<code>content.json</code>) — wygląd strony zostaje taki sam. Po zapisie odśwież stronę główną (F5). Sekcje:
+    <span class="cms-sekcje">
+      <a href="#sekcja-statystyki">Statystyki</a>
+      <a href="#sekcja-ceny">Ceny</a>
+      <a href="#sekcja-teksty">Teksty głównej</a>
+      <a href="#sekcja-opinie">Opinie</a>
+    </span>
   </p>
   <form method="post" class="formularz">
     {% csrf_token %}
