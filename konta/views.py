@@ -2700,7 +2700,16 @@ def api_contact(request):
         zapisz_blad_maila('api_contact', e)
         return _JsonResponse({'ok': False, 'error': 'Nie udało się wysłać zgłoszenia.'}, status=500)
     return _JsonResponse({'ok': True})
-
+STRONY_CMS = [
+    ('home', 'Strona główna'), ('cennik', 'Cennik'), ('o-nas', 'O nas'), ('kontakt', 'Kontakt'),
+    ('jak-uczymy', 'Jak uczymy'), ('zajecia', 'Zajęcia'), ('start', 'Start'),
+    ('dziekujemy', 'Dziękujemy'), ('regulamin', 'Regulamin'),
+    ('polityka-prywatnosci', 'Polityka prywatności'), ('polityka-cookies', 'Polityka cookies'),
+    ('matematyka', 'Przedmiot: Matematyka'), ('angielski', 'Przedmiot: Angielski'),
+    ('hiszpanski', 'Przedmiot: Hiszpański'), ('biologia', 'Przedmiot: Biologia'),
+    ('chemia', 'Przedmiot: Chemia'), ('fizyka', 'Przedmiot: Fizyka'),
+    ('polski', 'Przedmiot: Polski'), ('geografia', 'Przedmiot: Geografia'),
+]
 
 def _domyslny_content():
     return {
