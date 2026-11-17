@@ -63,6 +63,10 @@ urlpatterns = [
     path('uzytkownicy/<int:user_id>/usun/', views.usun_konto, name='usun_konto'),
     path('zazalenia/', views.zazalenie, name='zazalenia'),
     path('zgloszenia/', views.zgloszenia, name='zgloszenia'),
+    path('api/contact', views.api_contact, name='api_contact_ns'),
+    path('api/contact/', views.api_contact, name='api_contact'),
+    path('api/content', views.api_content, name='api_content_ns'),
+    path('api/content/', views.api_content, name='api_content'),
 ]
 
 handler403 = 'konta.views.brak_dostepu'

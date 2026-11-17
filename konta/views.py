@@ -2667,6 +2667,44 @@ def umow_lekcje_cykliczna(request, uczen_id):
 
 KATEGORIE_ZAZALEN = ['aplikacja', 'zajęcia', 'pracownik', 'pomysły']
 
+import json as _json
+from django.http import JsonResponse as _JsonResponse
+from django.views.decorators.csrf import csrf_exempt as _csrf_exempt
+
+
+@_csrf_exempt
+def api_contact(request):
+    """Formularz ze strony publicznej (cms.js POSTuje JSON na /api/contact) → mail na biuro."""
+    if request.method != 'POST':
+        return _JsonResponse({'ok': False, 'error': 'Tylko POST.'}, status=405)
+    try:
+        dane = _json.loads(request.body.decode('utf-8') or '{}')
+        if not isinstance(dane, dict):
+            dane = {}
+    except ValueError:
+        dane = request.POST.dict()
+    tresc = (
+        f"Imię: {dane.get('name', '')}\n"
+        f"Przedmiot: {dane.get('subject', '')}\n"
+        f"Poziom/klasa: {dane.get('level', '')}\n"
+        f"Cel nauki: {dane.get('goal', '')}\n"
+        f"Telefon: {dane.get('phone', '')}\n"
+        f"E-mail: {dane.get('email', '')}\n"
+    )
+    odbiorcy = list(getattr(settings, 'EMAILE_POWIADOMIEN', []))
+    if not odbiorcy:
+        return _JsonResponse({'ok': False, 'error': 'Brak skonfigurowanej skrzynki biura.'}, status=500)
+    try:
+        send_mail('Nowe zgłoszenie ze strony www', tresc, None, odbiorcy)
+    except Exception as e:
+        zapisz_blad_maila('api_contact', e)
+        return _JsonResponse({'ok': False, 'error': 'Nie udało się wysłać zgłoszenia.'}, status=500)
+    return _JsonResponse({'ok': True})
+
+
+def api_content(request):
+    """Pusty kontent CMS — strona pokazuje własną kopię statyczną."""
+    return _JsonResponse({'copy': {}, 'stats': {}, 'images': {}, 'prices': {}, 'subjects': [], 'pages': [], 'reviews': []})
 
 def zazalenie(request):
     if request.method == 'POST':
