@@ -2860,6 +2860,7 @@ def cms_strony(request):
             'headline': dane.get('copy', {}).get(f'{slug}-headline', ''),
             'intro': dane.get('copy', {}).get(f'{slug}-intro', ''),
             'sloty_list': sloty_list,
+            'tag': ''.join(c for c in k.split('-')[-1] if c.isalpha()),
             'kroki_list': [f"{k['title']}|{k['text']}" for k in dane.get('steps', {}).get(slug, [])],
             'faq_list': [f"{f['q']}|{f['a']}" for f in dane.get('faq', {}).get(slug, [])],
         })
