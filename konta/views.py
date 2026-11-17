@@ -2711,6 +2711,7 @@ STRONY_CMS = [
     ('polski', 'Przedmiot: Polski'), ('geografia', 'Przedmiot: Geografia'),
 ]
 
+
 def _domyslny_content():
     return {
         'copy': {'home-headline': '', 'home-intro': ''},
@@ -2722,6 +2723,22 @@ def _domyslny_content():
         },
         'subjects': [], 'pages': [], 'reviews': [],
     }
+
+
+def _sloty_dostepne(slug):
+    """Sloty data-nk-slot z HTML podstrony: {klucz: aktualny tekst}."""
+    import re as _re
+    katalog = getattr(settings, 'NK_STRONA_DIR', '/home/NowoczesneKorepetycje/strona')
+    pliki = [katalog + '/index.html'] if slug == 'home' else [f'{katalog}/{slug}/index.html']
+    sloty = {}
+    for p in pliki:
+        try:
+            html = open(p, encoding='utf-8').read()
+        except Exception:
+            continue
+        for m in _re.finditer(r'data-nk-slot="([^"]+)"[^>]*>([^<]{1,300})', html):
+            sloty[m.group(1)] = m.group(2).strip()
+    return sloty
 
 
 def _content_ze_salda():
@@ -2738,19 +2755,30 @@ def _content_ze_salda():
 
 
 def api_content(request):
-    """Kontent CMS dla strony publicznej (cms.js woła /api/content)."""
+    """Kontent CMS dla strony (cms.js woła /api/content)."""
     return _JsonResponse(_content_ze_salda())
 
 
 @login_required
 def cms_strony(request):
-    """Edycja treści strony publicznej (tylko szef). Zapisuje content.json obok ~/strona."""
+    """Edycja treści strony — osobny adres /cms-strony, tylko admin/szefostwo."""
     if not czy_szef(request.user):
         raise PermissionDenied
-    import os as _os
     plik = getattr(settings, 'NK_CONTENT_JSON', '/home/NowoczesneKorepetycje/strona/content.json')
     if request.method == 'POST':
         dane = _content_ze_salda()
+        if 'wyczysc_wszystko' in request.POST:
+            dane['copy'] = {k: v for k, v in dane.get('copy', {}).items() if k in ('home-headline', 'home-intro')}
+            dane['steps'] = {}
+            dane['faq'] = {}
+            messages.info(request, 'Przywrócono domyślne teksty wszystkich stron.')
+        for slug, etykieta in STRONY_CMS:
+            if f'wyczysc_{slug}' in request.POST:
+                for k in [k for k in dane.get('copy', {}) if k.startswith(slug + '-')]:
+                    del dane['copy'][k]
+                dane.get('steps', {}).pop(slug, None)
+                dane.get('faq', {}).pop(slug, None)
+                messages.info(request, f'Przywrócono domyślne treści strony: {etykieta}')
         dane.setdefault('stats', {})
         dane.setdefault('prices', {})
         dane.setdefault('copy', {})
@@ -2769,7 +2797,7 @@ def cms_strony(request):
         dane['copy']['home-headline'] = request.POST.get('copy_home-headline', '').strip()
         dane['copy']['home-intro'] = request.POST.get('copy_home-intro', '').strip()
         opinie = []
-        for linia in request.POST.get('reviews', '').splitlines():
+        for linia in request.POST.getlist('reviews'):
             linia = linia.strip()
             if not linia:
                 continue
@@ -2777,6 +2805,37 @@ def cms_strony(request):
             if url.strip():
                 opinie.append({'url': url.strip(), 'alt': alt.strip()})
         dane['reviews'] = opinie
+        dane.setdefault('steps', {})
+        dane.setdefault('faq', {})
+        for slug, _etykieta in STRONY_CMS:
+            for pole in ('headline', 'intro'):
+                v = request.POST.get(f'copy_{slug}-{pole}', '').strip()
+                if v:
+                    dane['copy'][f'{slug}-{pole}'] = v
+                else:
+                    dane['copy'].pop(f'{slug}-{pole}', None)
+            for key, orig in _sloty_dostepne(slug).items():
+                v = request.POST.get(f'slot_{slug}__{key}', '').strip()
+                if v and v != orig:
+                    dane['copy'][key] = v
+                else:
+                    dane['copy'].pop(key, None)
+            kroki = []
+            for linia in request.POST.getlist(f'kroki_{slug}'):
+                linia = linia.rstrip()
+                if not linia.strip():
+                    continue
+                tytul, _, tekst = linia.partition('|')
+                kroki.append({'title': tytul.strip(), 'text': tekst.strip()})
+            dane['steps'][slug] = kroki
+            faq = []
+            for linia in request.POST.getlist(f'faq_{slug}'):
+                linia = linia.rstrip()
+                if not linia.strip():
+                    continue
+                pyt, _, odp = linia.partition('|')
+                faq.append({'q': pyt.strip(), 'a': odp.strip()})
+            dane['faq'][slug] = faq
         try:
             with open(plik, 'w', encoding='utf-8') as f:
                 _json.dump(dane, f, ensure_ascii=False, indent=2)
@@ -2785,11 +2844,24 @@ def cms_strony(request):
             messages.error(request, f'Nie udało się zapisać pliku: {e}')
         return redirect('cms_strony')
     dane = _content_ze_salda()
+    strony = []
+    for slug, etykieta in STRONY_CMS:
+        disp = _sloty_dostepne(slug)
+        nadpisania = {k: v for k, v in dane.get('copy', {}).items()
+                      if k.startswith(slug + '-') and k not in (f'{slug}-headline', f'{slug}-intro')}
+        sloty_list = [{'key': k, 'value': nadpisania.get(k, orig), 'original': orig} for k, orig in disp.items()]
+        strony.append({
+            'slug': slug, 'etykieta': etykieta,
+            'headline': dane.get('copy', {}).get(f'{slug}-headline', ''),
+            'intro': dane.get('copy', {}).get(f'{slug}-intro', ''),
+            'sloty_list': sloty_list,
+            'kroki_list': [f"{k['title']}|{k['text']}" for k in dane.get('steps', {}).get(slug, [])],
+            'faq_list': [f"{f['q']}|{f['a']}" for f in dane.get('faq', {}).get(slug, [])],
+        })
     return render(request, 'konta/cms_strony.html', {
         'content': dane,
-        'headline': dane.get('copy', {}).get('home-headline', ''),
-        'intro': dane.get('copy', {}).get('home-intro', ''),
-        'reviews_txt': '\n'.join(f"{r.get('url','')}|{r.get('alt','')}" for r in dane.get('reviews', [])),
+        'strony': strony,
+        'reviews_list': [f"{r.get('url','')}|{r.get('alt','')}" for r in dane.get('reviews', [])],
     })
 def zazalenie(request):
     if request.method == 'POST':
