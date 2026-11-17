@@ -14,6 +14,8 @@
   .cms-row { display:flex; gap:0.5rem; align-items:center; margin:0.3rem 0; }
   .cms-row input { flex:1; }
   .cms-row code { min-width: 9rem; font-size: 0.75rem; color:#555; }
+  .cms-slot input { width:100%; }
+  .cms-slot { border-top:1px dashed #e2e8f0; padding-top:0.3rem; margin-top:0.3rem; }
   .cms-btn { border:0; border-radius:8px; padding:0.25rem 0.7rem; cursor:pointer; font-weight:700; }
   .cms-add { background:#164e38; color:#fff; }
   .cms-del { background:#b91c1c; color:#fff; }
@@ -53,7 +55,15 @@
         <div class=\"cms-row\"><label>Wstęp</label><textarea name=\"copy_{{ s.slug }}-intro\" rows=\"2\">{{ s.intro }}</textarea></div>
         <h4>Teksty na tej stronie</h4>
         {% for slot in s.sloty_list %}
-        <div class=\"cms-row\"><code>{{ slot.key }}</code><input type=\"text\" name=\"slot_{{ s.slug }}__{{ slot.key }}\" value=\"{{ slot.value }}\" placeholder=\"oryginał: {{ slot.original|truncatechars:60 }}\"></div>
+        <div class="cms-slot">
+          <p class="cms-hint" style="margin:0.4rem 0 0.15rem">
+            <b>{{ slot.section|default:slot.tag }}</b>
+            {% if slot.section %} · {{ slot.tag }}{% endif %}
+            <code>{{ slot.key }}</code>
+            <br>Aktualnie na stronie: <i>{{ slot.original|truncatechars:120 }}</i>
+          </p>
+          <input type="text" name="slot_{{ s.slug }}__{{ slot.key }}" value="{{ slot.value }}" placeholder="nowy tekst (puste = znika ze strony)">
+        </div>
         {% endfor %}
         <h4>Kroki procesu <button type=\"button\" class=\"cms-btn cms-add\" data-add=\"kroki-{{ s.slug }}\">+ krok</button></h4>
         <div class=\"cms-list\" id=\"kroki-{{ s.slug }}\">

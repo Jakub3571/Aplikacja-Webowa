@@ -2726,7 +2726,7 @@ def _domyslny_content():
 
 
 def _sloty_dostepne(slug):
-    """Sloty data-nk-slot z HTML podstrony: {klucz: aktualny tekst}."""
+    """Sloty data-nk-slot z HTML podstrony: {klucz: {text, section}} — section = najbliższy nagłówek („gdzie to jest”)."""
     import re as _re
     katalog = getattr(settings, 'NK_STRONA_DIR', '/home/NowoczesneKorepetycje/strona')
     pliki = [katalog + '/index.html'] if slug == 'home' else [f'{katalog}/{slug}/index.html']
@@ -2736,8 +2736,12 @@ def _sloty_dostepne(slug):
             html = open(p, encoding='utf-8').read()
         except Exception:
             continue
-        for m in _re.finditer(r'data-nk-slot="([^"]+)"[^>]*>([^<]{1,300})', html):
-            sloty[m.group(1)] = m.group(2).strip()
+        section = ''
+        for m in _re.finditer(r'<(h[1-6])[^>]*>([^<]{1,120})</h[1-6]>|data-nk-slot="([^"]+)"[^>]*>([^<]{1,300})', html):
+            if m.group(1):
+                section = m.group(2).strip()
+            else:
+                sloty[m.group(3)] = {'text': m.group(4).strip(), 'section': section}
     return sloty
 
 
@@ -2814,11 +2818,11 @@ def cms_strony(request):
                     dane['copy'][f'{slug}-{pole}'] = v
                 else:
                     dane['copy'].pop(f'{slug}-{pole}', None)
-            for key, orig in _sloty_dostepne(slug).items():
-                v = request.POST.get(f'slot_{slug}__{key}', '').strip()
-                if v and v != orig:
+            for key, info in _sloty_dostepne(slug).items():
+              orig = info['text'] if isinstance(info, dict) else info
+            if v and v != orig:
                     dane['copy'][key] = v
-                else:
+            else:
                     dane['copy'].pop(key, None)
             kroki = []
             for linia in request.POST.getlist(f'kroki_{slug}'):
@@ -2850,6 +2854,7 @@ def cms_strony(request):
         nadpisania = {k: v for k, v in dane.get('copy', {}).items()
                       if k.startswith(slug + '-') and k not in (f'{slug}-headline', f'{slug}-intro')}
         sloty_list = [{'key': k, 'value': nadpisania.get(k, orig), 'original': orig} for k, orig in disp.items()]
+        
         strony.append({
             'slug': slug, 'etykieta': etykieta,
             'headline': dane.get('copy', {}).get(f'{slug}-headline', ''),
