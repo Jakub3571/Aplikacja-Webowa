@@ -8,12 +8,12 @@
   .cms-top a { color:#dcebdd; }
   .cms-wrap { max-width: 1050px; margin: 1.5rem auto; padding: 0 1rem; }
   .cms-wrap .karta { max-width: none; }
-  details.cms-strona { border:1px solid #dce5dd; border-radius:12px; margin:0.5rem 0; background:#fff; }
-  details.cms-strona summary { cursor:pointer; padding:0.7rem 1rem; font-weight:700; }
-  details.cms-strona .cialo { padding:0 1rem 1rem; }
+  .cms-tabs { display:flex; flex-wrap:wrap; gap:0.4rem; margin:0.5rem 0 1rem; }
+  .cms-tab { border:1px solid #164e38; background:#fff; color:#164e38; border-radius:8px; padding:0.35rem 0.8rem; cursor:pointer; font-weight:600; }
+  .cms-tab.aktywna { background:#164e38; color:#fff; }
+  .cms-strona { border:1px solid #dce5dd; border-radius:12px; background:#fff; padding:1rem; }
   .cms-row { display:flex; gap:0.5rem; align-items:center; margin:0.3rem 0; }
   .cms-row input { flex:1; }
-  .cms-row code { min-width: 9rem; font-size: 0.75rem; color:#555; }
   .cms-slot input { width:100%; }
   .cms-slot { border-top:1px dashed #e2e8f0; padding-top:0.3rem; margin-top:0.3rem; }
   .cms-btn { border:0; border-radius:8px; padding:0.25rem 0.7rem; cursor:pointer; font-weight:700; }
@@ -29,32 +29,39 @@
 <div class="cms-wrap">
 <section class="karta">
   <h2>Edytor treści strony WWW</h2>
-  <p class="cms-hint">Edytujesz <b>tylko treści</b> — układ strony bez zmian. Każda zakładka = jedna podstrona. Przy listach: <b>+</b> dodaje pozycję, <b>−</b> usuwa jedną. Puste pole = element znika; „Przywróć domyślne” wraca oryginał. Na dole: <b>Zapisz zmiany</b>.</p>
+  <p class="cms-hint">Tylko treści — układ strony bez zmian. Kliknij zakładkę podstrony → zobaczysz jej zawartość. Teksty grupowane sekcjami (widać gdzie są i jaki mają aktualny tekst). Listy: <b>+</b> dodaje, <b>−</b> usuwa jedną pozycję. Puste pole = tekst znika; „Przywróć domyślne” wraca oryginał. Na dole: <b>Zapisz zmiany</b>.</p>
   <form method="post" class="formularz">
     {% csrf_token %}
     <h3>📊 Liczby na stronie głównej</h3>
-    <div class="cms-row"><label>Korepetytorzy</label><input type="number\" name=\"stat_tutors\" value=\"{{ content.stats.tutors }}\"></div>
-    <div class=\"cms-row\"><label>Uczniowie</label><input type=\"number\" name=\"stat_students\" value=\"{{ content.stats.students }}\"></div>
-    <div class=\"cms-row\"><label>% zostaje po 1. lekcji</label><input type=\"number\" name=\"stat_retention\" value=\"{{ content.stats.retention }}\"></div>
+    <div class="cms-row"><label>Korepetytorzy</label><input type="number" name="stat_tutors" value="{{ content.stats.tutors }}"></div>
+    <div class="cms-row"><label>Uczniowie</label><input type="number" name="stat_students" value="{{ content.stats.students }}"></div>
+    <div class="cms-row"><label>% zostaje po 1. lekcji</label><input type="number" name="stat_retention" value="{{ content.stats.retention }}"></div>
     <h3>💰 Ceny (cennik)</h3>
     {% for slug, ceny in content.prices.items %}
-    <div class=\"cms-row\"><label>{{ slug }}</label><input type=\"text\" name=\"cena_{{ slug }}\" value=\"{{ ceny|join:' ' }}\" placeholder=\"np. 90 110 170\"></div>
+    <div class="cms-row"><label>{{ slug }}</label><input type="text" name="cena_{{ slug }}" value="{{ ceny|join:' ' }}" placeholder="np. 90 110 170\"></div>
     {% endfor %}
-    <h3>⭐ Opinie <button type=\"button\" class=\"cms-btn cms-add\" data-add=\"lista-reviews\">+ dodaj</button></h3>
-    <div class=\"cms-list\" id=\"lista-reviews\">
+    <h3>⭐ Opinie <button type="button" class="cms-btn cms-add" data-add="lista-reviews">+ dodaj</button></h3>
+    <div class="cms-list" id="lista-reviews">
       {% for r in reviews_list %}
-      <div class=\"cms-row\"><input type=\"text\" name=\"reviews\" value=\"{{ r }}\" placeholder=\"URL-obrazka | opis\"><button type=\"button\" class=\"cms-btn cms-del\" data-del>−</button></div>
+      <div class="cms-row"><input type="text" name="reviews" value="{{ r }}" placeholder="URL-obrazka | opis"><button type="button" class="cms-btn cms-del" data-del>−</button></div>
       {% endfor %}
     </div>
-    <h3>📄 Podstrony</h3>
+    <h3>📄 Podstrony — kliknij zakładkę, żeby zobaczyć i edytować jej treść</h3>
+    <div class="cms-tabs">
+      {% for s in strony %}
+      <button type="button" class="cms-tab" data-tab="strona-{{ s.slug }}">{{ s.etykieta }}</button>
+      {% endfor %}
+    </div>
     {% for s in strony %}
-    <details class=\"cms-strona">
-      <summary>{{ s.etykieta }} <code>/{{ s.slug }}/</code></summary>
-      <div class=\"cialo\">
-        <div class=\"cms-row\"><label>Nagłówek (h1)</label><input type=\"text\" name=\"copy_{{ s.slug }}-headline\" value=\"{{ s.headline }}\"></div>
-        <div class=\"cms-row\"><label>Wstęp</label><textarea name=\"copy_{{ s.slug }}-intro\" rows=\"2\">{{ s.intro }}</textarea></div>
-        <h4>Teksty na tej stronie</h4>
-        {% for slot in s.sloty_list %}
+    <div class="cms-strona" id="strona-{{ s.slug }}" style="display:none">
+      <div class="cialo">
+        <div class="cms-row"><label>Nagłówek (h1)</label><input type="text" name="copy_{{ s.slug }}-headline" value="{{ s.headline }}"></div>
+        <div class="cms-row"><label>Wstęp pod nagłówkiem</label><textarea name="copy_{{ s.slug }}-intro" rows="2">{{ s.intro }}</textarea></div>
+        <h4>Teksty na tej stronie (pogrupowane sekcjami)</h4>
+        {% regroup s.sloty_list by section as sekcje_slotow %}
+        {% for sekcja in sekcje_slotow %}
+        <h5 style="margin:0.8rem 0 0.2rem">{{ sekcja.grouper|default:"(reszta strony)" }}</h5>
+        {% for slot in sekcja.list %}
         <div class="cms-slot">
           <p class="cms-hint" style="margin:0.4rem 0 0.15rem">
             <b>{{ slot.section|default:slot.tag }}</b>
@@ -65,26 +72,40 @@
           <input type="text" name="slot_{{ s.slug }}__{{ slot.key }}" value="{{ slot.value }}" placeholder="nowy tekst (puste = znika ze strony)">
         </div>
         {% endfor %}
-        <h4>Kroki procesu <button type=\"button\" class=\"cms-btn cms-add\" data-add=\"kroki-{{ s.slug }}\">+ krok</button></h4>
+        {% endfor %}
+        <h4>Kroki procesu („suwak”) <button type="button" class="cms-btn cms-add\" data-add=\"kroki-{{ s.slug }}\">+ dodaj krok</button></h4>
         <div class=\"cms-list\" id=\"kroki-{{ s.slug }}\">
-          {% for k in s.kroki_list %}<div class=\"cms-row\"><input type=\"text\" name=\"kroki_{{ s.slug }}\" value=\"{{ k }}\" placeholder=\"tytuł|tekst\"><button type=\"button\" class=\"cms-btn cms-del\" data-del>−</button></div>{% endfor %}
+          {% for k in s.kroki_list %}<div class=\"cms-row\"><input type=\"text\" name=\"kroki_{{ s.slug }}\" value=\"{{ k }}\" placeholder=\"tytuł kroku|tekst kroku\"><button type=\"button\" class=\"cms-btn cms-del\" data-del>−</button></div>{% endfor %}
         </div>
-        <h4>FAQ <button type=\"button\" class=\"cms-btn cms-add\" data-add=\"faq-{{ s.slug }}\">+ pytanie</button></h4>
+        <h4>FAQ <button type=\"button\" class=\"cms-btn cms-add\" data-add=\"faq-{{ s.slug }}\">+ dodaj pytanie</button></h4>
         <div class=\"cms-list\" id=\"faq-{{ s.slug }}\">
           {% for f in s.faq_list %}<div class=\"cms-row\"><input type=\"text\" name=\"faq_{{ s.slug }}\" value=\"{{ f }}\" placeholder=\"pytanie|odpowiedź\"><button type=\"button\" class=\"cms-btn cms-del\" data-del>−</button></div>{% endfor %}
         </div>
-        <p><button type=\"submit\" name=\"wyczysc_{{ s.slug }}\" value=\"1\" class=\"cms-btn\" style=\"background:#b45309\">↩ Przywróć domyślne tej strony</button></p>
+        <p><button type=\"submit\" name=\"wyczysc_{{ s.slug }}\" value=\"1\" class=\"cms-btn\" style=\"background:#b45309\">↩ Przywróć domyślne teksty tej strony</button></p>
       </div>
-    </details>
+    </div>
     {% endfor %}
     <p>
       <button type=\"submit\" class=\"cms-btn cms-add\" style=\"font-size:1rem;padding:0.6rem 1.2rem\">💾 Zapisz zmiany</button>
-      <button type=\"submit\" name=\"wyczysc_wszystko\" value=\"1\" class=\"cms-btn\" style=\"background:#b91c1c\">↩ Przywróć domyślne WSZYSTKIE</button>
+      <button type=\"submit\" name=\"wyczysc_wszystko\" value=\"1\" class=\"cms-btn\" style=\"background:#b91c1c\">↩ Przywróć domyślne WSZYSTKIE teksty</button>
     </p>
   </form>
 </section>
 </div>
 <script>
+  function aktywujZakladke(id) {
+    document.querySelectorAll('.cms-strona').forEach(function (p) { p.style.display = 'none'; });
+    document.querySelectorAll('.cms-tab').forEach(function (b) { b.classList.remove('aktywna'); });
+    var panel = document.getElementById(id);
+    if (panel) panel.style.display = 'block';
+    var btn = document.querySelector('[data-tab="' + id + '"]');
+    if (btn) btn.classList.add('aktywna');
+  }
+  document.querySelectorAll('.cms-tab').forEach(function (b) {
+    b.addEventListener('click', function () { aktywujZakladke(b.getAttribute('data-tab')); });
+  });
+  var pierwsza = document.querySelector('.cms-tab');
+  if (pierwsza) aktywujZakladke(pierwsza.getAttribute('data-tab'));
   document.querySelectorAll('[data-add]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var box = document.getElementById(btn.getAttribute('data-add'));
