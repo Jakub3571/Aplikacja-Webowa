@@ -2674,7 +2674,9 @@ from django.views.decorators.csrf import csrf_exempt as _csrf_exempt
 
 @_csrf_exempt
 def api_contact(request):
-    """Formularz ze strony publicznej (cms.js POSTuje JSON na /api/contact) → mail na biuro."""
+    """Formularz ze strony publicznej (cms.js POSTuje JSON na /api/contact).
+    Wysyła maila na biuro (EMAILE_POWIADOMIEN) i/lub powiadomienie na DISCORD_WEBHOOK_URL."""
+    import os as _os
     if request.method != 'POST':
         return _JsonResponse({'ok': False, 'error': 'Tylko POST.'}, status=405)
     try:
@@ -2691,15 +2693,32 @@ def api_contact(request):
         f"Telefon: {dane.get('phone', '')}\n"
         f"E-mail: {dane.get('email', '')}\n"
     )
+    ok = False
     odbiorcy = list(getattr(settings, 'EMAILE_POWIADOMIEN', []))
-    if not odbiorcy:
-        return _JsonResponse({'ok': False, 'error': 'Brak skonfigurowanej skrzynki biura.'}, status=500)
-    try:
-        send_mail('Nowe zgłoszenie ze strony www', tresc, None, odbiorcy)
-    except Exception as e:
-        zapisz_blad_maila('api_contact', e)
-        return _JsonResponse({'ok': False, 'error': 'Nie udało się wysłać zgłoszenia.'}, status=500)
-    return _JsonResponse({'ok': True})
+    if odbiorcy:
+        try:
+            send_mail('Nowe zgłoszenie ze strony www', tresc, None, odbiorcy)
+            ok = True
+        except Exception as e:
+            zapisz_blad_maila('api_contact', e)
+    webhook = _os.environ.get('DISCORD_WEBHOOK_URL', '')
+    if webhook:
+        try:
+            import urllib.request as _urllib
+            zadanie = _urllib.Request(
+                webhook,
+                data=_json.dumps({'content': '**Nowe zgłoszenie ze strony www**\n' + tresc}).encode('utf-8'),
+                headers={'Content-Type': 'application/json'},
+                method='POST',
+            )
+            with _urllib.urlopen(zadanie, timeout=10) as odp:
+                if odp.status in (200, 204):
+                    ok = True
+        except Exception as e:
+            zapisz_blad_maila('api_contact_webhook', e)
+    if ok:
+        return _JsonResponse({'ok': True})
+    return _JsonResponse({'ok': False, 'error': 'Nie udało się wysłać zgłoszenia.'}, status=500)
 STRONY_CMS = [
     ('home', 'Strona główna'), ('cennik', 'Cennik'), ('o-nas', 'O nas'), ('kontakt', 'Kontakt'),
     ('jak-uczymy', 'Jak uczymy'), ('zajecia', 'Zajęcia'), ('start', 'Start'),
