@@ -2708,7 +2708,7 @@ def api_contact(request):
             zadanie = _urllib.Request(
                 webhook,
                 data=_json.dumps({'content': '**Nowe zgłoszenie ze strony www**\n' + tresc}).encode('utf-8'),
-                headers={'Content-Type': 'application/json'},
+                headers={'Content-Type': 'application/json', 'User-Agent': 'NowoczesneKorepetycje-Zgloszenia/1.0'},
                 method='POST',
             )
             with _urllib.urlopen(zadanie, timeout=10) as odp:
