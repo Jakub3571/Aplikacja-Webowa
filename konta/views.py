@@ -2130,6 +2130,7 @@ def przelacz_szefa(request, user_id):
     return redirect('uzytkownicy')
 
 
+@login_required
 def moj_tydzien(request, nauczyciel_id=None):
     """Widok tygodnia nauczyciela w stylu Calendly: 7 dni obok siebie,
     godziny dodaje się pojedynczym kliknięciem, przerwa 5/10/15/30 min pigułkami.
@@ -2896,6 +2897,8 @@ def cms_strony(request):
         'strony': strony,
         'reviews_list': [f"{r.get('url','')}|{r.get('alt','')}" for r in dane.get('reviews', [])],
     })
+
+@login_required
 def zazalenie(request):
     if request.method == 'POST':
         kategoria = request.POST.get('kategoria', '')
