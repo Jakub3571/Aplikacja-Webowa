@@ -52,7 +52,22 @@ class PrzeplywLogowaniaTests(TestCase):
         r = self.client.post('/', {'username': 'j.kowalski', 'password': 'Sup3rHaslo!'}, follow=True)
         self.assertTrue(r.context['user'].is_authenticated)
         self.assertRedirects(r, '/uczniowie/')
+    def test_udane_logowanie_z_next_wraca_do_next(self):
+        r = self.client.post('/?next=/cms/', {'username': 'j.kowalski', 'password': 'Sup3rHaslo!'})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.url, '/cms/')
 
+    def test_logowanie_ignoruje_zewnetrzny_next(self):
+        r = self.client.post('/?next=//evil.example/x', {'username': 'j.kowalski', 'password': 'Sup3rHaslo!'})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.url, '/pulpit/')
+
+    def test_zalogowany_z_next_idzie_do_next(self):
+        self.client.post('/', {'username': 'j.kowalski', 'password': 'Sup3rHaslo!'})
+        r = self.client.get('/?next=/cms/')
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.url, '/cms/')
+        
     def test_wylogowanie(self):
         self.client.post('/', {'username': 'j.kowalski', 'password': 'Sup3rHaslo!'})
         r = self.client.get('/wyloguj/', follow=True)

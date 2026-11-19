@@ -299,12 +299,21 @@ def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
     return False
 
 
+def _bezpieczny_next(request):
+    """Parametr ?next= tylko gdy to ścieżka wewnętrzna (ochrona przed otwarciem zewnętrznej strony)."""
+    nxt = request.GET.get('next') or request.POST.get('next') or ''
+    if nxt.startswith('/') and not nxt.startswith('//') and not nxt.startswith('/\\'):
+        return nxt
+    return ''
+
+
 def logowanie(request):
     """Wyświetla formularz logowania i loguje pracownika po poprawnych danych.
     Po 5 nieudanych próbach z rzędu blokuje logowanie do wygaśnięcia sesji
-    (ochrona przed zgadywaniem haseł)."""
+    (ochrona przed zgadywaniem haseł). Po zalogowaniu wraca do ?next= (np. /cms/)."""
     if request.user.is_authenticated:
-        return redirect('pulpit')
+        nxt = _bezpieczny_next(request)
+        return redirect(nxt) if nxt else redirect('pulpit')
     if request.method == 'POST':
         if request.session.get('proby_logowania', 0) >= MAX_PROB_LOGOWANIA:
             messages.error(
@@ -319,7 +328,8 @@ def logowanie(request):
         login(request, user)
         request.session['proby_logowania'] = 0
         messages.success(request, f'Witaj, {user.get_full_name() or user.username}!')
-        return redirect('pulpit')
+        nxt = _bezpieczny_next(request)
+        return redirect(nxt) if nxt else redirect('pulpit')
     return render(request, 'konta/logowanie.html', {'form': form})
 
 
