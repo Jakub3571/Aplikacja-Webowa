@@ -1209,27 +1209,46 @@ def kalendarz_dane(request, nauczyciel_id):
         okres = 2 if cyklicznosc_txt == '2' else 1
         kursor = datetime.combine(date(2000, 1, 1), start)
         koniec_dt = datetime.combine(date(2000, 1, 1), koniec_zakresu)
+        sloty_zakresu = []
         while kursor < koniec_dt:
-            slot_start = kursor.time()
-            slot_koniec = (kursor + timedelta(minutes=30)).time()
-            if odznaczyc:
-                Dostepnosc.objects.filter(
-                    nauczyciel=nauczyciel,
-                    data_od=dzien_data,
-                    godzina_od=slot_start,
-                    godzina_do=slot_koniec,
-                ).delete()
-            else:
-                # flaga 🔁 dotyczy TYLKO tego zakresu — pozostałe zakresy dnia mogą mieć inną
-                Dostepnosc.objects.update_or_create(
-                    nauczyciel=nauczyciel,
-                    data_od=dzien_data,
-                    data_do=dzien_data,
-                    godzina_od=slot_start,
-                    godzina_do=slot_koniec,
-                    defaults={'cykliczny': cykliczny, 'cykliczny_okres': okres},
-                )
+            sloty_zakresu.append((kursor.time(), (kursor + timedelta(minutes=30)).time()))
             kursor += timedelta(minutes=30)
+        # masowo: 1 zapytanie o sloty dnia zamiast pętli update_or_create/delete po każdym slocie
+        sloty_set = set(sloty_zakresu)
+        istniejace_dnia = {
+            (t.godzina_od, t.godzina_do): t
+            for t in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data)
+        }
+        if odznaczyc:
+            pks = [t.pk for klucz, t in istniejace_dnia.items() if klucz in sloty_set]
+            if pks:
+                Dostepnosc.objects.filter(pk__in=pks).delete()
+        else:
+            # flaga 🔁 dotyczy TYLKO tego zakresu — pozostałe zakresy dnia mogą mieć inną
+            do_zapisu = []
+            brakujace = []
+            for s, e in sloty_zakresu:
+                t = istniejace_dnia.get((s, e))
+                if t is not None:
+                    if t.data_do != dzien_data or t.cykliczny != cykliczny or t.cykliczny_okres != okres:
+                        t.data_do = dzien_data
+                        t.cykliczny = cykliczny
+                        t.cykliczny_okres = okres
+                        do_zapisu.append(t)
+                else:
+                    brakujace.append(Dostepnosc(
+                        nauczyciel=nauczyciel,
+                        data_od=dzien_data,
+                        data_do=dzien_data,
+                        godzina_od=s,
+                        godzina_do=e,
+                        cykliczny=cykliczny,
+                        cykliczny_okres=okres,
+                    ))
+            for t in do_zapisu:
+                t.save(update_fields=['data_do', 'cykliczny', 'cykliczny_okres'])
+            if brakujace:
+                Dostepnosc.objects.bulk_create(brakujace)
         komunikat = (
             f'Godziny {start:%H:%M}–{koniec_zakresu:%H:%M} — odznaczono.'
             if odznaczyc else
@@ -1237,19 +1256,33 @@ def kalendarz_dane(request, nauczyciel_id):
         )
         if cykliczny and not odznaczyc:
             # cykliczność od razu na cały rok (365 dni), krok 7 lub 14 dni
+            # (masowo: 1 zapytanie o istniejące sloty + bulk_create zamiast pętli get_or_create — przy 26 slotach to ~2700 zapytań mniej)
             ostatni_dzien = dzien_data + timedelta(days=365)
             krok = timedelta(days=7 * okres)
+            zrodlo_sloty = list(Dostepnosc.objects.filter(
+                nauczyciel=nauczyciel, data_od=dzien_data, cykliczny=True,
+                godzina_od__gte=start, godzina_do__lte=koniec_zakresu,
+            ))
+            docelowe_dni = []
             docelowy = dzien_data + krok
-            skopiowane = 0
             while docelowy <= ostatni_dzien:
-                for slot in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data, cykliczny=True, godzina_od__gte=start, godzina_do__lte=koniec_zakresu):
-                    Dostepnosc.objects.get_or_create(
-                        nauczyciel=nauczyciel, data_od=docelowy, data_do=docelowy,
-                        godzina_od=slot.godzina_od, godzina_do=slot.godzina_do,
-                        defaults={'cykliczny': True, 'cykliczny_okres': okres},
-                    )
-                    skopiowane += 1
+                docelowe_dni.append(docelowy)
                 docelowy += krok
+            istniejace = set(Dostepnosc.objects.filter(
+                nauczyciel=nauczyciel, data_od__in=docelowe_dni,
+            ).values_list('data_od', 'godzina_od'))
+            nowe = [
+                Dostepnosc(
+                    nauczyciel=nauczyciel, data_od=d, data_do=d,
+                    godzina_od=slot.godzina_od, godzina_do=slot.godzina_do,
+                    cykliczny=True, cykliczny_okres=okres,
+                )
+                for d in docelowe_dni
+                for slot in zrodlo_sloty
+                if (d, slot.godzina_od) not in istniejace
+            ]
+            Dostepnosc.objects.bulk_create(nowe)
+            skopiowane = len(nowe)
             komunikat += (f' Zakres cykliczny ({start:%H:%M}–{koniec_zakresu:%H:%M}) powtórzony '
                           f'do {ostatni_dzien:%d.%m.%Y} (co {"2 tygodnie" if okres == 2 else "tydzień"}, {skopiowane} terminów).')
     elif akcja == 'wklej_plan':
@@ -1265,14 +1298,16 @@ def kalendarz_dane(request, nauczyciel_id):
         if not zrodlo_sloty:
             return JsonResponse({'blad': 'Dzień źródłowy nie ma żadnych godzin.'}, status=400)
         Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).delete()
-        for slot in zrodlo_sloty:
-            Dostepnosc.objects.create(
+        Dostepnosc.objects.bulk_create([
+            Dostepnosc(
                 nauczyciel=nauczyciel,
                 data_od=dzien_data,
                 data_do=dzien_data,
                 godzina_od=slot.godzina_od,
                 godzina_do=slot.godzina_do,
             )
+            for slot in zrodlo_sloty
+        ])
         zrodlo_przerwa = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=zrodlo).first()
         if zrodlo_przerwa:
             PrzerwaDnia.objects.update_or_create(
@@ -1295,24 +1330,35 @@ def kalendarz_dane(request, nauczyciel_id):
         except ValueError:
             return JsonResponse({'blad': 'Nieprawidłowy zakres godzin.'}, status=400)
         # najpierw przyszłe kopie cykliczne tego zakresu (ten sam dzień tygodnia) — ale NIE sloty z lekcjami
+        # (lekcje wszystkich przyszłych dni pobieramy JEDNYM zapytaniem zamiast po jednym na termin)
         nazwa_n = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+        przyszle_terminy = [
+            t for t in Dostepnosc.objects.filter(
+                nauczyciel=nauczyciel, data_od__gt=dzien_data, cykliczny=True,
+                godzina_od__gte=start, godzina_do__lte=koniec_zakresu,
+            )
+            if t.data_od.weekday() == dzien_data.weekday()
+        ]
+        daty = sorted({t.data_od for t in przyszle_terminy})
+        godziny_lekcji = {}
+        if daty:
+            for l in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date__in=daty, odwolana=False):
+                if lekcja_jest_u_nauczyciela(l, nazwa_n):
+                    lt = timezone.localtime(l.data)
+                    godziny_lekcji.setdefault(lt.date(), []).append(lt.time())
         zablokowane = 0
-        for termin in Dostepnosc.objects.filter(
-            nauczyciel=nauczyciel, data_od__gt=dzien_data, cykliczny=True,
-            godzina_od__gte=start, godzina_do__lte=koniec_zakresu,
-        ):
-            if termin.data_od.weekday() != dzien_data.weekday():
-                continue
+        do_usuniecia = []
+        for termin in przyszle_terminy:
             ma_lekcje = any(
-                lekcja_jest_u_nauczyciela(l, nazwa_n) and timezone.localtime(l.data).date() == termin.data_od
-                and timezone.localtime(l.data).time() >= termin.godzina_od
-                and timezone.localtime(l.data).time() < termin.godzina_do
-                for l in Lekcja.objects.filter(data__date=termin.data_od, odwolana=False)
+                termin.godzina_od <= g < termin.godzina_do
+                for g in godziny_lekcji.get(termin.data_od, [])
             )
             if ma_lekcje:
                 zablokowane += 1
-                continue
-            termin.delete()
+            else:
+                do_usuniecia.append(termin.pk)
+        if do_usuniecia:
+            Dostepnosc.objects.filter(pk__in=do_usuniecia).delete()
         Dostepnosc.objects.filter(
             nauczyciel=nauczyciel,
             data_od=dzien_data,
@@ -1342,36 +1388,53 @@ def kalendarz_dane(request, nauczyciel_id):
         zrodlo_przerwa = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien_data).first()
         # koniec roku szkolnego: 30 czerwca (styczeń–czerwiec = bieżący rok, lipiec–grudzień = następny rok)
         ostatni_dzien = dzien_data + timedelta(days=365) # cykliczność na cały rok
+        docelowe_dni = []
         docelowy = dzien_data + timedelta(days=7)
-        utworzone = 0
         while docelowy <= ostatni_dzien:
-            for slot in zrodlo_sloty:
-                Dostepnosc.objects.get_or_create(
-                    nauczyciel=nauczyciel,
-                    data_od=docelowy,
-                    data_do=docelowy,
-                    godzina_od=slot.godzina_od,
-                    godzina_do=slot.godzina_do,
-                    defaults={'cykliczny': True},
-                )
-                utworzone += 1
-            if zrodlo_przerwa:
-                PrzerwaDnia.objects.update_or_create(
-                    nauczyciel=nauczyciel,
-                    data=docelowy,
-                    defaults={'minuty': zrodlo_przerwa.minuty},
-                )
+            docelowe_dni.append(docelowy)
             docelowy += timedelta(days=7)
+        # masowo: 1 zapytanie o istniejące sloty + bulk_create zamiast pętli get_or_create
+        istniejace = set(Dostepnosc.objects.filter(
+            nauczyciel=nauczyciel, data_od__in=docelowe_dni,
+        ).values_list('data_od', 'godzina_od'))
+        nowe = [
+            Dostepnosc(
+                nauczyciel=nauczyciel, data_od=d, data_do=d,
+                godzina_od=slot.godzina_od, godzina_do=slot.godzina_do,
+                cykliczny=True,
+            )
+            for d in docelowe_dni for slot in zrodlo_sloty
+            if (d, slot.godzina_od) not in istniejace
+        ]
+        Dostepnosc.objects.bulk_create(nowe)
+        utworzone = len(nowe)
+        if zrodlo_przerwa:
+            PrzerwaDnia.objects.filter(
+                nauczyciel=nauczyciel, data__in=docelowe_dni,
+            ).update(minuty=zrodlo_przerwa.minuty)
+            istniejace_przerwy = set(PrzerwaDnia.objects.filter(
+                nauczyciel=nauczyciel, data__in=docelowe_dni,
+            ).values_list('data', flat=True))
+            PrzerwaDnia.objects.bulk_create([
+                PrzerwaDnia(nauczyciel=nauczyciel, data=d, minuty=zrodlo_przerwa.minuty)
+                for d in docelowe_dni if d not in istniejace_przerwy
+            ])
         komunikat = f'Plan powtórzono co tydzień do {ostatni_dzien:%d.%m.%Y} ({utworzone} terminów).'
     elif akcja == 'cofnij_powtorzenia':
+        pks = [
+            t.pk for t in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__gt=dzien_data, cykliczny=True)
+            if t.data_od.weekday() == dzien_data.weekday()
+        ]
         usuniete = 0
-        for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__gt=dzien_data, cykliczny=True):
-            if termin.data_od.weekday() == dzien_data.weekday():
-                termin.delete()
-                usuniete += 1
-        for wpis in PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data__gt=dzien_data):
-            if wpis.data.weekday() == dzien_data.weekday():
-                wpis.delete()
+        if pks:
+            Dostepnosc.objects.filter(pk__in=pks).delete()
+            usuniete = len(pks)
+        pks_przerw = [
+            w.pk for w in PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data__gt=dzien_data)
+            if w.data.weekday() == dzien_data.weekday()
+        ]
+        if pks_przerw:
+            PrzerwaDnia.objects.filter(pk__in=pks_przerw).delete()
         komunikat = (f'Usunięto {usuniete} przyszłych powtórzeń dnia {dzien_data:%d.%m.%Y} '
                      f'(ten dzień tygodnia w kolejnych tygodniach).')
     else:
