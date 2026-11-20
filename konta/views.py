@@ -1478,9 +1478,46 @@ def lekcje(request):
     Admin i koordynator widzą wszystkich, pracownik — swoich,
     korepetytor — uczniów przypisanych do niego (wg pola korepetytor)."""
     nauczyciel_id = getattr(request.user, 'nauczyciel_id', None)
-    if nauczyciel_id:
-        nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
-        nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+    nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id) if nauczyciel_id else None
+    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower() if nauczyciel else ''
+    if request.method == 'POST' and 'szybka_lekcja' in request.POST:
+        if not nauczyciel:
+            raise PermissionDenied
+        uczen = get_object_or_404(Uczen, pk=request.POST.get('uczen_id'), zakonczona=False)
+        moj_uczen = (uczen.korepetytor or '').strip().lower() == nazwa_nauczyciela or any(
+            (k.korepetytor or '').strip().lower() == nazwa_nauczyciela
+            for k in uczen.przedmioty_ucznia.all()
+        )
+        if not moj_uczen:
+            messages.error(request, 'Możesz dodawać lekcje tylko swoim uczniom.')
+            return redirect('lekcje')
+        try:
+            dzien = date.fromisoformat(request.POST.get('data', ''))
+            godzina = datetime.strptime(request.POST.get('godzina', ''), '%H:%M').time()
+        except (ValueError, TypeError):
+            messages.error(request, 'Wybierz ucznia, datę i godzinę.')
+            return redirect('lekcje')
+        etykieta = f'{godzina.hour:02d}:{godzina.minute:02d}'
+        start_dt = datetime.combine(dzien, godzina)
+        if etykieta not in wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=uczen.id):
+            if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_dt, pomijaj_uczen_id=uczen.id):
+                messages.error(request, f'Godzina {etykieta} jest już zajęta inną lekcją.')
+            else:
+                messages.error(request, f'Godzina {etykieta} jest poza Twoimi godzinami pracy — zaznacz ją w „Mój tydzień”.')
+            return redirect('lekcje')
+        data_lekcji = timezone.make_aware(start_dt)
+        Lekcja.objects.get_or_create(uczen=uczen, data=data_lekcji, przedmiot_karta__isnull=True)
+        Dostepnosc.objects.get_or_create(
+            nauczyciel=nauczyciel, data_od=dzien, data_do=dzien,
+            godzina_od=godzina,
+            godzina_do=(datetime.combine(date(2000, 1, 1), godzina) + timedelta(minutes=GODZINA_LEKCJI)).time(),
+        )
+        messages.success(
+            request,
+            f'Zapisano lekcję: {uczen.imie_ucznia} {uczen.nazwisko_rodzica} — {dzien:%d.%m.%Y} o {etykieta} (godzina zablokowana).',
+        )
+        return redirect('lekcje')
+    if nauczyciel:
         uczniowie_lista = [
             u for u in Uczen.objects.filter(zakonczona=False).prefetch_related('przedmioty_ucznia')
             if (u.korepetytor or '').strip().lower() == nazwa_nauczyciela
@@ -1519,6 +1556,8 @@ def lekcje(request):
         'uczniowie_cykliczni': uczniowie_cykliczni,
         'uczniowie_pierwsze': uczniowie_pierwsze,
         'fraza': (request.GET.get('szukaj') or '').strip(),
+        'nauczyciel_id': nauczyciel_id,
+        'dzisiaj': date.today().isoformat(),
         'czy_szef': czy_szef(request.user),
         'jest_nauczycielem': bool(getattr(request.user, 'nauczyciel_id', None)),
     })

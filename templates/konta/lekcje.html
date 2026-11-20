@@ -4,7 +4,26 @@
 <div class="platnosci-uklad">
   <section class="karta">
     <h2>Lekcje</h2>
-
+    {% if jest_nauczycielem %}
+    <details style="margin-bottom: 1rem;">
+      <summary><strong>＋ Dodaj lekcję</strong> (jednorazową) — wybierz ucznia, datę i wolną godzinę; godzina zostanie zablokowana</summary>
+      <form method="post" style="margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .75rem; align-items: end;">
+        {% csrf_token %}
+        <input type="hidden" name="szybka_lekcja" value="1" />
+        <label>Uczeń:
+          <select name="uczen_id" required>
+            <option value="">— wybierz ucznia —</option>
+            {% for u in uczniowie %}
+            <option value="{{ u.id }}">{{ u.imie_ucznia }} {{ u.nazwisko_rodzica }} ({{ u.przedmiot }})</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Data: <input type="date" id="sl-data" name="data" value="{{ dzisiaj }}" required /></label>
+        <label>Godzina: <select id="sl-godzina" name="godzina" required></select></label>
+        <button type="submit">Zapisz lekcję</button>
+      </form>
+    </details>
+    {% endif %}
     <h3>🔄 Zajęcia cykliczne</h3>
     <div class="pole-szukania" style="margin-bottom: 1rem;">
       <input
@@ -120,6 +139,24 @@
 </div>
 
 <script>
+  var slData = document.getElementById('sl-data');
+  var slGodz = document.getElementById('sl-godzina');
+  if (slData && slGodz) {
+    var urlDane = "{% url 'korepetytorzy_dane' %}";
+    var nauczycielId = "{{ nauczyciel_id }}";
+    function zaladujGodziny() {
+      if (!slData.value) return;
+      fetch(urlDane + '?nauczyciel=' + nauczycielId + '&data=' + encodeURIComponent(slData.value))
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          slGodz.innerHTML = '';
+          (d.godziny || []).forEach(function (g) { slGodz.add(new Option(g.godzina, g.godzina)); });
+          if (!(d.godziny || []).length) slGodz.add(new Option('— brak wolnych godzin tego dnia —', ''));
+        });
+    }
+    slData.addEventListener('change', zaladujGodziny);
+    zaladujGodziny();
+  }
   document.querySelectorAll('.szukaj-tabela').forEach(function (pole) {
     pole.addEventListener('input', function () {
       var fraza = pole.value.trim().toLowerCase();
