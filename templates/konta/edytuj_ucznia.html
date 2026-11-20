@@ -151,7 +151,7 @@
       var data = selData.value;
       var id = mapaId[selKorepetytor.value];
       if (!data || !id) return;
-      fetch('/korepetytorzy/dane/?nauczyciel=' + id + '&data=' + encodeURIComponent(data), {
+      fetch('{% url "korepetytorzy_dane" %}?nauczyciel=' + id + '&data=' + encodeURIComponent(data), {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
       })
         .then(function (odp) { return odp.json(); })
@@ -175,7 +175,7 @@
       var poziom = selPoziom.value;
       selKorepetytor.innerHTML = '<option value="">— wybierz korepetytora —</option>';
       if (!przedmiot || !poziom) return;
-      fetch('/korepetytorzy/dane/?przedmiot=' + encodeURIComponent(przedmiot) + '&poziom=' + encodeURIComponent(poziom))
+      fetch('{% url "korepetytorzy_dane" %}?przedmiot=' + encodeURIComponent(przedmiot) + '&poziom=' + encodeURIComponent(poziom))
         .then(function (odp) { return odp.json(); })
         .then(function (wynik) {
           mapaId = {};

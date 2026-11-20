@@ -805,7 +805,7 @@ class LekcjeCykliczneTests(TestCase):
     def test_ajax_godziny_zwraca_date_i_dni_pracy(self):
         self.client.force_login(self.pracownik)
         dzis = date.today()
-        r = self.client.get(f'/korepetytorzy/dane/?nauczyciel={self.nauczyciel.id}&data={dzis.isoformat()}')
+        r = self.client.get(f'{% url "korepetytorzy_dane" %}?nauczyciel={self.nauczyciel.id}&data={dzis.isoformat()}')
         dane = r.json()
         self.assertTrue(dane['godziny'])
         self.assertEqual(dane['data'], dzis.isoformat())
@@ -1289,7 +1289,7 @@ class KalendarzKorepetytoraTests(TestCase):
         Lekcja.objects.create(uczen=uczen, data=uczen.pierwsza_lekcja)
         self.client.force_login(self.user)
         r = self.client.get(
-            '/korepetytorzy/dane/?tryb=godziny&przedmiot=matematyka'
+            '{% url "korepetytorzy_dane" %}?tryb=godziny&przedmiot=matematyka'
             f'&poziom=podstawowka&data={self.dzien.isoformat()}'
         )
         self.assertEqual(r.status_code, 200)
@@ -1378,7 +1378,7 @@ class PoprawkiSzefaTests(TestCase):
 
     def test_ajax_wolne_godziny_nauczyciela_rytm(self):
         self.client.force_login(self.user)
-        r = self.client.get(f'/korepetytorzy/dane/?nauczyciel={self.nauczyciel.id}&data={self.dzien.isoformat()}')
+        r = self.client.get(f'{% url "korepetytorzy_dane" %}?nauczyciel={self.nauczyciel.id}&data={self.dzien.isoformat()}')
         self.assertEqual(r.status_code, 200)
         godziny = [g['godzina'] for g in r.json()['godziny']]
         # siatka rytmu 65 min (60 lekcja + 5 przerwy) od 11:00; 12:05+60 wychodzi poza 13:00

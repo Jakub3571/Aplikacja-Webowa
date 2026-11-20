@@ -225,7 +225,7 @@ pracowniczy{% endblock %} {% block panel %}
 			poleGodzina.innerHTML =
 				'<option value="">— szukam dostępnych godzin... —</option>';
 			fetch(
-				'/korepetytorzy/dane/?tryb=godziny&przedmiot=' +
+				'{% url "korepetytorzy_dane" %}?tryb=godziny&przedmiot=' +
 					encodeURIComponent(przedmiot) +
 					'&poziom=' +
 					encodeURIComponent(poziom) +
@@ -274,7 +274,7 @@ pracowniczy{% endblock %} {% block panel %}
                     dataLekcji + ' o ' + godzinaLekcji + '... —</option>';
             }
             fetch(
-                '/korepetytorzy/dane/?przedmiot=' +
+                '{% url "korepetytorzy_dane" %}?przedmiot=' +
                 encodeURIComponent(przedmiot) +
                 '&poziom=' +
                 encodeURIComponent(poziom) +

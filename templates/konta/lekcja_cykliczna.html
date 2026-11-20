@@ -110,7 +110,7 @@
       if (!nt || !wyborDnia.value) return;
       var start = kontenerSlotow.dataset.start;
       var data = nastepnaData(parseInt(wyborDnia.value, 10), start);
-      fetch('/korepetytorzy/dane/?nauczyciel=' + encodeURIComponent(nt) + '&data=' + encodeURIComponent(data) + '&uczen=' + encodeURIComponent(kontenerSlotow.dataset.uczen || ''), {
+      fetch('{% url "korepetytorzy_dane" %}?nauczyciel=' + encodeURIComponent(nt) + '&data=' + encodeURIComponent(data) + '&uczen=' + encodeURIComponent(kontenerSlotow.dataset.uczen || ''), {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
       })
         .then(function (odp) { return odp.json(); })
