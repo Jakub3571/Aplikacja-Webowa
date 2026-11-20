@@ -100,15 +100,7 @@
 
     <p class="kalendarz-komunikat" id="tydzien-komunikat"></p>
 
-    <div class="start-link-do-kalendarza">
-      <h3>📲 Udostępnij swój kalendarz</h3>
-      <p class="podpowiedz">Skopiuj link i wyślij na grupę na WhatsApp — jak „Copy link” w Calendly.</p>
-      <div class="pole-linku">
-        <input type="text" id="link-kalendarza" readonly
-               value="{{ request.scheme }}://{{ request.get_host }}{% url 'moj_tydzien_nauczyciela' nauczyciel.id %}" />
-        <button type="button" class="przycisk-kalendarz" id="kopiuj-link">📋 Skopiuj link</button>
-      </div>
-    </div>
+
   </section>
 </div>
 
@@ -273,24 +265,7 @@
     }
 
 
-    var przyciskKopiuj = document.getElementById('kopiuj-link');
-    var poleLinku = document.getElementById('link-kalendarza');
-    if (przyciskKopiuj && poleLinku) {
-      przyciskKopiuj.addEventListener('click', function () {
-        poleLinku.select();
-        var ok = false;
-        try { ok = document.execCommand('copy'); } catch (e) {}
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(poleLinku.value).then(function () {
-            przyciskKopiuj.textContent = '✔ Skopiowano!';
-            setTimeout(function () { przyciskKopiuj.textContent = '📋 Skopiuj link'; }, 2000);
-          }).catch(function () {});
-        } else if (ok) {
-          przyciskKopiuj.textContent = '✔ Skopiowano!';
-          setTimeout(function () { przyciskKopiuj.textContent = '📋 Skopiuj link'; }, 2000);
-        }
-      });
-    }
+
   })();
 </script>
 {% endblock %}
