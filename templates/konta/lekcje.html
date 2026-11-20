@@ -5,9 +5,10 @@
   <section class="karta">
     <h2>Lekcje</h2>
     {% if jest_nauczycielem %}
-    <details style="margin-bottom: 1rem;">
-      <summary><strong>＋ Dodaj lekcję</strong> (jednorazową) — wybierz ucznia, datę i wolną godzinę; godzina zostanie zablokowana</summary>
-      <form method="post" style="margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .75rem; align-items: end;">
+    <div style="margin-bottom: 1rem;">
+      <button type="button" id="sl-toggle" style="font-size: 1.05rem; padding: .5rem 1.1rem; cursor: pointer;">＋ Dodaj lekcję</button>
+      <div id="sl-form" hidden>
+      <form method="post" style="margin-top: .75rem; display: flex; flex-wrap: wrap; gap: .75rem; align-items: end;">
         {% csrf_token %}
         <input type="hidden" name="szybka_lekcja" value="1" />
         <label>Uczeń:
@@ -22,7 +23,8 @@
         <label>Godzina: <select id="sl-godzina" name="godzina" required></select></label>
         <button type="submit">Zapisz lekcję</button>
       </form>
-    </details>
+      </div>
+    </div>
     {% endif %}
     <h3>🔄 Zajęcia cykliczne</h3>
     <div class="pole-szukania" style="margin-bottom: 1rem;">
@@ -139,6 +141,14 @@
 </div>
 
 <script>
+  var slToggle = document.getElementById('sl-toggle');
+  var slForm = document.getElementById('sl-form');
+  if (slToggle && slForm) {
+    slToggle.addEventListener('click', function () {
+      slForm.hidden = !slForm.hidden;
+      slToggle.textContent = slForm.hidden ? '＋ Dodaj lekcję' : '✕ Zamknij';
+    });
+  }
   var slData = document.getElementById('sl-data');
   var slGodz = document.getElementById('sl-godzina');
   if (slData && slGodz) {
