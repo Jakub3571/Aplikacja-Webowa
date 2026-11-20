@@ -35,16 +35,15 @@ urlpatterns = [
     ),
     path('pulpit/', views.pulpit, name='pulpit'),
     path('uczniowie/', views.uczniowie, name='uczniowie'),
-    path('nauczyciele/<int:nauczyciel_id>/kalendarz/', views.kalendarz_nauczyciela, name='kalendarz_nauczyciela'),
     path('nauczyciele/<int:nauczyciel_id>/kalendarz/dane/', views.kalendarz_dane, name='kalendarz_dane'),
-    path('moja-dyspozycyjnosc/', views.kreator_dyspozycyjnosc, name='kreator_dyspozycyjnosc'),
+
     path('moj-tydzien/', views.moj_tydzien, name='moj_tydzien'),
     path('moj-tydzien/<int:nauczyciel_id>/', views.moj_tydzien, name='moj_tydzien_nauczyciela'),
-    path('terminy/<int:termin_id>/usun/', views.usun_termin, name='usun_termin'),
+    
     path('lekcje/', views.lekcje, name='lekcje'),
     path('kalendarz/', views.kalendarz_zbiorczy, name='kalendarz_zbiorczy'),
     path('uczniowie/<int:uczen_id>/lekcja-cykliczna/', views.umow_lekcje_cykliczna, name='lekcja_cykliczna'),
-    path('lekcje/<int:uczen_id>/kalendarz/', views.kalendarz_lekcji, name='kalendarz_lekcji'),
+    
     path('platnosci/', views.platnosci, name='platnosci'),
     path('zmiana-hasla/', views.zmiana_hasla, name='zmiana_hasla'),
     path('uzytkownicy/', views.uzytkownicy, name='uzytkownicy'),

@@ -947,3 +947,74 @@ fieldset.wybor-nauczyciela label {
   text-decoration: none;
   color: inherit;
 }
+
+
+/* Kalendarz dostępności (kolumna dni tygodnia) w zakładce Uczniowie */
+.tydzien-nawigacja {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin-bottom: .6rem;
+}
+.tydzien-nawigacja .strzalka {
+  text-decoration: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: .2rem .5rem;
+}
+.dni-dostepnosci {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+.dzien-dostepnosci {
+  border: 1px solid var(--ramka);
+  border-radius: .5rem;
+  padding: .4rem .55rem;
+  background: var(--karta);
+}
+.dzien-dostepnosci.dzisiaj {
+  border-color: var(--akcent);
+  background: color-mix(in srgb, var(--akcent) 8%, var(--karta));
+}
+.dzien-naglowek {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: .25rem;
+}
+.dzien-nazwa {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.dzien-data {
+  color: var(--tekst);
+  opacity: .65;
+  font-size: .85rem;
+}
+.wpis-dostepnosci {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: .25rem .5rem;
+  padding: .15rem 0;
+  font-size: .9rem;
+}
+.wpis-dostepnosci.brak {
+  opacity: .55;
+  font-style: italic;
+}
+.zakresy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem;
+}
+.zakres-godzin {
+  background: var(--tlo);
+  border-radius: .35rem;
+  padding: .05rem .4rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

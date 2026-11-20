@@ -128,66 +128,36 @@ pracowniczy{% endblock %} {% block panel %}
 		</p>
 	</section>
 
-	<div class="uczniowie-bok">
-		<section class="karta">
-			<h2>Dostępność nauczycieli</h2>
-			<div class="pole-szukania">
-				<input
-					type="text"
-					class="szukaj-tabela"
-					data-tabela="tabela-dostepnosci"
-					placeholder="Szukaj nauczyciela..."
-				/>
-			</div>
-			{% if nadchodzace_dostepnosci %}
-			<div class="tabela-wrapper">
-				<table class="tabela" id="tabela-dostepnosci">
-					<thead>
-						<tr>
-							<th></th>
-							<th>Nauczyciel</th>
-							<th>Przedmiot</th>
-							<th>Dni</th>
-							<th>Godziny</th>
-						</tr>
-					</thead>
-					<tbody>
-						{% for termin in nadchodzace_dostepnosci %}
-						<tr>
-							<td>
-								<a
-									class="ikona-kalendarza"
-									href="{% url 'moj_tydzien_nauczyciela' termin.nauczyciel.id %}"
-									title="Zobacz kalendarz"
-									>📅</a
-								>
-							</td>
-							<td>
-								{{ termin.nauczyciel.imie }} {{ termin.nauczyciel.nazwisko }}
-							</td>
-							<td>{{ termin.nauczyciel.przedmioty_tekst }}</td>
-							<td>
-                {% if termin.dni_tygodnia %}
-                  {% for nr in termin.dni_tygodnia %}{% if nr == 0 %}pon{% elif nr == 1 %}wt{% elif nr == 2 %}śr{% elif nr == 3 %}czw{% elif nr == 4 %}pt{% elif nr == 5 %}sob{% elif nr == 6 %}nd{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}
-                  ({{ termin.dni|length }} dni)
-                {% else %}—{% endif %}
-							</td>
-							<td>
-								{% if termin.godzina_od %}{{ termin.godzina_od|time:"H:i" }} –
-								{{ termin.godzina_do|time:"H:i" }}{% else %}—{% endif %}
-							</td>
-						</tr>
-						{% endfor %}
-					</tbody>
-				</table>
-			</div>
-			{% else %}
-			<p>
-				Brak nauczycieli w systemie — utwórz im konta w zakładce „Użytkownicy”.
-			</p>
-			{% endif %}
-		</section>
-	</div>
+    <div class="uczniowie-bok">
+        <section class="karta">
+            <h2>Kalendarz dostępności</h2>
+            <div class="tydzien-nawigacja">
+                <a class="strzalka" href="?rok={{ dost.poprzedni_tydzien.year }}&miesiac={{ dost.poprzedni_tydzien.month }}&dzien={{ dost.poprzedni_tydzien.day }}" title="Poprzedni tydzień">&larr;</a>
+                <strong>{{ dost.zakres_tygodnia }}</strong>
+                <a class="strzalka" href="?rok={{ dost.nastepny_tydzien.year }}&miesiac={{ dost.nastepny_tydzien.month }}&dzien={{ dost.nastepny_tydzien.day }}" title="Następny tydzień">&rarr;</a>
+            </div>
+            <div class="dni-dostepnosci">
+                {% for dzien in dost.tydzien_dostepnosci %}
+                <div class="dzien-dostepnosci{% if dzien.dzisiaj %} dzisiaj{% endif %}">
+                    <div class="dzien-naglowek">
+                        <span class="dzien-nazwa">{{ dzien.nazwa }}</span>
+                        <span class="dzien-data">{{ dzien.data|date:"d.m" }}</span>
+                    </div>
+                    {% if dzien.wpisy %}
+                        {% for w in dzien.wpisy %}
+                        <div class="wpis-dostepnosci">
+                            <a class="nauczyciel-link" href="{% url 'moj_tydzien_nauczyciela' w.nauczyciel.id %}" title="Zobacz „Mój tydzień” nauczyciela">{{ w.nauczyciel.imie }} {{ w.nauczyciel.nazwisko }}</a>
+                            <span class="zakresy">{% for z in w.zakresy %}<span class="zakres-godzin">{{ z }}</span>{% endfor %}</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="wpis-dostepnosci brak">nikt nie pracuje</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
 </div>
 
 <script>

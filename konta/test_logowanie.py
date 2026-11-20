@@ -265,23 +265,18 @@ class NauczycieleTests(TestCase):
             godzina_od='16:00', godzina_do='16:30',
         )
         r = self.client.get(
-            f'/nauczyciele/{self.nauczyciel.id}/kalendarz/',
+            f'/moj-tydzien/{self.nauczyciel.id}/'
             {'rok': 2026, 'miesiac': 10, 'dzien': 5},
             follow=True,
         )
         self.assertContains(r, '16:00')
         self.assertContains(r, '16:30')
 
-    def test_uczniowie_pokazuja_dostepnosc(self):
-        self.client.force_login(self.user)
-        Dostepnosc.objects.create(
-            nauczyciel=self.nauczyciel,
-            data_od='2026-10-05', data_do='2026-10-10',
-            godzina_od='16:00', godzina_do='20:00',
-        )
-        r = self.client.get('/uczniowie/')
-        self.assertContains(r, 'Dostępność nauczycieli')
+        r = self.client.get('/uczniowie/', {'rok': 2026, 'miesiac': 10, 'dzien': 5})
+        self.assertContains(r, 'Kalendarz dostępności')
         self.assertContains(r, 'Jan Kowalski')
+        self.assertContains(r, '16:00')
+        self.assertContains(r, '20:00')
 
 
 class PlatnosciTests(TestCase):
@@ -505,7 +500,7 @@ class KontoNauczycielaTests(TestCase):
         inny = Nauczyciel.objects.create(imie='Ola', nazwisko='Nowak', email='ola@n.pl')
         self.client.logout()
         self.client.login(username='j.kowalski', password='M0taneHaslo!')
-        r = self.client.get(f'/nauczyciele/{inny.id}/kalendarz/')
+        r = self.client.get(f'/moj-tydzien/{inny.id}/')
         self.assertEqual(r.status_code, 403)
 
     def test_nauczyciel_nie_widzi_panelu_admina(self):
@@ -565,13 +560,6 @@ class KreatorDyspozycyjnoscTests(TestCase):
         self.assertContains(r, 'Mój tydzień')
         self.assertNotContains(r, 'Twoja dyspozycyjność')
 
-    def test_kreator_tylko_dla_nauczyciela(self):
-        # stary kreator formularzowy został zastąpiony — przekierowuje na Moj tydzień,
-        # który pracownik (bez konta nauczyciela) nie może otworzyć (403 po redyrekcie)
-        pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
-        self.client.force_login(pracownik)
-        r = self.client.get('/moja-dyspozycyjnosc/', follow=True)
-        self.assertEqual(r.status_code, 403)
 
     def test_kreator_generuje_sloty_z_przerwa(self):
         # kreator formularzowy zastąpiony: godziny dodaje się w "Mój tydzień" (klik/plusik),
@@ -606,7 +594,7 @@ class KreatorDyspozycyjnoscTests(TestCase):
         )
         pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
         self.client.force_login(pracownik)
-        adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/?rok=2026&miesiac=10&dzien=1'
+        adres = f'/moj-tydzien/{self.nauczyciel.id}/?rok=2026&miesiac=10&dzien=1'
         r = self.client.get(adres, follow=True)
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, '16:00')
@@ -843,8 +831,9 @@ class LekcjeCykliczneTests(TestCase):
         r = self.client.get('/lekcje/')
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Kasia')
+        # stary kalendarz lekcji ucznia usunięty — adres daje teraz 404
         r = self.client.get(f'/lekcje/{self.uczen.id}/kalendarz/')
-        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.status_code, 404)
 
 class NauczycielTylkoKalendarzTests(TestCase):
     """Konto nauczyciela widzi wyłącznie swój kalendarz — bez zakładki Uczniowie."""
