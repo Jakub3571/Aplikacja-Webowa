@@ -902,25 +902,10 @@ def archiwum_uczniow(request):
     for u in uczniowie_lista:
         u.liczba_lekcji = liczba_lekcji.get(u.id, 0)
 
-    korepetytorzy_lista = list(Nauczyciel.objects.order_by('nazwisko', 'imie'))
-    pracownicy_lista = [
-        u for u in Pracownik.objects.order_by('username')
-        if not u.nauczyciel
-        and (u.stanowisko or '').strip().lower() != 'koordynator'
-    ]
-    koordynatorzy_lista = [
-        u for u in Pracownik.objects.order_by('username')
-        if not u.nauczyciel
-        and (u.stanowisko or '').strip().lower() == 'koordynator'
-    ]
     return render(request, 'konta/archiwum.html', {
         'uczniowie': uczniowie_lista,
-        'korepetytorzy': korepetytorzy_lista,
-        'pracownicy': pracownicy_lista,
-        'koordynatorzy': koordynatorzy_lista,
         'fraza': (request.GET.get('szukaj') or '').strip(),
         'czy_szef': czy_szef(request.user),
-        'czy_koordynator': czy_koordynator(request.user),
     })
 
 
@@ -1048,8 +1033,7 @@ def usun_konto(request, user_id):
         messages.error(request, 'Nie możesz usunąć własnego konta.')
         return redirect('uzytkownicy')
     if not czy_szef(request.user):
-        if uzytkownik.utworzyl_id != request.user.id or uzytkownik.is_superuser:
-            raise PermissionDenied
+        raise PermissionDenied
     if request.method == 'POST':
         login = uzytkownik.username
         nauczyciel = uzytkownik.nauczyciel
@@ -1946,13 +1930,13 @@ def przelacz_szefa(request, user_id):
 def moj_tydzien(request, nauczyciel_id=None):
     """Widok tygodnia nauczyciela w stylu Calendly: 7 dni obok siebie,
     godziny dodaje się pojedynczym kliknięciem, przerwa 5/10/15/30 min pigułkami.
-    Admin/pracownik może otworzyć kalendarz dowolnego nauczyciela podając jego id
-    (link z zakładki Użytkownicy/Uczniowie) — widzi wtedy dokładnie to samo co nauczyciel."""
+    Kalendarz cudzy (z id w adresie) może otworzyć TYLKO szef — osoba umawiająca
+    i koordynator dostają 403 (w Uczniowie widać tylko imię + godziny pracy)."""
     if nauczyciel_id is None:
         nauczyciel_id = getattr(request.user, 'nauczyciel_id', None)
     if not nauczyciel_id:
         raise PermissionDenied
-    if getattr(request.user, 'nauczyciel_id', None) and request.user.nauczyciel_id != nauczyciel_id:
+    if not czy_szef(request.user) and getattr(request.user, 'nauczyciel_id', None) != nauczyciel_id:
         raise PermissionDenied
     nauczyciel = get_object_or_404(Nauczyciel, pk=nauczyciel_id)
 

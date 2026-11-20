@@ -1018,3 +1018,26 @@ fieldset.wybor-nauczyciela label {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Przycisk-pigułka „＋ Dodaj lekcję” (zakładka Lekcje u korepetytora) */
+.przycisk-pigulka {
+  border: none;
+  border-radius: 999px;
+  background: var(--akcent);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: .5rem 1.1rem;
+  cursor: pointer;
+  transition: background .15s ease, transform .1s ease;
+}
+.przycisk-pigulka:hover {
+  background: var(--akcent-ciemny);
+}
+.przycisk-pigulka:active {
+  transform: scale(.97);
+}
+/* Imię korepetytora w Kalendarzu dostępności (bez linku) */
+.nauczyciel-tekst {
+  font-weight: 600;
+}

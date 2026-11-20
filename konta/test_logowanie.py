@@ -272,6 +272,30 @@ class NauczycieleTests(TestCase):
         self.assertContains(r, '16:00')
         self.assertContains(r, '16:30')
 
+    def test_archiwum_pokazuje_tylko_zarchiwizowanych_uczniow(self):
+        self.client.force_login(self.user)
+        Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='jan@k.pl')
+        r = self.client.get('/archiwum/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Archiwum uczniów')
+        self.assertNotContains(r, 'Korepetytorzy (')
+        self.assertNotContains(r, 'Pracownicy (')
+        self.assertNotContains(r, 'Koordynatorzy (')
+
+    def test_archiwum_pokazuje_tylko_zakonczonych_i_wylaczonych(self):
+        self.client.force_login(self.user)
+        # self.nauczyciel (Jan Kowalski) jest aktywny -> nie pokazuje się w archiwum
+        Nauczyciel.objects.create(imie='Ola', nazwisko='Nieaktywna', email='o@n.pl', aktywny=False)
+        Pracownik.objects.create_user('prac_aktywny', 'pa@f.pl', 'Sup3rHaslo!')
+        Pracownik.objects.create_user('prac_wylaczony', 'pw@f.pl', 'Sup3rHaslo!', is_active=False)
+        r = self.client.get('/archiwum/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Archiwum uczniów')
+        self.assertContains(r, 'Ola Nieaktywna')        # nieaktywny korepetytor -> w archiwum
+        self.assertNotContains(r, 'Jan Kowalski')        # aktywny korepetytor -> NIE ma w archiwum
+        self.assertContains(r, 'prac_wylaczony')         # wyłączone konto -> w archiwum
+        self.assertNotContains(r, 'prac_aktywny')        # aktywne konto -> NIE ma w archiwum
+
     def test_uczniowie_pokazuja_dostepnosc(self):
         self.client.force_login(self.user)
         Dostepnosc.objects.create(
@@ -593,7 +617,7 @@ class KreatorDyspozycyjnoscTests(TestCase):
         godziny = sorted(d.godzina_od.strftime('%H:%M') for d in Dostepnosc.objects.filter(nauczyciel=self.nauczyciel))
         self.assertEqual(godziny, ['16:00'])
 
-    def test_pracownik_widzi_kalendarz_bez_edycji(self):
+    def test_pracownik_nie_wejdzie_do_cudzego_kalendarza(self):
         Dostepnosc.objects.create(
             nauczyciel=self.nauczyciel,
             data_od='2026-10-01', data_do='2026-10-01',
@@ -601,17 +625,35 @@ class KreatorDyspozycyjnoscTests(TestCase):
         )
         pracownik = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
         self.client.force_login(pracownik)
-        adres = f'/moj-tydzien/{self.nauczyciel.id}/?rok=2026&miesiac=10&dzien=1'
-        r = self.client.get(adres, follow=True)
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, '16:00')
-        # proba edycji AJAX: POST odrzucony, nic sie nie zmienia
+        # osoba umawiająca nie widzi cudzego kalendarza (403)
+        r = self.client.get(f'/moj-tydzien/{self.nauczyciel.id}/')
+        self.assertEqual(r.status_code, 403)
+        # i nie może dopisać godzin przez AJAX
         r = self.client.post(
             f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/',
             {'dzien': '2026-10-01', 'akcja': 'przelacz_godzine', 'godzina': '17:00'},
         )
         self.assertEqual(r.status_code, 403)
         self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel).count(), 1)
+
+    def test_koordynator_nie_wejdzie_do_cudzego_kalendarza(self):
+        k = Pracownik.objects.create_user('koord1', 'k@f.pl', 'Sup3rHaslo!')
+        k.stanowisko = 'koordynator'
+        k.save()
+        self.client.force_login(k)
+        r = self.client.get(f'/moj-tydzien/{self.nauczyciel.id}/')
+        self.assertEqual(r.status_code, 403)
+
+    def test_szef_widzi_kalendarz_nauczyciela(self):
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel,
+            data_od='2026-10-01', data_do='2026-10-01',
+            godzina_od='16:00', godzina_do='16:30',
+        )
+        self.client.force_login(self.admin)
+        r = self.client.get(f'/moj-tydzien/{self.nauczyciel.id}/?rok=2026&miesiac=10&dzien=1')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, '16:00')
 
 class LekcjeCykliczneTests(TestCase):
     """Lekcje cykliczne + widoczność uczniów per pracownik."""
@@ -1783,3 +1825,33 @@ class DodatkowyPrzedmiotZGrafikiemTests(TestCase):
         r = self.client.post(f'/uczniowie/{self.uczen.id}/edytuj/', self._dane('2026-11-09', '11:00'), follow=True)
         self.assertContains(r, 'nie może przyjąć lekcji')
         self.assertFalse(self.PrzedmiotUcznia.objects.filter(uczen=self.uczen, przedmiot='fizyka').exists())
+
+
+
+class UsuwanieKontTests(TestCase):
+    """Usuwanie kont (uzytkownicy/<id>/usun/) — TYLKO szef, nawet twórca konta nie może."""
+
+    def setUp(self):
+        self.szef = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.tworca = Pracownik.objects.create_user('tworca', 't@f.pl', 'Sup3rHaslo!')
+        self.konto = Pracownik.objects.create_user('do_usuniecia', 'd@f.pl', 'Sup3rHaslo!')
+        self.konto.utworzyl = self.tworca
+        self.konto.save()
+
+    def test_tworca_konta_nie_moze_go_usunac(self):
+        self.client.force_login(self.tworca)
+        r = self.client.post(f'/uzytkownicy/{self.konto.id}/usun/')
+        self.assertEqual(r.status_code, 403)
+        self.assertTrue(Pracownik.objects.filter(pk=self.konto.pk).exists())
+
+    def test_szef_usuwa_konto(self):
+        self.client.force_login(self.szef)
+        r = self.client.post(f'/uzytkownicy/{self.konto.id}/usun/')
+        self.assertEqual(r.status_code, 302)
+        self.assertFalse(Pracownik.objects.filter(pk=self.konto.pk).exists())
+
+    def test_nie_mozna_usunac_wlasnego_konta(self):
+        self.client.force_login(self.szef)
+        r = self.client.post(f'/uzytkownicy/{self.szef.id}/usun/')
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(Pracownik.objects.filter(pk=self.szef.pk).exists())

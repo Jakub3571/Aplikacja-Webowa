@@ -146,7 +146,7 @@ pracowniczy{% endblock %} {% block panel %}
                     {% if dzien.wpisy %}
                         {% for w in dzien.wpisy %}
                         <div class="wpis-dostepnosci">
-                            <a class="nauczyciel-link" href="{% url 'moj_tydzien_nauczyciela' w.nauczyciel.id %}" title="Zobacz „Mój tydzień” nauczyciela">{{ w.nauczyciel.imie }} {{ w.nauczyciel.nazwisko }}</a>
+<span class="nauczyciel-tekst">{{ w.nauczyciel.imie }} {{ w.nauczyciel.nazwisko }}</span>
                             <span class="zakresy">{% for z in w.zakresy %}<span class="zakres-godzin">{{ z }}</span>{% endfor %}</span>
                         </div>
                         {% endfor %}
