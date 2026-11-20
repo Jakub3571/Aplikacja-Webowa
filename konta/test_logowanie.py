@@ -272,15 +272,7 @@ class NauczycieleTests(TestCase):
         self.assertContains(r, '16:00')
         self.assertContains(r, '16:30')
 
-    def test_archiwum_pokazuje_tylko_zarchiwizowanych_uczniow(self):
-        self.client.force_login(self.user)
-        Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='jan@k.pl')
-        r = self.client.get('/archiwum/')
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Archiwum uczniów')
-        self.assertNotContains(r, 'Korepetytorzy (')
-        self.assertNotContains(r, 'Pracownicy (')
-        self.assertNotContains(r, 'Koordynatorzy (')
+
 
     def test_archiwum_pokazuje_tylko_zakonczonych_i_wylaczonych(self):
         self.client.force_login(self.user)

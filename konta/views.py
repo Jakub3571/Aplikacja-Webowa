@@ -902,10 +902,27 @@ def archiwum_uczniow(request):
     for u in uczniowie_lista:
         u.liczba_lekcji = liczba_lekcji.get(u.id, 0)
 
+    """Zakładka archiwum: uczniowie ze zakończoną współpracą, zakończeni korepetytorzy
+    i wyłączone konta pracowników — wszystko z możliwością przywrócenia. Aktywni się nie pokazują."""
+    korepetytorzy_lista = list(Nauczyciel.objects.filter(aktywny=False).order_by('nazwisko', 'imie'))
+    pracownicy_lista = [
+        u for u in Pracownik.objects.filter(is_active=False).order_by('username')
+        if not u.nauczyciel
+        and (u.stanowisko or '').strip().lower() != 'koordynator'
+    ]
+    koordynatorzy_lista = [
+        u for u in Pracownik.objects.filter(is_active=False).order_by('username')
+        if not u.nauczyciel
+        and (u.stanowisko or '').strip().lower() == 'koordynator'
+    ]
     return render(request, 'konta/archiwum.html', {
         'uczniowie': uczniowie_lista,
+        'korepetytorzy': korepetytorzy_lista,
+        'pracownicy': pracownicy_lista,
+        'koordynatorzy': koordynatorzy_lista,
         'fraza': (request.GET.get('szukaj') or '').strip(),
         'czy_szef': czy_szef(request.user),
+        'czy_koordynator': czy_koordynator(request.user),
     })
 
 
