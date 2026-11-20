@@ -595,7 +595,7 @@ def uczniowie(request):
     ):
         return JsonResponse({'blad': 'Brak uprawnień.'}, status=403)
         raise PermissionDenied
-        dost = _kontekst_dostepnosci(request)
+    dost = _kontekst_dostepnosci(request)
     if czy_szef(request.user) or czy_koordynator(request.user):
         uczniowie_lista = list(Uczen.objects.all())
     else:

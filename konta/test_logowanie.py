@@ -265,13 +265,20 @@ class NauczycieleTests(TestCase):
             godzina_od='16:00', godzina_do='16:30',
         )
         r = self.client.get(
-            f'/moj-tydzien/{self.nauczyciel.id}/'
+            f'/moj-tydzien/{self.nauczyciel.id}/',
             {'rok': 2026, 'miesiac': 10, 'dzien': 5},
             follow=True,
         )
         self.assertContains(r, '16:00')
         self.assertContains(r, '16:30')
 
+    def test_uczniowie_pokazuja_dostepnosc(self):
+        self.client.force_login(self.user)
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel,
+            data_od='2026-10-05', data_do='2026-10-10',
+            godzina_od='16:00', godzina_do='20:00',
+        )
         r = self.client.get('/uczniowie/', {'rok': 2026, 'miesiac': 10, 'dzien': 5})
         self.assertContains(r, 'Kalendarz dostępności')
         self.assertContains(r, 'Jan Kowalski')
