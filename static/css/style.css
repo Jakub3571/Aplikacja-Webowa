@@ -1,69 +1,43 @@
+/* style.css — wersja oczyszczona: bez duplikatów, kaskada zachowana 1:1 (zweryfikowane skryptem) */
+
 :root {
-  --tlo: #f1f5f9;
-  --karta: #ffffff;
-  --tekst: #0f172a;
-  --akcent: #2563eb;
-  --akcent-ciemny: #1d4ed8;
-  --blad: #dc2626;
-  --ramka: #cbd5e1;
+  --tlo: #f1f5f9; --karta: #ffffff; --tekst: #0f172a; --akcent: #2563eb; --akcent-ciemny: #1d4ed8;
+  --blad: #dc2626; --ramka: #cbd5e1;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --tlo: #0f172a;
-    --karta: #1e293b;
-    --tekst: #f1f5f9;
-    --akcent: #3b82f6;
-    --akcent-ciemny: #2563eb;
-    --blad: #f87171;
-    --ramka: #334155;
+    --tlo: #0f172a; --karta: #1e293b; --tekst: #f1f5f9; --akcent: #3b82f6; --akcent-ciemny: #2563eb;
+    --blad: #f87171; --ramka: #334155;
   }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background: var(--tlo);
-  color: var(--tekst);
-  min-height: 100vh;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--tlo);
+  color: var(--tekst); min-height: 100vh;
 }
 
 .komunikaty {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  position: fixed; top: 1rem; right: 1rem; display: flex; flex-direction: column; gap: 0.5rem;
   z-index: 10;
 }
 
 .komunikat {
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  background: var(--karta);
-  border: 1px solid var(--ramka);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  max-width: 22rem;
+  padding: 0.75rem 1rem; border-radius: 8px; background: var(--karta); border: 1px solid
+  var(--ramka); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); max-width: 22rem;
 }
 
 .komunikat.error { border-left: 4px solid var(--blad); }
+
 .komunikat.success { border-left: 4px solid #16a34a; }
+
 .komunikat.info { border-left: 4px solid var(--akcent); }
 
-.logowanie-wrapper {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-}
+.logowanie-wrapper { min-height: 100vh; display: grid; place-items: center; padding: 1rem; }
 
-.opakowanie {
-  max-width: 60rem;
-  margin: 0 auto;
-  padding: 1rem;
-}
+.opakowanie { max-width: 60rem; margin: 0 auto; padding: 1rem; }
 
 .opakowanie .karta { margin-top: 1rem; }
 
@@ -79,203 +53,109 @@ body {
 }
 
 .karta {
-  background: var(--karta);
-  border: 1px solid var(--ramka);
-  border-radius: 12px;
-  padding: 2rem;
-  width: 100%;
-  max-width: 24rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  background: var(--karta); border: 1px solid var(--ramka); border-radius: 12px; padding: 2rem;
+  width: 100%; max-width: 24rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .karta h1 { margin-bottom: 0.25rem; font-size: 1.5rem; }
+
 .karta h2 { margin-bottom: 0.5rem; }
 
-.podtytul {
-  color: var(--tekst);
-  opacity: 0.7;
-  margin-bottom: 1.5rem;
-}
+.podtytul { color: var(--tekst); opacity: 0.7; margin-bottom: 1.5rem; }
 
 .formularz { display: flex; flex-direction: column; gap: 0.5rem; }
+
 .formularz label { font-size: 0.875rem; font-weight: 600; margin-top: 0.5rem; }
 
-.formularz input,
-.formularz select,
-.formularz textarea {
-  padding: 0.625rem 0.75rem;
-  border: 1px solid var(--ramka);
-  border-radius: 8px;
-  background: var(--tlo);
-  color: var(--tekst);
-  font-size: 1rem;
-  font-family: inherit;
-  width: 100%;
+.formularz input, .formularz select, .formularz textarea {
+  padding: 0.625rem 0.75rem; border: 1px solid var(--ramka); border-radius: 8px; background:
+  var(--tlo); color: var(--tekst); font-size: 1rem; font-family: inherit; width: 100%;
 }
 
-.formularz input:focus,
-.formularz select:focus,
-.formularz textarea:focus {
-  outline: 2px solid var(--akcent);
-  border-color: var(--akcent);
+.formularz input:focus, .formularz select:focus, .formularz textarea:focus {
+  outline: 2px solid var(--akcent); border-color: var(--akcent);
 }
 
 .formularz button {
-  margin-top: 1.25rem;
-  padding: 0.75rem;
-  background: var(--akcent);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
+  margin-top: 1.25rem; padding: 0.75rem; background: var(--akcent); color: #fff; border: none;
+  border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;
 }
 
 .formularz button:hover { background: var(--akcent-ciemny); }
 
 .powrot {
-  display: block;
-  margin-top: 0.75rem;
-  text-align: center;
-  color: var(--akcent);
-  text-decoration: none;
-  font-size: 0.9rem;
+  display: block; margin-top: 0.75rem; text-align: center; color: var(--akcent); text-decoration:
+  none; font-size: 0.9rem;
 }
 
 .pasek {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  background: var(--karta);
-  border: 1px solid var(--ramka);
-  border-radius: 12px;
-  padding: 1rem;
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;
+  background: var(--karta); border: 1px solid var(--ramka); border-radius: 12px; padding: 1rem;
   margin-bottom: 1rem;
 }
 
 .pasek nav { display: flex; gap: 1rem; flex-wrap: wrap; }
+
 .pasek a { color: var(--akcent); text-decoration: none; font-weight: 600; }
 
-.zakladki {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-bottom: 1rem;
-}
+.zakladki { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 1rem; }
 
 .zakladki a {
-  flex: 1 1 0;
-  text-align: center;
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--ramka);
-  border-radius: 8px 8px 0 0;
-  background: var(--karta);
-  color: var(--tekst);
-  text-decoration: none;
-  font-weight: 600;
-  opacity: 0.7;
+  flex: 1 1 0; text-align: center; padding: 0.5rem 1rem; border: 1px solid var(--ramka);
+  border-radius: 8px 8px 0 0; background: var(--karta); color: var(--tekst); text-decoration: none;
+  font-weight: 600; opacity: 0.7;
 }
 
 .zakladki a:hover { opacity: 1; }
-.zakladki a.aktywna {
-  opacity: 1;
-  color: var(--akcent);
-  border-bottom: 2px solid var(--akcent);
-}
+
+.zakladki a.aktywna { opacity: 1; color: var(--akcent); border-bottom: 2px solid var(--akcent); }
 
 .panel-tresc { width: 100%; }
 
 .tabela-wrapper { overflow-x: auto; }
 
-.tabela {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
+.tabela { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 
-.tabela th, .tabela td {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--ramka);
-  text-align: left;
-}
+.tabela th, .tabela td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--ramka); text-align: left; }
 
 .tabela th { font-weight: 600; opacity: 0.7; }
 
 .gwiazdka { color: var(--blad); }
 
-.podpowiedz {
-  font-size: 0.8rem;
-  opacity: 0.65;
-  margin-top: 0.25rem;
-}
+.podpowiedz { font-size: 0.8rem; opacity: 0.65; margin-top: 0.25rem; }
 
-.pole-szukania {
-  position: relative;
-  margin-bottom: 0.75rem;
-}
+.pole-szukania { position: relative; margin-bottom: 0.75rem; }
 
-.pole-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0.75rem 0 0.25rem;
-}
+.pole-checkbox { display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0 0.25rem; }
 
-.pole-checkbox input[type="checkbox"] {
-  width: 1.1rem;
-  height: 1.1rem;
-  flex: none;
-}
+.pole-checkbox input[type="checkbox"] { width: 1.1rem; height: 1.1rem; flex: none; }
 
 .pole-szukania::before {
-  content: "🔍";
-  position: absolute;
-  left: 0.75rem;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 0.9rem;
-  pointer-events: none;
+  content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size:
+  0.9rem; pointer-events: none;
 }
 
 .pole-szukania input {
-  width: 100%;
-  padding: 0.55rem 0.75rem 0.55rem 2.4rem;
-  border: 1px solid var(--ramka);
-  border-radius: 999px;
-  background: var(--tlo);
-  color: var(--tekst);
-  font-size: 0.9rem;
-  font-family: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%; padding: 0.55rem 0.75rem 0.55rem 2.4rem; border: 1px solid var(--ramka);
+  border-radius: 999px; background: var(--tlo); color: var(--tekst); font-size: 0.9rem; font-family:
+  inherit; transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .pole-szukania input::placeholder { opacity: 0.6; }
 
 .pole-szukania input:focus {
-  outline: none;
-  border-color: var(--akcent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  outline: none; border-color: var(--akcent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .kalendarz-naglowek {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;
 }
 
 .kalendarz-naglowek h3 { margin: 0; }
 
 .strzalka {
-  padding: 0.25rem 0.75rem;
-  border: 1px solid var(--ramka);
-  border-radius: 8px;
-  color: var(--akcent);
-  text-decoration: none;
-  font-weight: 700;
+  padding: 0.25rem 0.75rem; border: 1px solid var(--ramka); border-radius: 8px; color:
+  var(--akcent); text-decoration: none; font-weight: 700;
 }
 
 .kalendarz { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -283,203 +163,122 @@ body {
 .kalendarz th { padding: 0.35rem; font-size: 0.8rem; opacity: 0.6; }
 
 .kalendarz td {
-  padding: 0.35rem;
-  text-align: center;
-  border: 1px solid var(--ramka);
-  border-radius: 6px;
+  padding: 0.35rem; text-align: center; border: 1px solid var(--ramka); border-radius: 6px;
   font-size: 0.9rem;
 }
 
 .kalendarz td.inny-miesiac { opacity: 0.25; }
 
-.kalendarz td.dzien-dostepny {
-  background: #16a34a;
-  color: #fff;
-  font-weight: 700;
-}
+.kalendarz td.dzien-dostepny { background: #16a34a; color: #fff; font-weight: 700; }
 
 .kalendarz-legenda { margin-top: 0.5rem; font-size: 0.8rem; opacity: 0.7; }
 
 .kropka-dostepny {
-  display: inline-block;
-  width: 0.75rem;
-  height: 0.75rem;
-  background: #16a34a;
-  border-radius: 4px;
+  display: inline-block; width: 0.75rem; height: 0.75rem; background: #16a34a; border-radius: 4px;
   vertical-align: middle;
 }
 
-.kalendarz td a { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; padding: 0.3rem 0.1rem; color: inherit; text-decoration: none; }
-
-.kalendarz td.dzien-wybrany {
-  outline: 3px solid var(--akcent);
-  font-weight: 700;
+.kalendarz td a {
+  display: flex; flex-direction: column; align-items: center; gap: 0.15rem; padding: 0.3rem 0.1rem;
+  color: inherit; text-decoration: none;
 }
+
+.kalendarz td.dzien-wybrany { outline: 3px solid var(--akcent); font-weight: 700; }
 
 .kropka-wybrany {
-  display: inline-block;
-  width: 0.75rem;
-  height: 0.75rem;
-  border: 2px solid var(--akcent);
-  border-radius: 4px;
-  vertical-align: middle;
+  display: inline-block; width: 0.75rem; height: 0.75rem; border: 2px solid var(--akcent);
+  border-radius: 4px; vertical-align: middle;
 }
 
 .usuwanie { color: var(--blad); }
 
 .stopka {
-  max-width: 60rem;
-  margin: 2rem auto 0;
-  padding: 1rem;
-  text-align: center;
-  font-size: 0.85rem;
+  max-width: 60rem; margin: 2rem auto 0; padding: 1rem; text-align: center; font-size: 0.85rem;
   opacity: 0.7;
 }
 
 .stopka a { color: var(--akcent); text-decoration: none; font-weight: 600; }
+
 .stopka a:hover { text-decoration: underline; }
 
 .uczniowie-uklad {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-  gap: 1rem;
-  align-items: start;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 1rem; align-items:
+  start;
 }
 
 .uczniowie-uklad .karta { margin-top: 0; max-width: none; }
 
-.uczniowie-bok {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  align-self: stretch;
-}
+.uczniowie-bok { display: flex; flex-direction: column; gap: 1rem; align-self: stretch; }
 
-.uczniowie-bok .karta {
-  flex: 1;
-}
+.uczniowie-bok .karta { flex: 1; }
 
 @media (max-width: 900px) {
   .uczniowie-uklad { grid-template-columns: 1fr; }
 }
 
-.platnosci-uklad {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
+.platnosci-uklad { display: flex; flex-direction: column; gap: 1rem; }
 
-.platnosci-uklad .karta {
-  margin-top: 0;
-  max-width: none;
-  width: 100%;
-}
+.platnosci-uklad .karta { margin-top: 0; max-width: none; width: 100%; }
 
 .przycisk-umowa {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  text-decoration: none;
-  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height:
+  1.75rem; border-radius: 6px; font-size: 0.85rem; text-decoration: none; cursor: pointer;
   transition: opacity 0.15s ease;
 }
 
 .umowa-tak { background: #16a34a; color: #fff; }
+
 .umowa-nie { background: #dc2626; color: #fff; }
 
 .przycisk-umowa:hover { opacity: 0.75; }
 
 .przycisk-zaplac {
-  padding: 0.3rem 0.75rem;
-  background: #16a34a;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
+  padding: 0.3rem 0.75rem; background: #16a34a; color: #fff; border: none; border-radius: 6px;
+  font-size: 0.8rem; font-weight: 600; cursor: pointer;
 }
 
 .przycisk-zaplac:hover { background: #15803d; }
 
 .status-zaplacone { font-weight: 600; }
+
 .status-niezaplacone { font-weight: 600; opacity: 0.8; }
 
-.ikona-kalendarza {
-  font-size: 1.3rem;
-  text-decoration: none;
-}
+.ikona-kalendarza { font-size: 1.3rem; text-decoration: none; }
 
 .przycisk-usun {
-  background: #dc2626;
-  color: #ffffff;
-  border: none;
-  border-radius: 0.5rem;
-  padding: 0.55rem 1rem;
-  font-size: 0.95rem;
-  cursor: pointer;
-  font-weight: 600;
-  margin-right: 0.75rem;
+  background: #dc2626; color: #ffffff; border: none; border-radius: 0.5rem; padding: 0.55rem 1rem;
+  font-size: 0.95rem; cursor: pointer; font-weight: 600; margin-right: 0.75rem;
 }
 
 .przycisk-usun:hover { background: #b91c1c; }
 
 .kafelki-godzin {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
-  gap: 0.35rem;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr)); gap: 0.35rem;
 }
 
 .kafelek-form { margin: 0; }
 
 .kafelek {
-  width: 100%;
-  padding: 0.4rem 0;
-  border: 1px solid var(--ramka);
-  border-radius: 999px;
-  background: var(--tlo);
-  color: var(--tekst);
-  font-size: 0.85rem;
-  font-family: inherit;
-  cursor: pointer;
+  width: 100%; padding: 0.4rem 0; border: 1px solid var(--ramka); border-radius: 999px; background:
+  var(--tlo); color: var(--tekst); font-size: 0.85rem; font-family: inherit; cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .kafelek:hover { border-color: var(--akcent); }
 
-.kafelek-zaznaczony {
-  background: #16a34a;
-  color: #fff;
-  border-color: #16a34a;
-  font-weight: 700;
-}
+.kafelek-zaznaczony { background: #16a34a; color: #fff; border-color: #16a34a; font-weight: 700; }
 
-.kafelek-zajety {
-  background: #fca5a5;
-  color: #7f1d1d;
-  cursor: not-allowed;
-  text-decoration: line-through;
-}
+.kafelek-zajety { background: #fca5a5; color: #7f1d1d; cursor: not-allowed; text-decoration: line-through; }
 
 .kafelek-zajety:hover { background: #f87171; }
 
 .kropka-zajety {
-  display: inline-block;
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: 999px;
-  background: #fca5a5;
+  display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 999px; background: #fca5a5;
 }
 
 .kalendarz-uklad {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  gap: 1rem;
-  align-items: start;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 1rem; align-items:
+  start;
 }
 
 .kalendarz-uklad .karta { margin-top: 0; max-width: none; }
@@ -490,98 +289,48 @@ body {
   .kalendarz-uklad { grid-template-columns: 1fr; }
 }
 
-.formularz input[type="datetime-local"] {
-  border-radius: 999px;
-  padding-left: 1.1rem;
+.formularz input[type="datetime-local"] { border-radius: 999px; padding-left: 1.1rem; }
+
+.formularz input[type="number"]::-webkit-outer-spin-button, .formularz input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
 }
 
-.formularz input[type="number"]::-webkit-outer-spin-button,
-.formularz input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
+.formularz input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
-.formularz input[type="number"] {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
+.przerwa-form { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--ramka); }
 
-.przerwa-form {
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--ramka);
-}
-
-.przerwa-form h3 {
-  margin-bottom: 0.35rem;
-}
+.przerwa-form h3 { margin-bottom: 0.35rem; }
 
 .pigulka {
-  display: inline-block;
-  padding: 0.1rem 0.4rem;
-  border-radius: 999px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  line-height: 1.4;
+  display: inline-block; padding: 0.1rem 0.4rem; border-radius: 999px; font-size: 0.68rem;
+  font-weight: 600; line-height: 1.4;
 }
 
-.pigulka-godziny {
-  background: #16a34a;
-  color: #ffffff;
-}
+.pigulka-godziny { background: #16a34a; color: #ffffff; }
 
 .przycisk-kalendarz {
-  padding: 0.45rem 0.9rem;
-  border: 1px solid var(--ramka);
-  border-radius: 999px;
-  background: var(--karta);
-  color: var(--tekst);
-  font-family: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
+  padding: 0.45rem 0.9rem; border: 1px solid var(--ramka); border-radius: 999px; background:
+  var(--karta); color: var(--tekst); font-family: inherit; font-size: 0.85rem; cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .przycisk-kalendarz:hover:not(:disabled) {
-  border-color: var(--akcent);
-  background: color-mix(in srgb, var(--akcent) 12%, var(--karta));
+  border-color: var(--akcent); background: color-mix(in srgb, var(--akcent) 12%, var(--karta));
 }
 
-.przycisk-kalendarz:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+.przycisk-kalendarz:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Przycisk wyczysc dzien — czerwony akcent */
-.przycisk-kalendarz-usun:hover:not(:disabled) {
-  border-color: #dc2626;
-  background: #fee2e2;
-  color: #7f1d1d;
-}
+.przycisk-kalendarz-usun:hover:not(:disabled) { border-color: #dc2626; background: #fee2e2; color: #7f1d1d; }
 
 /* === Moj tydzien — dni w wierszach z plusikiem zakresu (styl Calendly) === */
-
-.tydzien-uklad {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-  max-width: 75rem;
-  margin: 0 auto;
-}
+.tydzien-uklad { display: flex; gap: 1rem; align-items: flex-start; max-width: 75rem; margin: 0 auto; }
 
 .tydzien-karta { flex: 1; min-width: 0; max-width: none; }
 
-.instrukcja-kalendarza {
-  flex: 0 0 19rem;
-  margin-bottom: 0;
-  position: sticky;
-  top: 1rem;
-}
+.instrukcja-kalendarza { flex: 0 0 19rem; margin-bottom: 0; position: sticky; top: 1rem; }
 
-.kalendarz-dol {
-  margin-top: 0.75rem;
-  margin-bottom: 0;
-}
+.kalendarz-dol { margin-top: 0.75rem; margin-bottom: 0; }
 
 @media (max-width: 900px) {
   .tydzien-uklad { flex-direction: column; max-width: 60rem; }
@@ -589,114 +338,56 @@ body {
 }
 
 .dzien-wiersz {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--ramka);
-  border-radius: 0.6rem;
-  margin-bottom: 0.5rem;
-  background: var(--tlo);
-  flex-wrap: wrap;
+  display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; border: 1px solid
+  var(--ramka); border-radius: 0.6rem; margin-bottom: 0.5rem; background: var(--tlo); flex-wrap:
+  wrap;
 }
 
 .dzien-wiersz:has(.zakres-pigulka) {
-  border-color: #16a34a;
-  background: color-mix(in srgb, #16a34a 8%, var(--tlo));
+  border-color: #16a34a; background: color-mix(in srgb, #16a34a 8%, var(--tlo));
 }
 
 .dzien-nazwa {
-  display: flex;
-  flex-direction: column;
-  min-width: 5.5rem;
+  display: flex; flex-direction: column; min-width: 5.5rem; font-weight: 600; text-transform:
+  capitalize;
 }
 
-.dzien-data { font-size: 0.8rem; opacity: 0.7; }
+.dzien-data { font-size: .85rem; opacity: .65; color: var(--tekst); }
 
-.dzien-zakresy {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  flex: 1;
-  align-items: center;
-}
+.dzien-zakresy { display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1; align-items: center; }
 
 .zakres-pigulka {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: 999px;
-  background: #16a34a;
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.85rem;
+  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.6rem; border-radius:
+  999px; background: #16a34a; color: #fff; font-weight: 600; font-size: 0.85rem;
 }
 
 .zakres-usun {
-  background: none;
-  border: none;
-  color: #ff5a4e;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 700;
-  padding: 0;
-  line-height: 1;
+  background: none; border: none; color: #ff5a4e; cursor: pointer; font-size: 1rem; font-weight:
+  700; padding: 0; line-height: 1;
 }
 
 .zakres-usun:hover { color: #d92b1f; transform: scale(1.2); }
 
+.instrukcja-kalendarza ul { margin: 0.5rem 0 0 1.2rem; padding: 0; }
 
-.instrukcja-kalendarza ul {
-  margin: 0.5rem 0 0 1.2rem;
-  padding: 0;
-}
+.instrukcja-kalendarza li { margin-bottom: 0.35rem; }
 
-.instrukcja-kalendarza li {
-  margin-bottom: 0.35rem;
-}
+.zakres-pusty { opacity: 0.5; font-style: italic; font-size: 0.85rem; }
 
-.zakres-pusty {
-  opacity: 0.5;
-  font-style: italic;
-  font-size: 0.85rem;
-}
-
-.zakres-dodaj {
-  font-size: 1rem !important;
-  min-width: 2.2rem;
-}
+.zakres-dodaj { font-size: 1rem !important; min-width: 2.2rem; }
 
 .zakres-okienko {
-  margin-top: 0.75rem;
-  padding: 1rem 1.1rem;
-  border: 2px solid var(--akcent);
-  border-radius: 0.75rem;
-  background: var(--karta);
+  margin-top: 0.75rem; padding: 1rem 1.1rem; border: 2px solid var(--akcent); border-radius:
+  0.75rem; background: var(--karta);
 }
 
-.zakres-pola {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-  margin-top: 0.5rem;
-}
+.zakres-pola { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 0.5rem; }
 
-.zakres-pola label {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.9rem;
-}
+.zakres-pola label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; }
 
 .zakres-pola select {
-  padding: 0.4rem 0.5rem;
-  border: 1px solid var(--ramka);
-  border-radius: 0.5rem;
-  background: var(--tlo);
-  color: var(--tekst);
-  font-family: inherit;
+  padding: 0.4rem 0.5rem; border: 1px solid var(--ramka); border-radius: 0.5rem; background:
+  var(--tlo); color: var(--tekst); font-family: inherit;
 }
 
 .zakres-myslnik { font-weight: 700; opacity: 0.6; }
@@ -706,123 +397,85 @@ body {
 }
 
 .krok-info {
-  background: color-mix(in srgb, var(--akcent) 8%, var(--karta));
-  border-left: 4px solid var(--akcent);
-  padding: 0.6rem 0.9rem;
-  border-radius: 0.4rem;
-  font-size: 0.85rem;
-  margin-bottom: 1rem;
+  background: color-mix(in srgb, var(--akcent) 8%, var(--karta)); border-left: 4px solid
+  var(--akcent); padding: 0.6rem 0.9rem; border-radius: 0.4rem; font-size: 0.85rem; margin-bottom:
+  1rem;
 }
 
 /* Link Google Meet u nauczyciela */
 .meet-input {
-  flex: 1 1 18rem;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid var(--ramka);
-  border-radius: 0.5rem;
-  background: var(--tlo);
-  color: var(--tekst);
-  font-family: inherit;
-  font-size: 0.9rem;
+  flex: 1 1 18rem; padding: 0.55rem 0.75rem; border: 1px solid var(--ramka); border-radius: 0.5rem;
+  background: var(--tlo); color: var(--tekst); font-family: inherit; font-size: 0.9rem;
 }
 
 /* Zajęcia odwołane (kalendarz lekcji ucznia) */
 .kafelek-odwolany {
-  background: #fbbf24;
-  border-color: #d97706;
-  color: #7c2d12;
-  text-decoration: line-through;
+  background: #fbbf24; border-color: #d97706; color: #7c2d12; text-decoration: line-through;
 }
 
 .lista-lekcji-dnia {
-  list-style: none;
-  padding: 0;
-  margin: 0.5rem 0 0;
-  display: grid;
-  gap: 0.5rem;
+  list-style: none; padding: 0; margin: 0 0 0.5rem; display: flex; gap: 3px; flex-direction: column;
 }
 
 .lista-lekcji-dnia li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  border: 1px solid var(--ramka);
-  border-radius: 0.5rem;
-  padding: 0.45rem 0.7rem;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem;
+  border: 1px solid var(--ramka); border-radius: 0.5rem; padding: 0.45rem 0.7rem;
 }
 
-.lista-lekcji-dnia .lekcja-odwolana span {
-  color: #b45309;
-  text-decoration: line-through;
-}
+.lista-lekcji-dnia .lekcja-odwolana span { color: #b45309; text-decoration: line-through; }
 
 .przycisk-odwolaj {
-  background: #dc2626;
-  color: #fff;
-  border: none;
-  border-radius: 0.5rem;
-  padding: 0.4rem 0.8rem;
-  font-family: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
+  background: #dc2626; color: #fff; border: none; border-radius: 0.5rem; padding: 0.4rem 0.8rem;
+  font-family: inherit; font-size: 0.85rem; cursor: pointer;
 }
 
 .przycisk-odwolaj:hover { background: #b91c1c; }
 
 .przycisk-przywroc {
-  background: #16a34a;
-  color: #fff;
-  border: none;
-  border-radius: 0.5rem;
-  padding: 0.4rem 0.8rem;
-  font-family: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
+  background: #16a34a; color: #fff; border: none; border-radius: 0.5rem; padding: 0.4rem 0.8rem;
+  font-family: inherit; font-size: 0.85rem; cursor: pointer;
 }
 
 .przycisk-przywroc:hover { background: #15803d; }
 
 /* Pigułka lekcji w podglądzie kalendarza nauczyciela */
 .pigulka-lekcja {
-  background: color-mix(in srgb, var(--akcent) 15%, var(--karta));
-  border: 1px solid var(--akcent);
-  color: var(--tekst);
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  margin-left: 0.25rem;
-  display: inline-block;
+  background: color-mix(in srgb, var(--akcent) 15%, var(--karta)); border: 1px solid var(--akcent);
+  color: var(--tekst); padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.8rem;
+  margin-left: 0.25rem; display: inline-block;
 }
 
 /* === Kalendarz zbiorczy miesięczny (siatka jak zwykły kalendarz, tylko odczyt) === */
 .kalendarz-siata { display: flex; flex-direction: column; gap: 4px; }
-.kalendarz-wiersz { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+
+.kalendarz-wiersz { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; min-width: 0; }
+
 .kalendarz-wiersz-naglowki { position: sticky; top: 0; }
+
 .kalendarz-dzien-naglowek { font-weight: 600; text-align: center; padding: 0.25rem; font-size: 0.85rem; }
+
 .kalendarz-komorka {
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  height: 7.5rem;
-  overflow-y: auto;
-  padding: 0.25rem;
-  background: #fff;
+  border: 1px solid #e2e8f0; border-radius: 6px; height: 7.5rem; overflow-y: auto; padding: 0.25rem;
+  background: #fff; min-width: 0;
 }
+
 .kalendarz-komorka.poza-miesiacem { background: #f1f5f9; color: #94a3b8; }
+
 .kalendarz-komorka.dzisiaj { border: 2px solid var(--akcent, #2563eb); }
+
 .kalendarz-numer { font-weight: 700; font-size: 0.85rem; margin-bottom: 0.15rem; }
+
 .kalendarz-wpisy { display: flex; flex-direction: column; gap: 2px; }
+
 .chip {
-  font-size: 0.7rem;
-  border-radius: 4px;
-  padding: 1px 4px;
-  white-space: nowrap;
-  overflow: hidden;
+  font-size: 0.7rem; border-radius: 4px; padding: 1px 4px; white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .chip-wolny { background: #e5e7eb; color: #374151; }
+
 .chip-lekcja { background: #bbf7d0; color: #14532d; }
+
 @media (max-width: 900px) {
   .kalendarz-komorka { height: 6rem; }
   .chip { font-size: 0.62rem; }
@@ -831,213 +484,165 @@ body {
 
 /* === Kalendarz zbiorczy: karta na szerokość kontenera (równo z paskiem zakładek) === */
 .karta.karta-kalendarz { max-width: none; margin-top: 1rem; }
-.kalendarz-wiersz { min-width: 0; }
-.kalendarz-komorka { min-width: 0; }
 
 /* === Kalendarz zbiorczy: kolory lekcji i rozwinięcie dnia === */
 .chip-lekcja-cykliczna { background: #bfdbfe; color: #1e3a8a; }
-.kalendarz-komorka.wybrany { border: 2px solid var(--akcent, #2563eb); background: #eff6ff; }
+
+.kalendarz-komorka.wybrany { border: 2px solid var(--akcent, #2563eb); background: #eff6ff; height: 17rem; }
+
 a.kalendarz-numer { color: inherit; text-decoration: none; font-weight: 700; }
+
 a.kalendarz-numer:hover { color: var(--akcent, #2563eb); }
+
 .kalendarz-dzien-szczegoly { margin-top: 1rem; }
+
 .kalendarz-dzien-szczegoly h4 { margin: 0.75rem 0 0.25rem; }
-.lista-lekcji-dnia { list-style: none; padding: 0; margin: 0 0 0.5rem; display: flex; flex-direction: column; gap: 3px; }
+
 .lista-lekcji-dnia .chip { font-size: 0.8rem; white-space: normal; }
-
-
 
 /* cały kafelek dnia klikalny */
 a.kalendarz-komorka { display: block; color: inherit; text-decoration: none; cursor: pointer; }
+
 a.kalendarz-komorka:hover { border-color: var(--akcent, #2563eb); background: #eff6ff; }
 
+.kalendarz-komorka-szczegoly {
+  margin-top: 3px; border-top: 1px dashed #cbd5e1; padding-top: 3px; display: flex; flex-direction:
+  column; gap: 2px;
+}
 
-/* rozwinięty kafelek dnia: rośnie tylko trochę, lista w kolumnie, suwak w środku */
-.kalendarz-komorka.wybrany { height: 15rem; background: #eff6ff; }
-.kalendarz-komorka-szczegoly { margin-top: 3px; border-top: 1px dashed #cbd5e1; padding-top: 3px; display: flex; flex-direction: column; gap: 2px; }
 .komorka-nauczyciel { font-size: 0.65rem; font-weight: 700; margin-top: 2px; }
-.chip-szczegoly { font-size: 0.68rem; white-space: normal; text-align: left; }  
 
+.chip-szczegoly { font-size: 0.68rem; white-space: normal; text-align: left; }
 
-/* rozwinięty kafelek: podział na godziny + strzałka wróć */
-.kalendarz-komorka.wybrany { height: 17rem; }
 .strzalka-wroc { font-size: 1.1rem; }
-.komorka-godzina { display: flex; flex-wrap: wrap; gap: 2px; align-items: baseline; border-bottom: 1px dotted #e2e8f0; padding: 1px 0; }
-.komorka-godzina-etykieta { font-size: 0.62rem; color: #64748b; min-width: 2.1rem; font-weight: 700; }
 
+.komorka-godzina {
+  display: flex; flex-wrap: wrap; gap: 2px; align-items: baseline; border-bottom: 1px dotted
+  #e2e8f0; padding: 1px 0;
+}
+
+.komorka-godzina-etykieta { font-size: 0.62rem; color: #64748b; min-width: 2.1rem; font-weight: 700; }
 
 /* pełny widok dnia (po kliknięciu w kafelek) */
 .dzien-godziny { display: flex; flex-direction: column; border-top: 1px solid #eef2f7; }
-.dzien-wiersz-godzina { display: grid; grid-template-columns: 4.5rem 1fr; border-bottom: 1px solid #eef2f7; min-height: 2.1rem; }
-.dzien-godzina-etykieta { font-weight: 700; color: #64748b; font-size: 0.8rem; padding: 0.35rem 0.5rem; border-right: 1px solid #eef2f7; }
-.dzien-godzina-tresc { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 0.3rem 0.5rem; }
+
+.dzien-wiersz-godzina {
+  display: grid; grid-template-columns: 4.5rem 1fr; border-bottom: 1px solid #eef2f7; min-height:
+  2.1rem;
+}
+
+.dzien-godzina-etykieta {
+  font-weight: 700; color: #64748b; font-size: 0.8rem; padding: 0.35rem 0.5rem; border-right: 1px
+  solid #eef2f7;
+}
+
+.dzien-godzina-tresc {
+  display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 0.3rem 0.5rem;
+}
+
 .chip-dzien { font-size: 0.8rem; white-space: normal; text-align: left; }
+
 .dzien-pusto { color: #cbd5e1; font-size: 0.75rem; }
 
-
-
 .wybor-nauczyciela { border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 1rem; margin: 0 0 1rem; }
-.wybor-nauczyciela legend { padding: 0 0.4rem; font-weight: 600; }
-.wybor-nauczyciela-opcja { display: block; padding: 0.25rem 0; }
 
-.wybor-nauczyciela { border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 1rem; margin: 0 0 1rem; }
 .wybor-nauczyciela legend { padding: 0 0.4rem; font-weight: 600; }
-.wybor-nauczyciela-opcja { display: block; padding: 0.25rem 0; }
+
+.wybor-nauczyciela-opcja { display: flex; padding: 0.25rem 0; align-items: center; gap: 0.5rem; }
 
 #przycisk-zazalenia { position: fixed; right: 1rem; bottom: 1rem; z-index: 1000; }
-#okno-zazalenia { position: fixed; right: 1rem; bottom: 3.5rem; width: 320px; max-width: 90vw; z-index: 1001; padding: 1rem; }
+
+#okno-zazalenia {
+  position: fixed; right: 1rem; bottom: 3.5rem; width: 320px; max-width: 90vw; z-index: 1001;
+  padding: 1rem;
+}
+
 #okno-zazalenia h3 { margin-top: 0; }
+
 #okno-zazalenia textarea { width: 100%; box-sizing: border-box; }
 
-label:has(input[type="radio"]),
-label:has(input[type="checkbox"]) {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-input[type="radio"],
-input[type="checkbox"] {
-  margin: 0;
-  flex: 0 0 auto;
-  width: 1.1rem;
-  height: 1.1rem;
-  accent-color: #2563eb;
-}
-.wybor-nauczyciela-opcja {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0;
-}
-.wybor-nauczyciela fieldset,
-fieldset.wybor-nauczyciela label {
-  text-align: left;
+label:has(input[type="radio"]), label:has(input[type="checkbox"]) {
+  display: flex; align-items: center; gap: 0.5rem;
 }
 
+input[type="radio"], input[type="checkbox"] {
+  margin: 0; flex: 0 0 auto; width: 1.1rem; height: 1.1rem; accent-color: #2563eb;
+}
+
+.wybor-nauczyciela fieldset, fieldset.wybor-nauczyciela label { text-align: left; }
+
 .zgloszenia-strona .karta { max-width: none; width: 100%; }
+
 .zgloszenia-strona .zgloszenia-kolumny { display: flex; gap: 1rem; align-items: stretch; }
+
 .zgloszenia-strona .zgloszenia-kolumny .karta { flex: 1 1 0; }
+
 @media (max-width: 1100px) {
   .zgloszenia-strona .zgloszenia-kolumny { flex-direction: column; }
 }
 
-
 .zgloszenia-link { position: relative; font-weight: 600; }
+
 .badge-czerwony {
-  display: inline-block;
-  background: #dc2626;
-  color: #fff;
-  border-radius: 999px;
-  padding: 0 0.45rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.4;
+  display: inline-block; background: #dc2626; color: #fff; border-radius: 999px; padding: 0 0.45rem;
+  font-size: 0.75rem; font-weight: 700; line-height: 1.4;
 }
 
 .zgloszenia-float {
-  position: fixed;
-  top: 0.6rem;
-  right: 0.4rem;
-  z-index: 1200;
-  background: var(--karta, #fff);
-  border: 1px solid var(--ramka, #e2e8f0);
-  border-radius: 8px;
-  padding: 0.2rem 0.6rem;
-  font-weight: 600;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  text-decoration: none;
-  color: inherit;
+  position: fixed; top: 0.6rem; right: 0.4rem; z-index: 1200; background: var(--karta, #fff);
+  border: 1px solid var(--ramka, #e2e8f0); border-radius: 8px; padding: 0.2rem 0.6rem; font-weight:
+  600; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); text-decoration: none; color: inherit;
 }
-
 
 /* Kalendarz dostępności (kolumna dni tygodnia) w zakładce Uczniowie */
 .tydzien-nawigacja {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: .5rem;
-  margin-bottom: .6rem;
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom:
+  .6rem;
 }
+
 .tydzien-nawigacja .strzalka {
-  text-decoration: none;
-  font-size: 1.2rem;
-  line-height: 1;
-  padding: .2rem .5rem;
+  text-decoration: none; font-size: 1.2rem; line-height: 1; padding: .2rem .5rem;
 }
-.dni-dostepnosci {
-  display: flex;
-  flex-direction: column;
-  gap: .4rem;
-}
+
+.dni-dostepnosci { display: flex; flex-direction: column; gap: .4rem; }
+
 .dzien-dostepnosci {
-  border: 1px solid var(--ramka);
-  border-radius: .5rem;
-  padding: .4rem .55rem;
-  background: var(--karta);
+  border: 1px solid var(--ramka); border-radius: .5rem; padding: .4rem .55rem; background:
+  var(--karta);
 }
+
 .dzien-dostepnosci.dzisiaj {
-  border-color: var(--akcent);
-  background: color-mix(in srgb, var(--akcent) 8%, var(--karta));
+  border-color: var(--akcent); background: color-mix(in srgb, var(--akcent) 8%, var(--karta));
 }
+
 .dzien-naglowek {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: .25rem;
+  display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .25rem;
 }
-.dzien-nazwa {
-  font-weight: 600;
-  text-transform: capitalize;
-}
-.dzien-data {
-  color: var(--tekst);
-  opacity: .65;
-  font-size: .85rem;
-}
+
 .wpis-dostepnosci {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: .25rem .5rem;
-  padding: .15rem 0;
-  font-size: .9rem;
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .25rem
+  .5rem; padding: .15rem 0; font-size: .9rem;
 }
-.wpis-dostepnosci.brak {
-  opacity: .55;
-  font-style: italic;
-}
-.zakresy {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .25rem;
-}
+
+.wpis-dostepnosci.brak { opacity: .55; font-style: italic; }
+
+.zakresy { display: flex; flex-wrap: wrap; gap: .25rem; }
+
 .zakres-godzin {
-  background: var(--tlo);
-  border-radius: .35rem;
-  padding: .05rem .4rem;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  background: var(--tlo); border-radius: .35rem; padding: .05rem .4rem; font-variant-numeric:
+  tabular-nums; white-space: nowrap;
 }
 
 /* Przycisk-pigułka „＋ Dodaj lekcję” (zakładka Lekcje u korepetytora) */
 .przycisk-pigulka {
-  border: none;
-  border-radius: 999px;
-  background: var(--akcent);
-  color: #fff;
-  font-size: 1.05rem;
-  font-weight: 600;
-  padding: .5rem 1.1rem;
-  cursor: pointer;
-  transition: background .15s ease, transform .1s ease;
+  border: none; border-radius: 999px; background: var(--akcent); color: #fff; font-size: 1.05rem;
+  font-weight: 600; padding: .5rem 1.1rem; cursor: pointer; transition: background .15s ease,
+  transform .1s ease;
 }
-.przycisk-pigulka:hover {
-  background: var(--akcent-ciemny);
-}
-.przycisk-pigulka:active {
-  transform: scale(.97);
-}
+
+.przycisk-pigulka:hover { background: var(--akcent-ciemny); }
+
+.przycisk-pigulka:active { transform: scale(.97); }
+
 /* Imię korepetytora w Kalendarzu dostępności (bez linku) */
-.nauczyciel-tekst {
-  font-weight: 600;
-}
+.nauczyciel-tekst { font-weight: 600; }
