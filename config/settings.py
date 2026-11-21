@@ -120,6 +120,7 @@ AUTH_USER_MODEL = 'konta.Pracownik'
 # Bez tego Django 4.x odrzuca POST-y z JavaScriptu (kalendarz) błędem 403.
 CSRF_TRUSTED_ORIGINS = [
     'https://www.nowoczesnekorepetycje.pl',
+    'https://nowoczesnekorepetycje.pl',
 ]
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -150,6 +151,7 @@ if not DEBUG:
     CSRF_COOKIE_HTTPONLY = False
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
+    SECURE_REFERRER_POLICY = 'same-origin'  # Referer nie wychodzi poza domenę
 
 # Poczta: na czas developmentu maile wypisywane są w terminalu (backend konsolowy).
 # Na produkcji wystarczy ustawić zmienną środowiskową DJANGO_EMAIL=smtp

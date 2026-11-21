@@ -1,4 +1,5 @@
 import calendar
+import re
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.views import PasswordResetConfirmView
 from django.core.exceptions import PermissionDenied
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse, request
 from django.shortcuts import get_object_or_404, redirect, render
@@ -2482,26 +2484,71 @@ from django.http import JsonResponse as _JsonResponse
 from django.views.decorators.csrf import csrf_exempt as _csrf_exempt
 
 
+def _ip_z_zadania(request):
+    """IP klienta (pierwszy z X-Forwarded-For, gdy PA podstawia proxy)."""
+    xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    if xff:
+        return xff.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', '')
+
+
 @_csrf_exempt
 def api_contact(request):
-    """Formularz ze strony publicznej (cms.js POSTuje JSON na /api/contact).
-    Wysyła maila na biuro (EMAILE_POWIADOMIEN) i/lub powiadomienie na DISCORD_WEBHOOK_URL."""
+    """Formularz ze strony publicznej (strona POSTuje JSON na /api/contact).
+    Wysyła maila na biuro (EMAILE_POWIADOMIEN) i/lub powiadomienie na DISCORD_WEBHOOK_URL.
+    Zabezpieczenia antyspamowe: limit 10 KB body, rate-limit 5 zgłoszeń/godz. na IP,
+    honeypot (pole „website”), walidacja pól. Boty dostają udawany sukces {'ok': true}."""
     import os as _os
     if request.method != 'POST':
         return _JsonResponse({'ok': False, 'error': 'Tylko POST.'}, status=405)
+    if int(request.headers.get('Content-Length') or 0) > 10_240:
+        return _JsonResponse({'ok': False, 'error': 'Za duże zapytanie.'}, status=413)
     try:
         dane = _json.loads(request.body.decode('utf-8') or '{}')
         if not isinstance(dane, dict):
             dane = {}
     except ValueError:
         dane = request.POST.dict()
+
+    def _pole(nazwa, maks):
+        return str(dane.get(nazwa, '') or '')[:maks].replace('\r', ' ').replace('\n', ' ').strip()
+
+    # honeypot: wypełnione „website” = bot -> udajemy sukces, nic nie wysyłamy
+    if dane.get('website'):
+        return _JsonResponse({'ok': True})
+    # rate-limit per IP: max 5 zgłoszeń na godzinę
+    klucz = f'api_contact:{_ip_z_zadania(request)}'
+    if not cache.add(klucz, 1, timeout=3600):
+        try:
+            cache.incr(klucz)
+        except ValueError:
+            cache.set(klucz, 1, timeout=3600)
+    if (cache.get(klucz) or 0) > 5:
+        return _JsonResponse({'ok': True})  # udajemy sukces, żeby bot nie wiedział
+
+    name = _pole('name', 100)
+    subject = _pole('subject', 200)
+    level = _pole('level', 100)
+    goal = _pole('goal', 500)
+    phone = _pole('phone', 20)
+    email = _pole('email', 254)
+    if len(name) < 2:
+        return _JsonResponse({'ok': False, 'error': 'Podaj imię (min. 2 znaki).'}, status=400)
+    if phone and not re.fullmatch(r'[0-9+\- ]{5,20}', phone):
+        return _JsonResponse({'ok': False, 'error': 'Nieprawidłowy numer telefonu.'}, status=400)
+    if email:
+        from django.core.validators import validate_email
+        try:
+            validate_email(email)
+        except Exception:
+            return _JsonResponse({'ok': False, 'error': 'Nieprawidłowy adres e-mail.'}, status=400)
     tresc = (
-        f"Imię: {dane.get('name', '')}\n"
-        f"Przedmiot: {dane.get('subject', '')}\n"
-        f"Poziom/klasa: {dane.get('level', '')}\n"
-        f"Cel nauki: {dane.get('goal', '')}\n"
-        f"Telefon: {dane.get('phone', '')}\n"
-        f"E-mail: {dane.get('email', '')}\n"
+        f"Imię: {name}\n"
+        f"Przedmiot: {subject}\n"
+        f"Poziom/klasa: {level}\n"
+        f"Cel nauki: {goal}\n"
+        f"Telefon: {phone}\n"
+        f"E-mail: {email}\n"
     )
     ok = False
     odbiorcy = list(getattr(settings, 'EMAILE_POWIADOMIEN', []))
@@ -2612,7 +2659,9 @@ def zazalenie(request):
             messages.success(request, 'Zgłoszenie zapisane.')
         else:
             messages.error(request, 'Wybierz kategorię i napisz treść zgłoszenia.')
-        return redirect(request.META.get('HTTP_REFERER') or 'pulpit')
+        ref = request.META.get('HTTP_REFERER') or ''
+        wlasna = f'{request.scheme}://{request.get_host()}'
+        return redirect(ref if ref.startswith(wlasna) else 'pulpit')
     return redirect('pulpit')
 @login_required
 def zgloszenia(request):
