@@ -6,3 +6,4 @@ db.sqlite3
 .venv/
 logi_maili.txt
 staticfiles/
+.cache/
