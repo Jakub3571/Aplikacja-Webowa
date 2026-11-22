@@ -414,7 +414,16 @@ def dostepnosci_tygodnia(dni):
     [{'data', 'nazwa', 'dzisiaj', 'wpisy': [{'nauczyciel', 'zakresy': ['08:00–12:00']}]}].
     Sloty tego samego dnia sklejane w zakresy (tak jak w „Mój tydzień”)."""
     dni_pelne = ['poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota', 'niedziela']
-    nauczyciele = list(Nauczyciel.objects.filter(aktywny=True).order_by('nazwisko', 'imie'))
+    nauczyciele = list(
+        Nauczyciel.objects.filter(aktywny=True)
+        .prefetch_related('przedmioty')
+        .order_by('nazwisko', 'imie')
+    )
+    # przedmioty nauczyciela (same nazwy, bez poziomów) — raz na nauczyciela, bez N+1
+    przedmioty_na_nauczyciela = {
+        n.id: ', '.join(sorted({p.przedmiot for p in n.przedmioty.all()}))
+        for n in nauczyciele
+    }
     terminy = (
         Dostepnosc.objects
         .filter(data_od__lte=dni[-1], data_do__gte=dni[0])
@@ -440,6 +449,7 @@ def dostepnosci_tygodnia(dni):
             if zakresy:
                 wpisy.append({
                     'nauczyciel': n,
+                    'przedmioty': przedmioty_na_nauczyciela.get(n.id, ''),
                     'zakresy': [f'{s:%H:%M}–{e:%H:%M}' for s, e in zakresy],
                 })
         wynik.append({

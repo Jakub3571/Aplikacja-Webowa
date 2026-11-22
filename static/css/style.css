@@ -646,3 +646,6 @@ input[type="radio"], input[type="checkbox"] {
 
 /* Imię korepetytora w Kalendarzu dostępności (bez linku) */
 .nauczyciel-tekst { font-weight: 600; }
+
+/* Przedmioty korepetytora obok nazwiska w Kalendarzu dostępności */
+.nauczyciel-przedmiot { opacity: 0.65; font-size: 0.85rem; }

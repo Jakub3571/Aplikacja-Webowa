@@ -301,6 +301,20 @@ class NauczycieleTests(TestCase):
         self.assertContains(r, '16:00')
         self.assertContains(r, '20:00')
 
+    def test_uczniowie_dostepnosc_pokazuje_przedmioty_nauczyciela(self):
+        # obok nazwiska w nawiasie mają być przedmioty korepetytora (posortowane, bez poziomów)
+        PrzedmiotNauczyciela.objects.create(
+            nauczyciel=self.nauczyciel, przedmiot='angielski', poziom='podstawowka',
+        )
+        self.client.force_login(self.user)
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel,
+            data_od='2026-10-05', data_do='2026-10-10',
+            godzina_od='16:00', godzina_do='20:00',
+        )
+        r = self.client.get('/uczniowie/', {'rok': 2026, 'miesiac': 10, 'dzien': 5})
+        self.assertContains(r, 'Jan Kowalski')
+        self.assertContains(r, '(angielski, matematyka)')
 
 class PlatnosciTests(TestCase):
     def setUp(self):
