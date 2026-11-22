@@ -649,3 +649,6 @@ input[type="radio"], input[type="checkbox"] {
 
 /* Przedmioty korepetytora obok nazwiska w Kalendarzu dostępności */
 .nauczyciel-przedmiot { opacity: 0.65; font-size: 0.85rem; }
+
+/* nazwisko + przedmioty razem z lewej wiersza, zakresy godzin z prawej */
+.nauczyciel-grupa { display: inline-flex; align-items: baseline; gap: .3rem; }

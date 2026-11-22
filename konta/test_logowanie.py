@@ -315,6 +315,7 @@ class NauczycieleTests(TestCase):
         r = self.client.get('/uczniowie/', {'rok': 2026, 'miesiac': 10, 'dzien': 5})
         self.assertContains(r, 'Jan Kowalski')
         self.assertContains(r, '(angielski, matematyka)')
+        self.assertContains(r, 'nauczyciel-grupa') # nazwisko + przedmioty w jednej grupie z lewej
 
 class PlatnosciTests(TestCase):
     def setUp(self):
