@@ -288,6 +288,38 @@ class NauczycieleTests(TestCase):
         self.assertContains(r, 'prac_wylaczony')         # wyłączone konto -> w archiwum
         self.assertNotContains(r, 'prac_aktywny')        # aktywne konto -> NIE ma w archiwum
 
+
+    def test_archiwum_sekcja_osoby_umawiajace_i_czerwony_x(self):
+        self.client.force_login(self.user)
+        Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 5, 17)),
+            przedmiot='matematyka', poziom='rozszerzony',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='e@f.pl',
+            telefon_dodatkowy='600300400', email_dodatkowy='r@f.pl',
+            korepetytor='Jan Kowalski', umowil=self.user, zakonczona=True,
+        )
+        r = self.client.get('/archiwum/')
+        self.assertContains(r, 'Osoby umawiające — wyłączone')
+        self.assertNotContains(r, 'Pracownicy — wyłączeni')
+        self.assertNotContains(r, '🗑')          # kosz zamieniony na X
+        self.assertContains(r, 'ikona-usun')    # czerwony X przy „usuń ucznia” (szef)
+
+    def test_pasek_nauczyciela_pod_zakladkami(self):
+        # pasek z imieniem + przedmiotami widzi tylko zalogowany korepetytor, na całej szerokości pod zakładkami
+        n = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='j@k.pl')
+        PrzedmiotNauczyciela.objects.create(nauczyciel=n, przedmiot='matematyka', poziom='srednia podstawa')
+        u = Pracownik.objects.create_user('jk', 'jk@f.pl', 'Sup3rHaslo!', nauczyciel=n)
+        self.client.force_login(u)
+        r = self.client.get('/moj-tydzien/')
+        self.assertContains(r, 'pasek-nauczyciela')
+        self.assertContains(r, 'Jan Kowalski')
+        self.assertContains(r, 'matematyka')
+        # osoba bez konta korepetytora (tu: superuser bez nauczyciela) paska NIE widzi
+        self.client.force_login(self.user)
+        r2 = self.client.get('/uczniowie/')
+        self.assertNotContains(r2, 'pasek-nauczyciela')
+
     def test_uczniowie_pokazuja_dostepnosc(self):
         self.client.force_login(self.user)
         Dostepnosc.objects.create(

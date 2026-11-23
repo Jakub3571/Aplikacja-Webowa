@@ -156,7 +156,7 @@ pracowniczy{% endblock %} {% block panel %}
                                     title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}"
                                     >{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a
                                 >
-                                <a class="ikona-kalendarza" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">🗑</a>
+                                <a class="ikona-usun" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">✖</a>
                                 {% endif %}{% endif %}
                             </td>
                         </tr>
@@ -216,7 +216,7 @@ pracowniczy{% endblock %} {% block panel %}
                                     title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}"
                                     >{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a
                                 >
-                                <a class="ikona-kalendarza" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">🗑</a>
+                                <a class="ikona-kalendarza" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">✖</a>
                                 {% endif %} {% elif czy_koordynator %}
                                 <span class="podpowiedz">nadawanie admina: tylko szef</span>
                                 {% endif %}
@@ -279,7 +279,7 @@ pracowniczy{% endblock %} {% block panel %}
                                     title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}"
                                     >{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a
                                 >
-                                <a class="ikona-kalendarza" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">🗑</a>
+                                <a class="ikona-kalendarza" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">✖</a>
                                 {% endif %} {% elif czy_koordynator %}
                                 <span class="podpowiedz">nadawanie admina: tylko szef</span>
                                 {% endif %}
@@ -359,7 +359,7 @@ pracowniczy{% endblock %} {% block panel %}
                                     title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}"
                                     >{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a
                                 >
-                                <a class="ikona-kalendarza" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">🗑</a>
+                                <a class="ikona-kalendarza" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">✖</a>
                                 {% endif %} {% elif czy_koordynator %}
                                 <span class="podpowiedz">nadawanie admina: tylko szef</span>
                                 {% endif %}
