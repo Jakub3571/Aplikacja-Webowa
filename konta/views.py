@@ -1389,7 +1389,8 @@ def kalendarz_dane(request, nauczyciel_id):
         komunikat = (f'Godziny {start:%H:%M}–{koniec_zakresu:%H:%M} usunięte tylko w dniu {dzien_data:%d.%m.%Y} '
                      f'({usuniete} terminów) — cykl co tydzień zostaje na kolejne tygodnie.')
         if z_lekcjami:
-            komunikat += f" UWAGA: tego dnia w tym zakresie są lekcje ({', '.join(z_lekcjami)}) — odwołaj je osobno (✖ na lekcji)."
+            lekcje_txt = ', '.join(z_lekcjami)
+            komunikat += f' UWAGA: tego dnia w tym zakresie są lekcje ({lekcje_txt}) — odwołaj je osobno (✖ na lekcji).'
     elif akcja == 'wyczysc_dzien':
         usuniete = Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).count()
         Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).delete()
