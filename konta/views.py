@@ -1166,7 +1166,45 @@ def reset_hasla_wygasl(request):
     """Strona „czas minął” — link do ustawienia hasła był ważny 3 dni i wygasł."""
     return render(request, 'konta/reset_wygasl.html')
 
+def _koniec_wakacji(dzien):
+    """Koniec wakacji 31.08 — bieżący rok, a jeśli już minął, następny."""
+    rok = dzien.year if dzien <= date(dzien.year, 8, 31) else dzien.year + 1
+    return date(rok, 8, 31)
 
+
+def _rozszerz_cyklicznie(nauczyciel, dzien_data, start, koniec, okres=1):
+    """Kopiuje cykliczne sloty zakresu [start, koniec) z dnia dzien_data co okres tygodni
+    aż do końca wakacji (31.08). Zwraca liczbę nowo utworzonych terminów."""
+    ostatni = _koniec_wakacji(dzien_data)
+    krok = timedelta(days=7 * okres)
+    zrodlo = list(Dostepnosc.objects.filter(
+        nauczyciel=nauczyciel, data_od=dzien_data, cykliczny=True,
+        godzina_od__gte=start, godzina_do__lte=koniec,
+    ))
+    if not zrodlo:
+        return 0
+    docelowe = []
+    d = dzien_data + krok
+    while d <= ostatni:
+        docelowe.append(d)
+        d += krok
+    if not docelowe:
+        return 0
+    istniejace = set(Dostepnosc.objects.filter(
+        nauczyciel=nauczyciel, data_od__in=docelowe,
+    ).values_list('data_od', 'godzina_od'))
+    nowe = [
+        Dostepnosc(
+            nauczyciel=nauczyciel, data_od=d, data_do=d,
+            godzina_od=s.godzina_od, godzina_do=s.godzina_do,
+            cykliczny=True, cykliczny_okres=okres,
+        )
+        for d in docelowe for s in zrodlo
+        if (d, s.godzina_od) not in istniejace
+    ]
+    if nowe:
+        Dostepnosc.objects.bulk_create(nowe)
+    return len(nowe)
 
 
 @login_required
@@ -1199,16 +1237,21 @@ def kalendarz_dane(request, nauczyciel_id):
         ).first()
         if slot:
             slot.delete()
-            komunikat = f'Godzina {etykieta} — odznaczono.'
+            komunikat = f'Godzina {etykieta} — odznaczona tylko w tym dniu (cykl co tydzień zostaje).'
         else:
+            # każda godzina od razu jako cykliczna: co tydzień do końca wakacji (31.08)
             Dostepnosc.objects.create(
                 nauczyciel=nauczyciel,
                 data_od=dzien_data,
                 data_do=dzien_data,
                 godzina_od=start,
                 godzina_do=koniec,
+                cykliczny=True,
+                cykliczny_okres=1,
             )
-            komunikat = f'Godzina {etykieta} — oznaczono jako dostępna.'
+            _rozszerz_cyklicznie(nauczyciel, dzien_data, start, koniec, okres=1)
+            komunikat = (f'Godzina {etykieta} — dostępna co tydzień '
+                         f'do {_koniec_wakacji(dzien_data):%d.%m.%Y}.')
     elif akcja == 'zapisz_przerwe':
         try:
             nowa_przerwa = int(request.POST.get('przerwa', 0))
@@ -1229,9 +1272,9 @@ def kalendarz_dane(request, nauczyciel_id):
         except ValueError:
             return JsonResponse({'blad': 'Nieprawidłowy zakres godzin.'}, status=400)
         odznaczyc = request.POST.get('tryb') == 'odznacz'
-        cyklicznosc_txt = request.POST.get('cyklicznosc', '0')
-        cykliczny = cyklicznosc_txt in ('1', '2')
-        okres = 2 if cyklicznosc_txt == '2' else 1
+        # zawsze co tydzień (bez opcji „nie” i „co 2 tygodnie”) — decyzja szefa
+        cykliczny = not odznaczyc
+        okres = 1
         kursor = datetime.combine(date(2000, 1, 1), start)
         koniec_dt = datetime.combine(date(2000, 1, 1), koniec_zakresu)
         sloty_zakresu = []
@@ -1280,36 +1323,11 @@ def kalendarz_dane(request, nauczyciel_id):
             f'Godziny {start:%H:%M}–{koniec_zakresu:%H:%M} — oznaczono jako dostępne.'
         )
         if cykliczny and not odznaczyc:
-            # cykliczność od razu na cały rok (365 dni), krok 7 lub 14 dni
-            # (masowo: 1 zapytanie o istniejące sloty + bulk_create zamiast pętli get_or_create — przy 26 slotach to ~2700 zapytań mniej)
-            ostatni_dzien = dzien_data + timedelta(days=365)
-            krok = timedelta(days=7 * okres)
-            zrodlo_sloty = list(Dostepnosc.objects.filter(
-                nauczyciel=nauczyciel, data_od=dzien_data, cykliczny=True,
-                godzina_od__gte=start, godzina_do__lte=koniec_zakresu,
-            ))
-            docelowe_dni = []
-            docelowy = dzien_data + krok
-            while docelowy <= ostatni_dzien:
-                docelowe_dni.append(docelowy)
-                docelowy += krok
-            istniejace = set(Dostepnosc.objects.filter(
-                nauczyciel=nauczyciel, data_od__in=docelowe_dni,
-            ).values_list('data_od', 'godzina_od'))
-            nowe = [
-                Dostepnosc(
-                    nauczyciel=nauczyciel, data_od=d, data_do=d,
-                    godzina_od=slot.godzina_od, godzina_do=slot.godzina_do,
-                    cykliczny=True, cykliczny_okres=okres,
-                )
-                for d in docelowe_dni
-                for slot in zrodlo_sloty
-                if (d, slot.godzina_od) not in istniejace
-            ]
-            Dostepnosc.objects.bulk_create(nowe)
-            skopiowane = len(nowe)
-            komunikat += (f' Zakres cykliczny ({start:%H:%M}–{koniec_zakresu:%H:%M}) powtórzony '
-                          f'do {ostatni_dzien:%d.%m.%Y} (co {"2 tygodnie" if okres == 2 else "tydzień"}, {skopiowane} terminów).')
+            # cykliczność od razu co tydzień aż do końca wakacji (31.08)
+            skopiowane = _rozszerz_cyklicznie(nauczyciel, dzien_data, start, koniec_zakresu, okres=1)
+            ostatni_dzien = _koniec_wakacji(dzien_data)
+            komunikat += (f' Zakres powtórzony co tydzień do {ostatni_dzien:%d.%m.%Y} '
+                          f'({skopiowane} terminów).')
     elif akcja == 'wklej_plan':
         try:
             zrodlo = date.fromisoformat(request.POST.get('zrodlo', ''))
@@ -1349,119 +1367,67 @@ def kalendarz_dane(request, nauczyciel_id):
         nauczyciel.save()
         komunikat = 'Link Google Meet zapisany.' if link else 'Link Google Meet usunięty.'
     elif akcja == 'usun_zakres':
+        # TYLKO ten dzień staje się wolny — cykl co tydzień zostaje na kolejne tygodnie
         try:
             start = datetime.strptime(request.POST.get('od', ''), '%H:%M').time()
             koniec_zakresu = datetime.strptime(request.POST.get('do', ''), '%H:%M').time()
         except ValueError:
             return JsonResponse({'blad': 'Nieprawidłowy zakres godzin.'}, status=400)
-        # najpierw przyszłe kopie cykliczne tego zakresu (ten sam dzień tygodnia) — ale NIE sloty z lekcjami
-        # (lekcje wszystkich przyszłych dni pobieramy JEDNYM zapytaniem zamiast po jednym na termin)
-        nazwa_n = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
-        przyszle_terminy = [
-            t for t in Dostepnosc.objects.filter(
-                nauczyciel=nauczyciel, data_od__gt=dzien_data, cykliczny=True,
-                godzina_od__gte=start, godzina_do__lte=koniec_zakresu,
-            )
-            if t.data_od.weekday() == dzien_data.weekday()
-        ]
-        daty = sorted({t.data_od for t in przyszle_terminy})
-        godziny_lekcji = {}
-        if daty:
-            for l in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date__in=daty, odwolana=False):
-                if lekcja_jest_u_nauczyciela(l, nazwa_n):
-                    lt = timezone.localtime(l.data)
-                    godziny_lekcji.setdefault(lt.date(), []).append(lt.time())
-        zablokowane = 0
-        do_usuniecia = []
-        for termin in przyszle_terminy:
-            ma_lekcje = any(
-                termin.godzina_od <= g < termin.godzina_do
-                for g in godziny_lekcji.get(termin.data_od, [])
-            )
-            if ma_lekcje:
-                zablokowane += 1
-            else:
-                do_usuniecia.append(termin.pk)
-        if do_usuniecia:
-            Dostepnosc.objects.filter(pk__in=do_usuniecia).delete()
-        Dostepnosc.objects.filter(
+        usuniete = Dostepnosc.objects.filter(
             nauczyciel=nauczyciel,
             data_od=dzien_data,
             godzina_od__gte=start,
             godzina_do__lte=koniec_zakresu,
-        ).delete()
-        komunikat = f'Godziny {start:%H:%M}–{koniec_zakresu:%H:%M} usunięto (razem z cyklicznymi powtórzeniami).'
-        if zablokowane:
-            komunikat += (f' UWAGA: {zablokowane} godz. z przyszłych tygodni ma już umówione lekcje '
-                          f'i zostało — zgłoś przełożenie tych zajęć (zakładka Zażalenia ✉).')
+        ).delete()[0]
+        nazwa_n = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+        lekcje_dnia = [
+            timezone.localtime(l.data).strftime('%H:%M')
+            for l in Lekcja.objects.filter(data__date=dzien_data, odwolana=False)
+            if lekcja_jest_u_nauczyciela(l, nazwa_n)
+        ]
+        z_lekcjami = [g for g in lekcje_dnia if start <= datetime.strptime(g, '%H:%M').time() < koniec_zakresu]
+        komunikat = (f'Godziny {start:%H:%M}–{koniec_zakresu:%H:%M} usunięte tylko w dniu {dzien_data:%d.%m.%Y} '
+                     f'({usuniete} terminów) — cykl co tydzień zostaje na kolejne tygodnie.')
+        if z_lekcjami:
+            komunikat += f' UWAGA: tego dnia w tym zakresie są lekcje ({', '.join(z_lekcjami)}) — odwołaj je osobno (✖ na lekcji).'
     elif akcja == 'wyczysc_dzien':
         usuniete = Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).count()
         Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).delete()
         komunikat = f'Wyczyszczono cały dzień {dzien_data:%d.%m.%Y} — usunięto {usuniete} terminów.'
-    elif akcja == 'powtorz_tygodniowo':
-        zrodlo_sloty = list(
-            Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data, cykliczny=True)
-        )
-        if not zrodlo_sloty:
-            wszystkie = list(Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data))
-            for slot in wszystkie:
-                slot.cykliczny = True
-                slot.save(update_fields=['cykliczny'])
-            zrodlo_sloty = wszystkie
-        if not zrodlo_sloty:
-            return JsonResponse({'blad': 'Ten dzień nie ma żadnych godzin — najpierw wpisz plan.'}, status=400)
-        zrodlo_przerwa = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien_data).first()
-        # koniec roku szkolnego: 30 czerwca (styczeń–czerwiec = bieżący rok, lipiec–grudzień = następny rok)
-        ostatni_dzien = dzien_data + timedelta(days=365) # cykliczność na cały rok
-        docelowe_dni = []
-        docelowy = dzien_data + timedelta(days=7)
-        while docelowy <= ostatni_dzien:
-            docelowe_dni.append(docelowy)
-            docelowy += timedelta(days=7)
-        # masowo: 1 zapytanie o istniejące sloty + bulk_create zamiast pętli get_or_create
-        istniejace = set(Dostepnosc.objects.filter(
-            nauczyciel=nauczyciel, data_od__in=docelowe_dni,
-        ).values_list('data_od', 'godzina_od'))
-        nowe = [
-            Dostepnosc(
-                nauczyciel=nauczyciel, data_od=d, data_do=d,
-                godzina_od=slot.godzina_od, godzina_do=slot.godzina_do,
-                cykliczny=True,
-            )
-            for d in docelowe_dni for slot in zrodlo_sloty
-            if (d, slot.godzina_od) not in istniejace
-        ]
-        Dostepnosc.objects.bulk_create(nowe)
-        utworzone = len(nowe)
-        if zrodlo_przerwa:
-            PrzerwaDnia.objects.filter(
-                nauczyciel=nauczyciel, data__in=docelowe_dni,
-            ).update(minuty=zrodlo_przerwa.minuty)
-            istniejace_przerwy = set(PrzerwaDnia.objects.filter(
-                nauczyciel=nauczyciel, data__in=docelowe_dni,
-            ).values_list('data', flat=True))
-            PrzerwaDnia.objects.bulk_create([
-                PrzerwaDnia(nauczyciel=nauczyciel, data=d, minuty=zrodlo_przerwa.minuty)
-                for d in docelowe_dni if d not in istniejace_przerwy
-            ])
-        komunikat = f'Plan powtórzono co tydzień do {ostatni_dzien:%d.%m.%Y} ({utworzone} terminów).'
-    elif akcja == 'cofnij_powtorzenia':
-        pks = [
-            t.pk for t in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od__gt=dzien_data, cykliczny=True)
-            if t.data_od.weekday() == dzien_data.weekday()
-        ]
-        usuniete = 0
-        if pks:
-            Dostepnosc.objects.filter(pk__in=pks).delete()
-            usuniete = len(pks)
-        pks_przerw = [
-            w.pk for w in PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data__gt=dzien_data)
-            if w.data.weekday() == dzien_data.weekday()
-        ]
-        if pks_przerw:
-            PrzerwaDnia.objects.filter(pk__in=pks_przerw).delete()
-        komunikat = (f'Usunięto {usuniete} przyszłych powtórzeń dnia {dzien_data:%d.%m.%Y} '
-                     f'(ten dzień tygodnia w kolejnych tygodniach).')
+    elif akcja in ('odwolaj_lekcje', 'przywroc_lekcje'):
+        # odwołanie/przywrócenie JEDNEJ lekcji — cykl zajęć zostaje bez zmian
+        lekcja = get_object_or_404(Lekcja, pk=request.POST.get('lekcja_id'))
+        nazwa_n = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+        if not lekcja_jest_u_nauczyciela(lekcja, nazwa_n):
+            return JsonResponse({'blad': 'To nie jest lekcja tego korepetytora.'}, status=403)
+        lekcja.odwolana = (akcja == 'odwolaj_lekcje')
+        lekcja.save(update_fields=['odwolana'])
+        komunikat = (f'Lekcja {timezone.localtime(lekcja.data):%d.%m.%Y %H:%M} odwołana — tylko ten termin, cykl zostaje.'
+                     if lekcja.odwolana else
+                     f'Lekcja {timezone.localtime(lekcja.data):%d.%m.%Y %H:%M} przywrócona.')
+    elif akcja == 'przesun_lekcje':
+        # przesunięcie JEDNEJ lekcji na inny dzień TEGO SAMEGO tygodnia — cykl zostaje
+        lekcja = get_object_or_404(Lekcja, pk=request.POST.get('lekcja_id'))
+        nazwa_n = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+        if not lekcja_jest_u_nauczyciela(lekcja, nazwa_n):
+            return JsonResponse({'blad': 'To nie jest lekcja tego korepetytora.'}, status=403)
+        try:
+            nowy_dzien = date.fromisoformat(request.POST.get('nowy_dzien', ''))
+            nowa_godzina = datetime.strptime(request.POST.get('nowa_godzina', ''), '%H:%M').time()
+        except ValueError:
+            return JsonResponse({'blad': 'Nieprawidłowy nowy termin.'}, status=400)
+        stara = timezone.localtime(lekcja.data)
+        pon = stara.date() - timedelta(days=stara.date().weekday())
+        if not (pon <= nowy_dzien <= pon + timedelta(days=6)):
+            return JsonResponse({'blad': 'Nowy termin musi być w tym samym tygodniu co lekcja.'}, status=400)
+        if nowy_dzien == stara.date() and nowa_godzina == stara.time():
+            return JsonResponse({'blad': 'To już jest ten termin.'}, status=400)
+        if nowa_godzina.strftime('%H:%M') not in wolne_godziny_nauczyciela(nauczyciel, nowy_dzien, pomijaj_uczen_id=lekcja.uczen_id):
+            return JsonResponse({'blad': f'Korepetytor nie ma wolnej godziny {nowy_dzien:%d.%m} o {nowa_godzina:%H:%M}.'}, status=400)
+        lekcja.data = timezone.make_aware(datetime.combine(nowy_dzien, nowa_godzina))
+        lekcja.save(update_fields=['data'])
+        komunikat = (f'Lekcja przesunięta: {stara:%d.%m.%Y %H:%M} → {nowy_dzien:%d.%m.%Y} {nowa_godzina:%H:%M} '
+                     f'(tylko ten jeden termin; cykl bez zmian).')
     else:
         return JsonResponse({'blad': 'Nieznana akcja.'}, status=400)
 
@@ -2012,6 +1978,7 @@ def moj_tydzien(request, nauczyciel_id=None):
         lekcje_listy = []
         for lekcja in sorted(lekcje_dni.get(dzien, []), key=lambda l: l.data):
             lekcje_listy.append({
+                'id': lekcja.id,
                 'uczen': f'{lekcja.uczen.imie_ucznia} {lekcja.uczen.nazwisko_rodzica}',
                 'przedmiot': (lekcja.przedmiot_karta.przedmiot if lekcja.przedmiot_karta_id else lekcja.uczen.przedmiot),
                 'godzina': timezone.localtime(lekcja.data).strftime('%H:%M'),
@@ -2358,7 +2325,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
 
     if request.method == 'POST':
         okres = request.POST.get('okres', 'miesiac')
-        co_2_tygodnie = request.POST.get('co_2_tygodnie') == 'on'
+        co_2_tygodnie = False # opcja „co 2 tygodnie” usunięta — zawsze co tydzień
         link_meet = request.POST.get('link_meet', '').strip()
         try:
             data_poczatkowa = date.fromisoformat(request.POST.get('data_od', '') or request.POST.get('data_poczatkowa', ''))

@@ -37,7 +37,7 @@
         <div class="dzien-zakresy">
           {% for zakres in dzien.zakresy %}
           <span class="zakres-pigulka">
-            {{ zakres.od }} – {{ zakres.do }}{% if zakres.cykliczny %} 📌{% if zakres.okres == 2 %} co 2 tyg.{% endif %}{% endif %}
+           {% if zakres.cykliczny %} 🔁 co tydzień{% endif %}
             {% if dzien.przerwa %} · przerwa {{ dzien.przerwa }} min{% endif %}
             <button type="button" class="zakres-usun" data-dzien="{{ dzien.data|date:'Y-m-d' }}" data-od="{{ zakres.od }}" data-do="{{ zakres.do }}" title="Usuń ten zakres">✖</button>
           </span>
@@ -47,7 +47,9 @@
           {% endif %}
           {% for lekcja in dzien.lekcje %}
           <span class="zakres-pigulka pigulka-lekcja">
-            📚 {{ lekcja.uczen }} · {{ lekcja.przedmiot }} · {{ lekcja.godzina }}–{{ lekcja.koniec }}
+            📅 {{ lekcja.uczen }} · {{ lekcja.przedmiot }} · {{ lekcja.godzina }}–{{ lekcja.koniec }}
+            <button type="button" class="lekcja-odwolaj" data-lekcja-id="{{ lekcja.id }}" title="Odwołaj tylko to jedno zajęcie (cykl zostaje)">✖</button>
+            <button type="button" class="lekcja-przesun" data-lekcja-id="{{ lekcja.id }}" title="Przesuń tylko to zajęcie na inny dzień tego tygodnia">↔</button>
           </span>
           {% endfor %}
         </div>
@@ -68,13 +70,7 @@
               </select>
             </label>
             <button type="button" class="przycisk-kalendarz zakres-zapisz">✔ Zapisz</button>
-            <label>cykliczność zakresu
-              <select class="zakres-cyklicznosc">
-                <option value="0" selected>nie</option>
-                <option value="1">🔁 co tydzień (cały rok)</option>
-                <option value="2">🔁 co 2 tygodnie (cały rok)</option>
-              </select>
-            </label>
+            <span class="podpowiedz">🔁 automatycznie co tydzień do 31.08</span>
             <button type="button" class="przycisk-kalendarz zakres-anuluj">✖ Anuluj</button>
           </div>
           <div class="zakres-pola">
@@ -90,6 +86,25 @@
         </div>
       </div>
       {% endfor %}
+    </div>
+
+    <div class="zakres-okienko" id="przesun-okienko" style="display: none;">
+      <div class="zakres-pola">
+        <input type="hidden" id="przesun-lekcja-id">
+        <strong>Przesuń jedno zajęcie (cykl zostaje):</strong>
+        <label>nowy dzień
+          <select id="przesun-dzien">
+            {% for d in dni %}<option value="{{ d.data|date:'Y-m-d' }}">{{ d.data|date:'D d.m' }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>nowa godzina
+          <select id="przesun-godzina">
+            {% for godzina in godziny %}<option value="{{ godzina }}">{{ godzina }}</option>{% endfor %}
+          </select>
+        </label>
+        <button type="button" class="przycisk-kalendarz" id="przesun-zapisz">✔ Przesuń</button>
+        <button type="button" class="przycisk-kalendarz" id="przesun-anuluj">✖ Anuluj</button>
+      </div>
     </div>
 
     <div class="kalendarz-naglowek kalendarz-dol">

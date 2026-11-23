@@ -244,7 +244,7 @@ class NauczycieleTests(TestCase):
             nauczyciel=self.nauczyciel, przedmiot='matematyka', poziom='srednia podstawa',
         )
 
-    def test_kalendarz_dane_przelacza_godzine(self):
+    def test_kreator_generuje_sloty_z_przerwa(self):
         self.client.force_login(self.user)
         adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/'
         r = self.client.post(adres, {'dzien': '2026-10-05', 'akcja': 'przelacz_godzine', 'godzina': '16:00'})
@@ -1478,7 +1478,7 @@ class PoprawkiSzefaTests(TestCase):
         self.assertEqual(godziny, ['11:00', '12:00', '13:00'])
 
 
-    def test_cykliczna_kwadracik_co_2_tygodnie(self):
+    def test_cykliczna_zawsze_co_tydzien_opcja_co_2_tyg_usunieta(self):
         # checkbox co_2_tygodnie + okres rok: lekcje tylko co 14 dni (09.11, 23.11, ...)
         self.client.force_login(self.user)
         r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', {

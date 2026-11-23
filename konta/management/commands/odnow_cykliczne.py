@@ -54,13 +54,7 @@ class Command(BaseCommand):
                 for (dzien_tygodnia, godzina), daty_wzorca in wzorce.items():
                     if dzien.weekday() != dzien_tygodnia or dzien > granica:
                         continue
-                    daty_posortowane = sorted(daty_wzorca)
-                    co_14_dni = any((b - a).days == 14 for a, b in zip(daty_posortowane, daty_posortowane[1:]))
-                    if co_14_dni and (dzien - daty_posortowane[-1]).days % 14 != 0:
-                        continue
-                    data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
-                    if Lekcja.objects.filter(uczen=uczen, data=data_lekcji).exists():
-                        continue
+
                     if nauczyciel:
                         if kolizja_lekcji_nauczyciela(nauczyciel, dzien, datetime.combine(dzien, godzina)):
                             pominiete += 1
