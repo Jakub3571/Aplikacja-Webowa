@@ -549,6 +549,40 @@ class UzytkownicyTests(TestCase):
         r = self.client.get('/uzytkownicy/')
         self.assertEqual(r.status_code, 200)
 
+    def test_blad_w_polowie_tworzenia_konta_nie_zostawia_konta_i_nie_wycieka(self):
+        # awaria podczas zapisu przedmiotów: konto NIE może zostać w bazie (transakcja),
+        # a komunikat nie może zawierać treści wyjątku (np. szczegółów bazy)
+        from unittest.mock import patch
+        self.client.force_login(self.user)
+        dane = {
+            'username': 'awaria', 'first_name': 'A', 'last_name': 'B',
+            'email': 'awaria@f.pl', 'telefon': '',
+            'haslo1': 'M0taneHaslo!', 'haslo2': 'M0taneHaslo!',
+            'rola': 'nauczyciel',
+            'w_przedmiot': ['matematyka'], 'w_poziom': ['srednia podstawa'], 'w_stawka': ['50'],
+        }
+        with patch('konta.forms.PrzedmiotNauczyciela.objects.update_or_create', side_effect=RuntimeError('SECRET DB DETAIL 123')):
+            r = self.client.post('/uzytkownicy/', dane, follow=True)
+        self.assertFalse(Pracownik.objects.filter(username='awaria').exists(), 'po błędzie konto nie może zostać w bazie')
+        self.assertFalse(Nauczyciel.objects.filter(email='awaria@f.pl').exists(), 'karta nauczyciela też nie może zostać')
+        tresc = r.content.decode()
+        self.assertNotIn('SECRET DB DETAIL', tresc, 'komunikat nie może wyciekać treści wyjątku')
+        self.assertContains(r, 'Nie udało się utworzyć konta')
+
+    def test_duplikat_email_karty_korepetytora_ma_czytelny_komunikat(self):
+        Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='jan@k.pl')
+        self.client.force_login(self.user)
+        dane = {
+            'username': 'nowy.jan', 'first_name': 'Jan', 'last_name': 'Kowalski',
+            'email': 'jan@k.pl', 'telefon': '',
+            'haslo1': 'M0taneHaslo!', 'haslo2': 'M0taneHaslo!',
+            'rola': 'nauczyciel',
+            'w_przedmiot': ['matematyka'], 'w_poziom': ['srednia podstawa'], 'w_stawka': ['50'],
+        }
+        r = self.client.post('/uzytkownicy/', dane, follow=True)
+        self.assertFalse(Pracownik.objects.filter(username='nowy.jan').exists())
+        self.assertContains(r, 'karta korepetytora z tym adresem e-mail')
+
 class KontoNauczycielaTests(TestCase):
     """Konto dla nauczyciela: dodawanie i dostęp tylko do własnego kalendarza."""
 
@@ -1908,19 +1942,67 @@ class SiatkaRytmuTests(TestCase):
             telefon_dodatkowy='', korepetytor='Tomek Tomek', kto_umowil='szef')
         Lekcja.objects.create(uczen=u, data=u.pierwsza_lekcja)
         wolne = self.wolne(self.n, self.dzien)
-        # zajęta 11:00; odpada też 10:00 (jej przerwa 11:00-11:05 zahacza o 11:00),
-        # zostają łańcuchy wokół lekcji: 12:05 (po niej) i 12:10 (z siatki)
+        # zajęta 11:00; odpada też 10:00 i 12:00 (przerwa 5 min po 11:00),
+        # a tuż po lekcji pokazuje się slot przesunięty o przerwę: 12:05
         self.assertNotIn('10:00', wolne)
         self.assertNotIn('11:00', wolne)
         self.assertNotIn('11:30', wolne)
         self.assertNotIn('12:00', wolne)
+        self.assertIn('12:05', wolne)
         self.assertIn('13:00', wolne)
         self.assertIn('14:00', wolne)
-        self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(12, 5))))
+        self.assertTrue(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(12, 5))))
         self.assertTrue(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(13, 0))))
         self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(11, 0))))
         self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(11, 30))))
         self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(12, 0))))
+
+    def test_sloty_obok_lekcji_przesuniete_o_przerwe(self):
+        # lekcja 11:00 w zakresie 10:00-14:00, przerwa domyślna 5 min:
+        # po lekcji wolne 12:05 (11:00 + 60 + 5), 12:00 odpada; 09:55 jest przed zakresem
+        u = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 0))),
+            przedmiot='matematyka', poziom='podstawowka', szkola='SP', imie_ucznia='K',
+            nazwisko_rodzica='N', rodzic='R', telefon_glowny='6', email_glowny='e@f.pl',
+            telefon_dodatkowy='', korepetytor='Tomek Tomek', kto_umowil='szef')
+        Lekcja.objects.create(uczen=u, data=u.pierwsza_lekcja)
+        wolne = self.wolne(self.n, self.dzien)
+        self.assertIn('12:05', wolne)
+        self.assertNotIn('12:00', wolne)
+        self.assertNotIn('09:55', wolne)
+
+    def test_przerwa_dnia_przesuwa_sloty_obok_lekcji(self):
+        # jak wyżej, ale przerwa DNIA z „Mój tydzień” = 10 min -> po lekcji 12:10, a 12:05 odpada
+        from konta.models import PrzerwaDnia
+        u = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 0))),
+            przedmiot='matematyka', poziom='podstawowka', szkola='SP', imie_ucznia='K',
+            nazwisko_rodzica='N', rodzic='R', telefon_glowny='6', email_glowny='e@f.pl',
+            telefon_dodatkowy='', korepetytor='Tomek Tomek', kto_umowil='szef')
+        Lekcja.objects.create(uczen=u, data=u.pierwsza_lekcja)
+        self.assertIn('12:05', self.wolne(self.n, self.dzien))
+        PrzerwaDnia.objects.create(nauczyciel=self.n, data=self.dzien, minuty=10)
+        wolne = self.wolne(self.n, self.dzien)
+        self.assertIn('12:10', wolne)
+        self.assertNotIn('12:05', wolne)
+
+    def test_slot_przed_lekcja_z_przerwa(self):
+        # zakres od 6:00: przed lekcją 11:00 przy przerwie 5 min wolne 09:55 (10:00 zajęte)
+        k = datetime.combine(self.dzien, self.czas(6, 0))
+        koniec = datetime.combine(self.dzien, self.czas(10, 0))
+        while k < koniec:
+            Dostepnosc.objects.create(nauczyciel=self.n, data_od=self.dzien, data_do=self.dzien,
+                                      godzina_od=k.time(), godzina_do=(k + timedelta(minutes=30)).time())
+            k += timedelta(minutes=30)
+        u = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 0))),
+            przedmiot='matematyka', poziom='podstawowka', szkola='SP', imie_ucznia='K',
+            nazwisko_rodzica='N', rodzic='R', telefon_glowny='6', email_glowny='e@f.pl',
+            telefon_dodatkowy='', korepetytor='Tomek Tomek', kto_umowil='szef')
+        Lekcja.objects.create(uczen=u, data=u.pierwsza_lekcja)
+        wolne = self.wolne(self.n, self.dzien)
+        self.assertIn('09:55', wolne)  # 11:00 - 60 min lekcji - 5 min przerwy
+        self.assertNotIn('10:00', wolne)
 
     def test_nie_mozna_umowic_dwoch_nachodzacych_lekcji(self):
         # zgłoszony bug: po lekcji 18:00 dało się ustawić 18:30 u tego samego korepetytora
