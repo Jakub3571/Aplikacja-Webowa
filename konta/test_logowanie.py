@@ -233,6 +233,50 @@ class DodawanieUczniaTests(TestCase):
         self.assertIn('Jan Kowalski', wartosci)
         self.assertNotIn('Ola Wiśniewska', wartosci)
 
+    def test_godzina_1_lekcji_sloty_z_przerwa_co_5_min(self):
+        # korepetytor ma zakres 18:00-20:00 i już lekcję o 18:00 (przerwa 5 min):
+        # AJAX pokazuje 19:05 (i NIE 18:30), a formularz przyjmuje 19:05
+        self.client.force_login(self.user)
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel, data_od=date(2026, 10, 5), data_do=date(2026, 10, 5),
+            godzina_od='18:00', godzina_do='20:00',
+        )
+        inny = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 5, 18)),
+            przedmiot='matematyka', poziom='srednia rozszerzenie',
+            imie_ucznia='Ola', nazwisko_rodzica='Lis', rodzic='Ala Lis',
+            telefon_glowny='600', email_glowny='o@f.pl', telefon_dodatkowy='',
+            korepetytor='Jan Kowalski', kto_umowil='test',
+        )
+        Lekcja.objects.create(uczen=inny, data=inny.pierwsza_lekcja)  # zajęte 18:00
+        r = self.client.get(
+            '/korepetytorzy/dane/?tryb=godziny&przedmiot=matematyka'
+            '&poziom=srednia rozszerzenie&data=2026-10-05'
+        )
+        etykiety = [g['godzina'] for g in r.json()['godziny']]
+        self.assertIn('19:05', etykiety)    # 18:00 + 60 min + 5 min przerwy
+        self.assertIn('20:00', etykiety)
+        self.assertNotIn('18:00', etykiety)
+        self.assertNotIn('18:30', etykiety)
+        self.assertNotIn('19:00', etykiety)
+        # POST z godziną 19:05 przechodzi
+        dane = {
+            'data_pierwszej_lekcji': '2026-10-05', 'godzina_pierwszej_lekcji': '19:05',
+            'przedmiot': 'matematyka', 'poziom': 'srednia rozszerzenie',
+            'imie_ucznia': 'Kasia', 'nazwisko_rodzica': 'Nowak', 'rodzic': 'Ewa Nowak',
+            'telefon_glowny': '600100200', 'email_glowny': 'ewa@f.pl',
+            'telefon_dodatkowy': '', 'email_dodatkowy': '',
+            'korepetytor': 'Jan Kowalski', 'notatka_od_rodzica': '', 'auto_wyslij_meet': 'on',
+        }
+        r = self.client.post('/uczniowie/', dane, follow=True)
+        self.assertContains(r, 'został dodany')
+        self.assertEqual(Uczen.objects.filter(imie_ucznia='Kasia').count(), 1)
+        # a 18:30 jest odrzucane (koliduje z przerwą po lekcji 18:00)
+        dane['godzina_pierwszej_lekcji'] = '18:30'
+        dane['imie_ucznia'] = 'Kasia2'
+        r = self.client.post('/uczniowie/', dane, follow=True)
+        self.assertContains(r, 'nie może przyjąć lekcji')
+        self.assertFalse(Uczen.objects.filter(imie_ucznia='Kasia2').exists())
 
 class NauczycieleTests(TestCase):
     def setUp(self):
