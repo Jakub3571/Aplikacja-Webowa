@@ -3,6 +3,7 @@
 {% block tytul %}Edytuj ucznia — {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}{% endblock %}
 
 {% block panel %}
+<div class="edytuj-uklad">
 <section class="karta">
   <h2>✏️ Edytuj ucznia: {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</h2>
   {% if form.errors %}
@@ -132,6 +133,7 @@
     <button type="submit">Dodaj przedmiot</button>
   </form>
 </section>
+</div>
 
 <script>
   // dynamiczna lista korepetytorów dla dodatkowego przedmiotu

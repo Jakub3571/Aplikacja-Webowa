@@ -657,3 +657,8 @@ input[type="radio"], input[type="checkbox"] {
 .ikona-usun { color: var(--blad); font-weight: 700; font-size: 1.2rem; text-decoration: none; }
 /* Pasek z imieniem i przedmiotami korepetytora pod zakładkami (na całą szerokość) */
 .pasek-nauczyciela { width: 100%; background: var(--karta); border: 1px solid var(--ramka); border-radius: 12px; padding: .6rem 1rem; margin-bottom: 1rem; font-weight: 600; }
+
+/* Edytuj ucznia: formularz edycji i przedmioty ucznia obok siebie (na szerokość paska zakładek) */
+.edytuj-uklad { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.edytuj-uklad .karta { margin-top: 0; max-width: none; }
+@media (max-width: 900px) { .edytuj-uklad { grid-template-columns: 1fr; } }

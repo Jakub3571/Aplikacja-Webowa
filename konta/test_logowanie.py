@@ -320,6 +320,22 @@ class NauczycieleTests(TestCase):
         r2 = self.client.get('/uczniowie/')
         self.assertNotContains(r2, 'pasek-nauczyciela')
 
+    def test_edytuj_ucznia_przedmioty_obok_formularza(self):
+        # na stronie edycji ucznia formularz i sekcja przedmiotów są obok siebie (jedna siatka)
+        uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 5, 17)),
+            przedmiot='matematyka', poziom='rozszerzony',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='e@f.pl',
+            telefon_dodatkowy='600300400', email_dodatkowy='r@f.pl',
+            korepetytor='Jan Kowalski', umowil=self.user,
+        )
+        self.client.force_login(self.user)
+        r = self.client.get(f'/uczniowie/{uczen.id}/edytuj/')
+        self.assertContains(r, 'edytuj-uklad')
+        self.assertContains(r, 'Edytuj ucznia')
+        self.assertContains(r, 'Przedmioty ucznia')
+
     def test_uczniowie_pokazuja_dostepnosc(self):
         self.client.force_login(self.user)
         Dostepnosc.objects.create(
