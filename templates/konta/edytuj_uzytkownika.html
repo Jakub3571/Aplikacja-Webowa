@@ -3,6 +3,7 @@
 {% block tytul %}Edytuj konto — {{ uzytkownik.username }}{% endblock %}
 
 {% block panel %}
+<div class="edytuj-uklad">
 <section class="karta">
   <h2>✏️ Edytuj konto: {{ uzytkownik.username }}</h2>
   <p class="podtytul">
@@ -17,7 +18,9 @@
     <label for="id_last_name">Nazwisko</label>
     <input type="text" name="last_name" id="id_last_name" value="{{ uzytkownik.last_name }}">
 
-
+    <label for="id_email">E-mail</label>
+    <input type="email" name="email" id="id_email" value="{{ uzytkownik.email }}">
+    <p class="podpowiedz">Puste pole = zostaje obecny adres. Przy korepetytorze e-mail, imię i nazwisko synchronizują się też z jego kartą (i z uczniami podpisanymi pod to nazwisko).</p>
 
     <label for="id_telefon">Telefon</label>
     <input type="text" name="telefon" id="id_telefon" value="{{ uzytkownik.telefon }}">
@@ -26,4 +29,54 @@
   </form>
   <a class="powrot" href="{% url 'uzytkownicy' %}">← Wróć do listy użytkowników</a>
 </section>
+
+{% if uzytkownik.nauczyciel %}
+<section class="karta">
+  <h2>📚 Przedmioty korepetytora: {{ uzytkownik.nauczyciel.imie }} {{ uzytkownik.nauczyciel.nazwisko }}</h2>
+  {% if uzytkownik.nauczyciel.przedmioty.all %}
+  <table class="tabela">
+    <thead>
+      <tr><th>Przedmiot</th><th>Poziom</th><th>Stawka</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for p in uzytkownik.nauczyciel.przedmioty.all %}
+      <tr>
+        <td>{{ p.przedmiot }}</td>
+        <td>{{ p.get_poziom_display }}</td>
+        <td>{{ p.stawka }} zł</td>
+        <td>
+          <form method="post" style="display:inline">
+            {% csrf_token %}
+            <input type="hidden" name="usun_przedmiot" value="1">
+            <input type="hidden" name="przedmiot_id" value="{{ p.id }}">
+            <button type="submit" class="ikona-usun" title="Usuń ten przedmiot">✖</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="podpowiedz">Brak przedmiotów — dodaj poniżej.</p>
+  {% endif %}
+
+  <form method="post" class="formularz">
+    {% csrf_token %}
+    <input type="hidden" name="dodaj_przedmiot" value="1">
+    <label for="id_przedmiot">Przedmiot</label>
+    <select name="przedmiot" id="id_przedmiot">
+      {% for wartosc, etykieta in przedmioty %}<option value="{{ wartosc }}">{{ etykieta }}</option>{% endfor %}
+    </select>
+    <label for="id_poziom">Poziom</label>
+    <select name="poziom" id="id_poziom">
+      {% for wartosc, etykieta in poziomy_nauczyciela %}<option value="{{ wartosc }}">{{ etykieta }}</option>{% endfor %}
+    </select>
+    <label for="id_stawka">Stawka za godzinę (zł)</label>
+    <input type="text" name="stawka" id="id_stawka" value="0" inputmode="decimal">
+    <button type="submit">➕ Dodaj przedmiot</button>
+    <p class="podpowiedz">Jeśli ten przedmiot i poziom już istnieje — zapisanie tej samej pary aktualizuje tylko stawkę.</p>
+  </form>
+</section>
+{% endif %}
+</div>
 {% endblock %}

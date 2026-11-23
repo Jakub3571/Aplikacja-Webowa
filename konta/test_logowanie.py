@@ -583,6 +583,107 @@ class UzytkownicyTests(TestCase):
         self.assertFalse(Pracownik.objects.filter(username='nowy.jan').exists())
         self.assertContains(r, 'karta korepetytora z tym adresem e-mail')
 
+class EdycjaKorepetytoraTests(TestCase):
+    """Pełna edycja konta korepetytora: dane, e-mail (synchronizacja z kartą), przedmioty."""
+
+    def setUp(self):
+        self.szef = Pracownik.objects.create_superuser('szef', 's@f.pl', 'Sup3rHaslo!')
+        self.nauczyciel = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='jan@k.pl')
+        PrzedmiotNauczyciela.objects.create(nauczyciel=self.nauczyciel, przedmiot='matematyka', poziom='srednia podstawa', stawka=50)
+        self.user = Pracownik.objects.create_user('jk', 'jk@f.pl', 'Sup3rHaslo!', nauczyciel=self.nauczyciel)
+        self.uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 5, 17)),
+            przedmiot='matematyka', poziom='srednia podstawa', szkola='SP 1',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='e@f.pl', telefon_dodatkowy='',
+            korepetytor='Jan Kowalski', kto_umowil='szef', umowil=self.szef,
+        )
+
+    def test_szef_edytuje_email_korepetytora_synchronizacja_z_karta(self):
+        self.client.force_login(self.szef)
+        r = self.client.post(f'/uzytkownicy/{self.user.id}/edytuj/', {
+            'first_name': 'Jan', 'last_name': 'Kowalski',
+            'email': 'jan.nowy@f.pl', 'telefon': '600111222',
+        }, follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.user.refresh_from_db()
+        self.nauczyciel.refresh_from_db()
+        self.assertEqual(self.user.email, 'jan.nowy@f.pl')
+        self.assertEqual(self.nauczyciel.email, 'jan.nowy@f.pl')
+        self.assertEqual(self.user.telefon, '600111222')
+
+    def test_zmiana_imienia_synchronizuje_karte_i_uczniow(self):
+        self.client.force_login(self.szef)
+        self.client.post(f'/uzytkownicy/{self.user.id}/edytuj/', {
+            'first_name': 'Janusz', 'last_name': 'Kowal', 'email': '', 'telefon': '',
+        }, follow=True)
+        self.nauczyciel.refresh_from_db()
+        self.uczen.refresh_from_db()
+        self.assertEqual(f'{self.nauczyciel.imie} {self.nauczyciel.nazwisko}', 'Janusz Kowal')
+        self.assertEqual(self.uczen.korepetytor, 'Janusz Kowal')
+
+    def test_dodaj_przedmiot_i_zmien_stawke(self):
+        from decimal import Decimal
+        self.client.force_login(self.szef)
+        r = self.client.post(f'/uzytkownicy/{self.user.id}/edytuj/', {
+            'dodaj_przedmiot': '1', 'przedmiot': 'angielski', 'poziom': 'podstawowka', 'stawka': '70',
+        }, follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(PrzedmiotNauczyciela.objects.filter(
+            nauczyciel=self.nauczyciel, przedmiot='angielski', poziom='podstawowka', stawka=70,
+        ).exists())
+        # ta sama para przedmiot+poziom -> tylko aktualizacja stawki, bez duplikatu
+        self.client.post(f'/uzytkownicy/{self.user.id}/edytuj/', {
+            'dodaj_przedmiot': '1', 'przedmiot': 'angielski', 'poziom': 'podstawowka', 'stawka': '80,50',
+        }, follow=True)
+        wiersze = PrzedmiotNauczyciela.objects.filter(nauczyciel=self.nauczyciel, przedmiot='angielski', poziom='podstawowka')
+        self.assertEqual(wiersze.count(), 1)
+        self.assertEqual(wiersze.first().stawka, Decimal('80.50'))
+
+    def test_usun_przedmiot(self):
+        self.client.force_login(self.szef)
+        wiersz = PrzedmiotNauczyciela.objects.get(nauczyciel=self.nauczyciel, przedmiot='matematyka')
+        self.client.post(f'/uzytkownicy/{self.user.id}/edytuj/', {
+            'usun_przedmiot': '1', 'przedmiot_id': wiersz.id,
+        }, follow=True)
+        self.assertFalse(PrzedmiotNauczyciela.objects.filter(pk=wiersz.id).exists())
+
+    def test_zla_stawka_odrzucona(self):
+        self.client.force_login(self.szef)
+        self.client.post(f'/uzytkownicy/{self.user.id}/edytuj/', {
+            'dodaj_przedmiot': '1', 'przedmiot': 'fizyka', 'poziom': 'studia', 'stawka': 'abc',
+        }, follow=True)
+        self.assertFalse(PrzedmiotNauczyciela.objects.filter(nauczyciel=self.nauczyciel, przedmiot='fizyka').exists())
+
+    def test_koordynator_edytuje_korepetytora_ale_nie_admina(self):
+        koord = Pracownik.objects.create_user('koord', 'k@f.pl', 'Sup3rHaslo!')
+        koord.stanowisko = 'koordynator'
+        koord.save()
+        self.client.force_login(koord)
+        r = self.client.post(f'/uzytkownicy/{self.user.id}/edytuj/', {
+            'first_name': 'Jan', 'last_name': 'Kowalski', 'email': 'k.koord@f.pl', 'telefon': '',
+        }, follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, 'k.koord@f.pl')
+        r = self.client.get(f'/uzytkownicy/{self.szef.id}/edytuj/')
+        self.assertEqual(r.status_code, 403)
+
+    def test_pracownik_nie_edytuje(self):
+        prac = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
+        self.client.force_login(prac)
+        r = self.client.get(f'/uzytkownicy/{self.user.id}/edytuj/')
+        self.assertEqual(r.status_code, 403)
+
+    def test_strona_edycji_ma_email_i_przedmioty(self):
+                # formularz edycji i przedmioty obok siebie (2 kolumny, pełna szerokość jak pasek zakładek)
+        self.assertContains(r, 'edytuj-uklad')
+        self.client.force_login(self.szef)
+        r = self.client.get(f'/uzytkownicy/{self.user.id}/edytuj/')
+        self.assertContains(r, 'id_email')
+        self.assertContains(r, 'Przedmioty korepetytora')
+        self.assertContains(r, 'matematyka')
+
 class KontoNauczycielaTests(TestCase):
     """Konto dla nauczyciela: dodawanie i dostęp tylko do własnego kalendarza."""
 

@@ -2,6 +2,7 @@ import calendar
 import re
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.contrib import messages
@@ -25,7 +26,23 @@ from .forms import (
     FormularzZmianyHasla,
     FormularzLekcjiCyklicznej,
 )
-from .models import Dostepnosc, Lekcja, Nauczyciel, Pracownik, PrzedmiotUcznia, PrzerwaDnia, PrzypomnienieLekcji, RaportPlatnosci, Uczen, Zgloszenie
+
+from .models import (
+    POZIOMY_NAUCZYCIELA,
+    PRZEDMIOTY,
+    Dostepnosc,
+    Lekcja,
+    Nauczyciel,
+    Pracownik,
+    PrzedmiotNauczyciela,
+    PrzedmiotUcznia,
+    PrzerwaDnia,
+    PrzypomnienieLekcji,
+    RaportPlatnosci,
+    Uczen,
+    Zgloszenie,
+)
+
 
 MIESIACE = [
     'styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec',
@@ -1036,14 +1053,58 @@ def przywroc_wspolprace(request, nauczyciel_id):
 @login_required
 def edytuj_uzytkownika(request, user_id):
     """Edycja konta: imię, nazwisko, email, telefon (bez hasła i roli).
-    Szef i koordynator (edycja danych), ale bez zmiany roli/uprawnień."""
+    Dla korepetytora dodatkowo zarządzanie przedmiotami (dodaj / usuń / zmień stawkę).
+    Szef i koordynator (edycja danych), ale koordynator nie edytuje kont adminów."""
     if not (czy_szef(request.user) or czy_koordynator(request.user)):
         raise PermissionDenied
     # koordynator nie edytuje kont adminów
     uzytkownik = get_object_or_404(Pracownik, pk=user_id)
     if not czy_szef(request.user) and uzytkownik.is_superuser:
         raise PermissionDenied
+    nauczyciel = uzytkownik.nauczyciel
+
+    # --- przedmioty korepetytora: dodawanie / aktualizacja stawki ---
+    if request.method == 'POST' and nauczyciel and 'dodaj_przedmiot' in request.POST:
+        przedmiot = request.POST.get('przedmiot', '')
+        poziom = request.POST.get('poziom', '')
+        stawka_txt = (request.POST.get('stawka', '') or '0').replace(',', '.')
+        if przedmiot not in dict(PRZEDMIOTY) or poziom not in dict(POZIOMY_NAUCZYCIELA):
+            messages.error(request, 'Wybierz przedmiot i poziom z listy.')
+            return redirect('edytuj_uzytkownika', user_id=uzytkownik.id)
+        try:
+            stawka = Decimal(stawka_txt)
+            if stawka < 0:
+                raise ValueError
+        except (InvalidOperation, ValueError):
+            messages.error(request, 'Stawka musi być liczbą (np. 100 lub 99,50).')
+            return redirect('edytuj_uzytkownika', user_id=uzytkownik.id)
+        _, stworzony = PrzedmiotNauczyciela.objects.update_or_create(
+            nauczyciel=nauczyciel,
+            przedmiot=przedmiot,
+            poziom=poziom,
+            defaults={'stawka': stawka},
+        )
+        if stworzony:
+            messages.success(request, f'Dodano przedmiot {przedmiot} ({poziom}) — stawka {stawka} zł.')
+        else:
+            messages.success(request, f'Zaktualizowano stawkę: {przedmiot} ({poziom}) — {stawka} zł.')
+        return redirect('edytuj_uzytkownika', user_id=uzytkownik.id)
+
+    # --- przedmioty korepetytora: usuwanie ---
+    if request.method == 'POST' and nauczyciel and 'usun_przedmiot' in request.POST:
+        wiersz = PrzedmiotNauczyciela.objects.filter(
+            pk=request.POST.get('przedmiot_id'), nauczyciel=nauczyciel,
+        ).first()
+        if wiersz:
+            opis = f'{wiersz.przedmiot} ({wiersz.poziom})'
+            wiersz.delete()
+            messages.success(request, f'Usunięto przedmiot {opis}.')
+        return redirect('edytuj_uzytkownika', user_id=uzytkownik.id)
+
     if request.method == 'POST':
+        stara_nazwa = ''
+        if nauczyciel:
+            stara_nazwa = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip()
         uzytkownik.first_name = request.POST.get('first_name', '').strip()
         uzytkownik.last_name = request.POST.get('last_name', '').strip()
         email = request.POST.get('email', '').strip()
@@ -1052,13 +1113,24 @@ def edytuj_uzytkownika(request, user_id):
             uzytkownik.email = email
         uzytkownik.telefon = request.POST.get('telefon', '').strip()
         uzytkownik.save()
-        # korepetytor: synchronizujemy e-mail na karcie nauczyciela
-        if uzytkownik.nauczyciel:
-            uzytkownik.nauczyciel.email = uzytkownik.email
-            uzytkownik.nauczyciel.save()
+        # korepetytor: synchronizujemy imię, nazwisko i e-mail na karcie nauczyciela;
+        # przy zmianie imienia/nazwiska przepisujemy też nazwisko na kartach uczniów
+        if nauczyciel:
+            nauczyciel.imie = uzytkownik.first_name or uzytkownik.username
+            nauczyciel.nazwisko = uzytkownik.last_name or uzytkownik.username
+            nauczyciel.email = uzytkownik.email
+            nauczyciel.save()
+            nowa_nazwa = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip()
+            if stara_nazwa and stara_nazwa.lower() != nowa_nazwa.lower():
+                Uczen.objects.filter(korepetytor__iexact=stara_nazwa).update(korepetytor=nowa_nazwa)
+                PrzedmiotUcznia.objects.filter(korepetytor__iexact=stara_nazwa).update(korepetytor=nowa_nazwa)
         messages.success(request, f'Dane konta {uzytkownik.username} zostały zaktualizowane.')
         return redirect('uzytkownicy')
-    return render(request, 'konta/edytuj_uzytkownika.html', {'uzytkownik': uzytkownik})
+    return render(request, 'konta/edytuj_uzytkownika.html', {
+        'uzytkownik': uzytkownik,
+        'przedmioty': PRZEDMIOTY,
+        'poziomy_nauczyciela': POZIOMY_NAUCZYCIELA,
+    })
 
 
 @login_required
