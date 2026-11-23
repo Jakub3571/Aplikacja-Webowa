@@ -278,6 +278,41 @@ class DodawanieUczniaTests(TestCase):
         self.assertContains(r, 'nie może przyjąć lekcji')
         self.assertFalse(Uczen.objects.filter(imie_ucznia='Kasia2').exists())
 
+    def test_dwie_lekcje_pod_rzad_dostaja_slot_z_przerwa(self):
+        # zgloszenie szefa: po lekcji 11:00 druga lekcja ma byc dostepna o 12:05 (przerwa 5 min), nie dopiero 13:00
+        self.client.force_login(self.user)
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel, data_od=date(2026, 10, 5), data_do=date(2026, 10, 5),
+            godzina_od='11:00', godzina_do='14:00',
+        )
+        dane = {
+            'data_pierwszej_lekcji': '2026-10-05', 'godzina_pierwszej_lekcji': '11:00',
+            'przedmiot': 'matematyka', 'poziom': 'srednia rozszerzenie',
+            'imie_ucznia': 'Kasia', 'nazwisko_rodzica': 'Nowak', 'rodzic': 'Ewa Nowak',
+            'telefon_glowny': '600100200', 'email_glowny': 'ewa@f.pl',
+            'telefon_dodatkowy': '', 'email_dodatkowy': '',
+            'korepetytor': 'Jan Kowalski', 'notatka_od_rodzica': '', 'auto_wyslij_meet': 'on',
+        }
+        r = self.client.post('/uczniowie/', dane, follow=True)
+        self.assertContains(r, 'został dodany')
+        # AJAX godzin (jak w formularzu) pokazuje 12:05
+        r = self.client.get(
+            '/korepetytorzy/dane/?tryb=godziny&przedmiot=matematyka'
+            '&poziom=srednia rozszerzenie&data=2026-10-05'
+        )
+        etykiety = [g['godzina'] for g in r.json()['godziny']]
+        self.assertIn('12:05', etykiety)
+        self.assertNotIn('12:00', etykiety)
+        # druga lekcja o 12:05 przechodzi
+        dane['godzina_pierwszej_lekcji'] = '12:05'
+        dane['imie_ucznia'] = 'Ola'
+        r = self.client.post('/uczniowie/', dane, follow=True)
+        self.assertContains(r, 'został dodany')
+        self.assertTrue(Uczen.objects.filter(imie_ucznia='Ola').exists())
+        # i kolejna wolna godzina idzie dalej o przerwe: 13:10
+        from konta.views import wolne_godziny_nauczyciela
+        self.assertIn('13:10', wolne_godziny_nauczyciela(self.nauczyciel, date(2026, 10, 5)))
+
 class NauczycieleTests(TestCase):
     def setUp(self):
         self.user = Pracownik.objects.create_superuser('test', 't@f.pl', 'Sup3rHaslo!')
