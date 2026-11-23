@@ -1208,6 +1208,31 @@ class LekcjeCykliczneTests(TestCase):
         r = self.client.get(f'/lekcje/{self.uczen.id}/kalendarz/')
         self.assertEqual(r.status_code, 404)
 
+    def test_dni_pracy_tylko_z_grafikiem_nauczyciela(self):
+        # AJAX dni_pracy pokazuje tylko dni tygodnia, w ktorych korepetytor ma godziny
+        n2 = Nauczyciel.objects.create(imie='Ewa', nazwisko='Lis', email='e2@f.pl')
+        dzis = date.today()
+        d = dzis + timedelta(days=1)
+        while d.weekday() != 0:
+            d += timedelta(days=1)
+        for i in range(2):
+            dd = d + timedelta(weeks=i)
+            Dostepnosc.objects.create(
+                nauczyciel=n2, data_od=dd, data_do=dd,
+                godzina_od=time(16, 0), godzina_do=time(20, 0),
+            )
+        self.client.force_login(self.pracownik)
+        r = self.client.get(f'/korepetytorzy/dane/?nauczyciel={n2.id}&data={dzis.isoformat()}')
+        self.assertEqual(r.json()['dni_pracy'], [0])  # tylko poniedzialki
+
+    def test_strona_cyklicznej_chowa_dni_bez_grafika(self):
+        self.client.force_login(self.pracownik)
+        r = self.client.get(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'slot_dzien')
+        # JS pobiera dni_pracy i chowa dni tygodnia, w ktorych korepetytor nie pracuje
+        self.assertContains(r, 'dni_pracy')
+
 class NauczycielTylkoKalendarzTests(TestCase):
     """Konto nauczyciela widzi wyłącznie swój kalendarz — bez zakładki Uczniowie."""
 

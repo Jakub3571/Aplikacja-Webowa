@@ -83,6 +83,7 @@
         klon.remove();
       });
       kontenerSlotow.appendChild(klon);
+      oznaczDni(klon);
     });
     kontenerSlotow.querySelectorAll('.przycisk-usun-slot').forEach(function (prz) {
       prz.addEventListener('click', function () {
@@ -145,6 +146,34 @@
         window.location.search = radio.value ? ('?karta=' + radio.value) : '?';
       });
     });
+        // dni tygodnia, w których korepetytor w ogóle pracuje — pozostałe dni chowamy w wyborze
+    var dniPracy = null;
+    function oznaczDni(wiersz) {
+      if (!dniPracy) return;
+      var sel = wiersz.querySelector('select[name="slot_dzien"]');
+      if (!sel) return;
+      Array.prototype.forEach.call(sel.options, function (opt) {
+        if (!opt.value) return;
+        if (dniPracy.indexOf(parseInt(opt.value, 10)) === -1) {
+          opt.disabled = true;
+          opt.hidden = true;
+        }
+      });
+    }
+    (function () {
+      var nt = kontenerSlotow.dataset.nauczyciel;
+      var start = kontenerSlotow.dataset.start;
+      if (!nt || !start) return;
+      fetch('{% url "korepetytorzy_dane" %}?nauczyciel=' + encodeURIComponent(nt) + '&data=' + encodeURIComponent(start), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      })
+        .then(function (odp) { return odp.json(); })
+        .then(function (dane) {
+          dniPracy = dane.dni_pracy || [];
+          kontenerSlotow.querySelectorAll('.wiersz-przedmiotu').forEach(oznaczDni);
+        })
+        .catch(function () {});
+    })();
     kontenerSlotow.addEventListener('change', function (e) {
       if (e.target && e.target.name === 'slot_dzien') {
         odswiezGodzinyWiersza(e.target.closest('.wiersz-przedmiotu'));
