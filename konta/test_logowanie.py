@@ -676,13 +676,13 @@ class EdycjaKorepetytoraTests(TestCase):
         self.assertEqual(r.status_code, 403)
 
     def test_strona_edycji_ma_email_i_przedmioty(self):
-                # formularz edycji i przedmioty obok siebie (2 kolumny, pełna szerokość jak pasek zakładek)
-        self.assertContains(r, 'edytuj-uklad')
         self.client.force_login(self.szef)
         r = self.client.get(f'/uzytkownicy/{self.user.id}/edytuj/')
         self.assertContains(r, 'id_email')
         self.assertContains(r, 'Przedmioty korepetytora')
         self.assertContains(r, 'matematyka')
+        # formularz edycji i przedmioty obok siebie (2 kolumny, pełna szerokość jak pasek zakładek)
+        self.assertContains(r, 'edytuj-uklad')
 
 class KontoNauczycielaTests(TestCase):
     """Konto dla nauczyciela: dodawanie i dostęp tylko do własnego kalendarza."""
