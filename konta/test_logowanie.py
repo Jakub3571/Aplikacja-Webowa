@@ -249,13 +249,19 @@ class NauczycieleTests(TestCase):
         adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/'
         r = self.client.post(adres, {'dzien': '2026-10-05', 'akcja': 'przelacz_godzine', 'godzina': '16:00'})
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(Dostepnosc.objects.count(), 1)
-        slot = Dostepnosc.objects.first()
-        self.assertEqual(slot.data_od, date(2026, 10, 5))
+        # NOWE: godzina od razu jako cykl co tydzień aż do końca wakacji (31.08.2027) — 48 terminów
+        self.assertEqual(Dostepnosc.objects.count(), 48)
+        slot = Dostepnosc.objects.filter(data_od=date(2026, 10, 5)).first()
         self.assertEqual(slot.godzina_od.strftime('%H:%M'), '16:00')
         self.assertEqual(slot.godzina_do.strftime('%H:%M'), '16:30')
+        self.assertTrue(slot.cykliczny)
+        self.assertEqual(slot.cykliczny_okres, 1)
+        self.assertTrue(Dostepnosc.objects.filter(data_od=date(2026, 10, 12), godzina_od='16:00').exists())
+        # drugi klik w tym dniu: usuwa TYLKO 05.10 — cykl w kolejnych tygodniach zostaje
         r = self.client.post(adres, {'dzien': '2026-10-05', 'akcja': 'przelacz_godzine', 'godzina': '16:00'})
-        self.assertEqual(Dostepnosc.objects.count(), 0)
+        self.assertEqual(Dostepnosc.objects.count(), 47)
+        self.assertFalse(Dostepnosc.objects.filter(data_od=date(2026, 10, 5)).exists())
+        self.assertTrue(Dostepnosc.objects.filter(data_od=date(2026, 10, 12), godzina_od='16:00').exists())
 
     def test_kalendarz_pokazuje_tydzien(self):
         self.client.force_login(self.user)
@@ -669,8 +675,30 @@ class KreatorDyspozycyjnoscTests(TestCase):
             {'dzien': '2026-10-01', 'akcja': 'zapisz_przerwe', 'przerwa': '10'},
         )
         self.assertEqual(r.json()['przerwa'], 10)
-        godziny = sorted(d.godzina_od.strftime('%H:%M') for d in Dostepnosc.objects.filter(nauczyciel=self.nauczyciel))
-        self.assertEqual(godziny, ['16:00'])
+        sloty = list(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel))
+        # NOWE: 16:00 od razu co tydzień do 31.08.2027 — 48 kopii tej samej godziny, wszystkie cykliczne
+        self.assertEqual(len(sloty), 48)
+        self.assertEqual(sorted(d.godzina_od.strftime('%H:%M') for d in sloty), ['16:00'] * 48)
+        self.assertTrue(all(d.cykliczny and d.cykliczny_okres == 1 for d in sloty))
+
+    def test_usun_zakres_usuwa_tylko_wybrany_dzien_cykl_zostaje(self):
+        # zakres zaznaczony przez korepetytora jest od razu cykliczny co tydzień do 31.08,
+        # a ✖ (usun_zakres) kasuje godziny tylko z jednego, wybranego dnia
+        self.client.logout()
+        self.client.login(username='j.kowalski', password='M0taneHaslo!')
+        adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/'
+        r = self.client.post(adres, {'dzien': '2026-10-01', 'akcja': 'zaznacz_zakres', 'od': '14:00', 'do': '16:00'})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('co tydzień', r.json()['komunikat'])
+        # 4 sloty (14:00–16:00) w dniu 01.10 + 4 sloty co tydzień do 26.08.2027 (47 tygodni) = 192
+        self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel).count(), 192)
+        r = self.client.post(adres, {'dzien': '2026-10-08', 'akcja': 'usun_zakres', 'od': '14:00', 'do': '16:00'})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('tylko w dniu', r.json()['komunikat'])
+        self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel).count(), 188)
+        self.assertFalse(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, data_od=date(2026, 10, 8)).exists())
+        self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, data_od=date(2026, 10, 1)).count(), 4)
+        self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, data_od=date(2026, 10, 15)).count(), 4)
 
     def test_pracownik_nie_wejdzie_do_cudzego_kalendarza(self):
         Dostepnosc.objects.create(
@@ -709,6 +737,33 @@ class KreatorDyspozycyjnoscTests(TestCase):
         r = self.client.get(f'/moj-tydzien/{self.nauczyciel.id}/?rok=2026&miesiac=10&dzien=1')
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, '16:00')
+
+    def _adres(self):
+        return f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/'
+
+    def _uczen(self):
+        return Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 5, 16)),
+            przedmiot='matematyka', poziom='rozszerzony',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='e@f.pl',
+            telefon_dodatkowy='600300400', email_dodatkowy='r@f.pl',
+            korepetytor='Jan Kowalski', umowil=self.admin,
+        )
+
+    def test_zakres_od_razu_cykliczny_co_tydzien_do_31_08(self):
+        self.client.force_login(self.admin)
+        r = self.client.post(self._adres(), {
+            'dzien': '2026-10-05', 'akcja': 'zaznacz_zakres', 'od': '14:00', 'do': '16:00',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('co tydzień', r.json()['komunikat'])
+        sloty = Dostepnosc.objects.filter(nauczyciel=self.nauczyciel)
+        self.assertTrue(sloty.exists())
+        self.assertTrue(all(t.cykliczny and t.cykliczny_okres == 1 for t in sloty))
+        self.assertTrue(sloty.filter(data_od='2026-10-12').exists())   # +7 dni
+        ostatni = max(t.data_od for t in sloty)
+        self.assertLessEqual(ostatni, date(2027, 8, 31))  # do końca sierpnia następnego roku
 
 class LekcjeCykliczneTests(TestCase):
     """Lekcje cykliczne + widoczność uczniów per pracownik."""
@@ -1477,9 +1532,8 @@ class PoprawkiSzefaTests(TestCase):
         # siatka rytmu 65 min (60 lekcja + 5 przerwy) od 11:00; 12:05+60 wychodzi poza 13:00
         self.assertEqual(godziny, ['11:00', '12:00', '13:00'])
 
-
-    def test_cykliczna_zawsze_co_tydzien_opcja_co_2_tyg_usunieta(self):
-        # checkbox co_2_tygodnie + okres rok: lekcje tylko co 14 dni (09.11, 23.11, ...)
+    def test_cykliczna_co_2_tyg_usunieta_zawsze_co_tydzien(self):
+        # opcja „co 2 tygodnie” usunięta: mimo wysłania co_2_tygodnie=on lekcje idą co TYDZIEŃ
         self.client.force_login(self.user)
         r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', {
             'okres': 'rok',
@@ -1493,11 +1547,91 @@ class PoprawkiSzefaTests(TestCase):
         lekcje = Lekcja.objects.filter(uczen=self.uczen).order_by('data')
         daty = [timezone.localtime(l.data).date().isoformat() for l in lekcje]
         self.assertIn('2026-11-09', daty)
-        self.assertIn('2026-11-23', daty)      # +14 dni
-        self.assertNotIn('2026-11-16', daty)   # tydzień pośredni — NIE ma
-        self.assertNotIn('2026-11-30', daty)   # +21 dni — NIE ma
+        self.assertIn('2026-11-16', daty)      # tydzień pośredni — JEST (co tydzień, nie co 14 dni)
+        self.assertIn('2026-11-23', daty)
+        self.assertIn('2026-11-30', daty)
+        self.assertNotIn('2027-07-05', daty)   # poza okresem „rok” (do 30.06.2027)
+        self.assertEqual(len(daty), 34)        # wszystkie poniedziałki 09.11.2026–28.06.2027
         godziny = {timezone.localtime(l.data).strftime('%H:%M') for l in lekcje}
         self.assertEqual(godziny, {'11:00'})
+
+    def test_odwolaj_i_przywroc_jedna_lekcje_cykl_zostaje(self):
+        # cykl co tydzień (miesiąc): 4 lekcje w listopadzie; odwołanie jednej nie kasuje cyklu
+        self.client.force_login(self.user)
+        self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', {
+            'okres': 'miesiac',
+            'data_poczatkowa': '2026-11-09',
+            'slot_dzien': ['0'],
+            'slot_godzina': ['11:00'],
+            'link_meet': '',
+        }, follow=True)
+        self.assertEqual(Lekcja.objects.filter(uczen=self.uczen).count(), 4)
+        lekcja = Lekcja.objects.get(uczen=self.uczen, data__date=date(2026, 11, 16))
+        adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/'
+        r = self.client.post(adres, {'dzien': '2026-11-16', 'akcja': 'odwolaj_lekcje', 'lekcja_id': lekcja.id})
+        self.assertEqual(r.status_code, 200)
+        lekcja.refresh_from_db()
+        self.assertTrue(lekcja.odwolana)
+        self.assertEqual(Lekcja.objects.filter(uczen=self.uczen).count(), 4)
+        self.assertEqual(Lekcja.objects.filter(uczen=self.uczen, odwolana=False).count(), 3)
+        r = self.client.post(adres, {'dzien': '2026-11-16', 'akcja': 'przywroc_lekcje', 'lekcja_id': lekcja.id})
+        self.assertEqual(r.status_code, 200)
+        lekcja.refresh_from_db()
+        self.assertFalse(lekcja.odwolana)
+        self.assertEqual(Lekcja.objects.filter(uczen=self.uczen, odwolana=False).count(), 4)
+
+    def test_przesun_jedna_lekcje_tylko_w_tym_tygodniu(self):
+        self.client.force_login(self.user)
+        self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', {
+            'okres': 'miesiac',
+            'data_poczatkowa': '2026-11-09',
+            'slot_dzien': ['0'],
+            'slot_godzina': ['11:00'],
+            'link_meet': '',
+        }, follow=True)
+        lekcja = Lekcja.objects.get(uczen=self.uczen, data__date=date(2026, 11, 9))
+        adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/'
+        # przesunięcie w tym samym tygodniu (pon 09.11 11:00 → wt 10.11 12:00) — działa
+        r = self.client.post(adres, {
+            'dzien': '2026-11-09', 'akcja': 'przesun_lekcje', 'lekcja_id': lekcja.id,
+            'nowy_dzien': '2026-11-10', 'nowa_godzina': '12:00',
+        })
+        self.assertEqual(r.status_code, 200)
+        lekcja.refresh_from_db()
+        self.assertEqual(timezone.localtime(lekcja.data).date(), date(2026, 11, 10))
+        self.assertEqual(timezone.localtime(lekcja.data).strftime('%H:%M'), '12:00')
+        # cykl zostaje: liczba lekcji i pozostałe poniedziałki bez zmian
+        self.assertEqual(Lekcja.objects.filter(uczen=self.uczen).count(), 4)
+        self.assertTrue(Lekcja.objects.filter(uczen=self.uczen, data__date=date(2026, 11, 16)).exists())
+        # przesunięcie poza ten tydzień → odrzucone (400)
+        r = self.client.post(adres, {
+            'dzien': '2026-11-10', 'akcja': 'przesun_lekcje', 'lekcja_id': lekcja.id,
+            'nowy_dzien': '2026-11-17', 'nowa_godzina': '12:00',
+        })
+        self.assertEqual(r.status_code, 400)
+
+    def test_moj_tydzien_pokazuje_odwolana_lekcje_z_przyciskiem_przywroc(self):
+        # odwołana lekcja widać w „Mój tydzień” jako przekreśloną z przyciskiem ↩ (cykl zostaje)
+        self.client.force_login(self.user)
+        self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', {
+            'okres': 'miesiac',
+            'data_poczatkowa': '2026-11-09',
+            'slot_dzien': ['0'],
+            'slot_godzina': ['11:00'],
+            'link_meet': '',
+        }, follow=True)
+        lekcja = Lekcja.objects.get(uczen=self.uczen, data__date=date(2026, 11, 16))
+        self.client.post(
+            f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/',
+            {'dzien': '2026-11-16', 'akcja': 'odwolaj_lekcje', 'lekcja_id': lekcja.id},
+        )
+        r = self.client.get(f'/moj-tydzien/{self.nauczyciel.id}/', {'rok': 2026, 'miesiac': 11, 'dzien': 16})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'odwołana')
+        self.assertContains(r, 'lekcja-przywroc')
+        # pozostałe (nieodwołane) lekcje nadal mają ✖ odwołaj i ↔ przesuń
+        self.assertContains(r, 'lekcja-odwolaj')
+        self.assertContains(r, 'lekcja-przesun')
 
     def test_cykliczna_w_tym_samym_czasie_co_pierwsza_lekcja_nie_blokuje(self):
         self.client.force_login(self.user)

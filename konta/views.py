@@ -1389,7 +1389,7 @@ def kalendarz_dane(request, nauczyciel_id):
         komunikat = (f'Godziny {start:%H:%M}–{koniec_zakresu:%H:%M} usunięte tylko w dniu {dzien_data:%d.%m.%Y} '
                      f'({usuniete} terminów) — cykl co tydzień zostaje na kolejne tygodnie.')
         if z_lekcjami:
-            komunikat += f' UWAGA: tego dnia w tym zakresie są lekcje ({', '.join(z_lekcjami)}) — odwołaj je osobno (✖ na lekcji).'
+            komunikat += f" UWAGA: tego dnia w tym zakresie są lekcje ({', '.join(z_lekcjami)}) — odwołaj je osobno (✖ na lekcji)."
     elif akcja == 'wyczysc_dzien':
         usuniete = Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).count()
         Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).delete()
@@ -1957,7 +1957,7 @@ def moj_tydzien(request, nauczyciel_id=None):
         przerwy_dni[wpis.data] = wpis.minuty
     nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
     lekcje_dni = {}
-    for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__gte=poniedzialek, data__lt=nastepny, odwolana=False):
+    for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__gte=poniedzialek, data__lt=nastepny):
         if not lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela):
             continue
         dzien_lekcji = timezone.localtime(lekcja.data).date()
@@ -1983,6 +1983,7 @@ def moj_tydzien(request, nauczyciel_id=None):
                 'przedmiot': (lekcja.przedmiot_karta.przedmiot if lekcja.przedmiot_karta_id else lekcja.uczen.przedmiot),
                 'godzina': timezone.localtime(lekcja.data).strftime('%H:%M'),
                 'koniec': (timezone.localtime(lekcja.data) + timedelta(minutes=GODZINA_LEKCJI)).strftime('%H:%M'),
+                'odwolana': lekcja.odwolana,
             })
         dni.append({
             'data': dzien,
@@ -2308,7 +2309,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
     def okres_dat(okres, od_dnia):
         """Zwraca (od, do) wg wybranego presetu.
         'zawsze' celowo usunięte — lekcje cykliczne zawsze mają koniec
-        (miesiąc / co 2 tygodnie / do końca roku szkolnego)."""
+        (miesiąc / do końca roku szkolnego)."""
 
         if okres == 'miesiac':
             if od_dnia.month == 12:
@@ -2325,7 +2326,7 @@ def umow_lekcje_cykliczna(request, uczen_id):
 
     if request.method == 'POST':
         okres = request.POST.get('okres', 'miesiac')
-        co_2_tygodnie = False # opcja „co 2 tygodnie” usunięta — zawsze co tydzień
+        co_2_tygodnie = False # opcja „co 2 tygodnie” usunięta całkowicie — lekcje cykliczne zawsze co tydzień
         link_meet = request.POST.get('link_meet', '').strip()
         try:
             data_poczatkowa = date.fromisoformat(request.POST.get('data_od', '') or request.POST.get('data_poczatkowa', ''))
@@ -2364,12 +2365,9 @@ def umow_lekcje_cykliczna(request, uczen_id):
                 godzina = datetime.strptime(godzina_txt, '%H:%M').time()
             except ValueError:
                 continue
-            pierwszy_slot = od_dnia + timedelta(days=(dzien_tygodnia - od_dnia.weekday()) % 7)
             dzien = od_dnia
             while dzien <= do_dnia:
-                if dzien.weekday() == dzien_tygodnia and (
-                    not co_2_tygodnie or (dzien - pierwszy_slot).days % 14 == 0
-                    ):
+                if dzien.weekday() == dzien_tygodnia:
                     data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
                     start_dt = datetime.combine(dzien, godzina)
                     if nauczyciel and godzina_txt not in wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=uczen.id):

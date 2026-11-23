@@ -9,7 +9,8 @@
       <ul>
         <li>Strzałkami <strong>← →</strong> na dole (pod dniami) zmieniasz tydzień.</li>
         <li>Kliknij <strong>＋</strong> przy dniu → wpisz godziny „od — do” i przerwę po każdej lekcji (minimum <strong>5 min</strong>, możesz ustawić więcej: 10/15/30) → <strong>Zapisz</strong>. Możesz dodać kilka zakresów w jednym dniu. <strong>Koniec zakresu jest włączny</strong>: przy „do 20:00” lekcję można też umówić na 20:00.</li>
-        <li>Zakres usuwasz czerwonym <strong>✖</strong> obok niego. Przycisk <strong>🔄</strong> powtarza ten plan dnia co tydzień aż do końca roku szkolnego (30 czerwca).</li>
+        <li>Każdy dodany zakres jest <strong>od razu cykliczny: co tydzień aż do 31.08</strong> (koniec wakacji). Zakres usuwasz czerwonym <strong>✖</strong> obok niego — usuwa się tylko w tym dniu, w kolejnych tygodniach godziny zostają.</li>
+        <li>Przy lekcji <strong>✖</strong> odwołujesz tylko to jedno zajęcie (cykl zostaje), a <strong>↔</strong> przesuwasz je na inny dzień tego samego tygodnia. Odwołane zajęcie widać przekreślone — można je <strong>↩</strong> przywrócić.</li>
         <li>Przy dodawaniu ucznia (zakładka <strong>Uczniowie</strong>): wybierz przedmiot, poziom i datę — pokażą się wtedy wolne godziny korepetytorów na ten dzień, z uwzględnieniem ich przerw i już umówionych lekcji.</li>
         <li><strong>Zajęcia cykliczne:</strong> wejdź na kartę ucznia i kliknij „Lekcja cykliczna” → wybierz dzień tygodnia i godzinę → lekcje wpiszą się automatycznie co tydzień, a korepetytor będzie miał te godziny zablokowane.</li>
       </ul>
@@ -46,10 +47,14 @@
           <span class="zakres-pusty">wolny dzień</span>
           {% endif %}
           {% for lekcja in dzien.lekcje %}
-          <span class="zakres-pigulka pigulka-lekcja">
-            📅 {{ lekcja.uczen }} · {{ lekcja.przedmiot }} · {{ lekcja.godzina }}–{{ lekcja.koniec }}
+          <span class="zakres-pigulka pigulka-lekcja{% if lekcja.odwolana %} pigulka-odwolana{% endif %}">
+            📅 {{ lekcja.uczen }} · {{ lekcja.przedmiot }} · {{ lekcja.godzina }}–{{ lekcja.koniec }}{% if lekcja.odwolana %} (odwołana){% endif %}
+            {% if lekcja.odwolana %}
+            <button type="button" class="lekcja-przywroc" data-lekcja-id="{{ lekcja.id }}" title="Przywróć tylko to jedno zajęcie (cykl został)">↩</button>
+            {% else %}
             <button type="button" class="lekcja-odwolaj" data-lekcja-id="{{ lekcja.id }}" title="Odwołaj tylko to jedno zajęcie (cykl zostaje)">✖</button>
             <button type="button" class="lekcja-przesun" data-lekcja-id="{{ lekcja.id }}" title="Przesuń tylko to zajęcie na inny dzień tego tygodnia">↔</button>
+            {% endif %}
           </span>
           {% endfor %}
         </div>
@@ -91,6 +96,7 @@
     <div class="zakres-okienko" id="przesun-okienko" style="display: none;">
       <div class="zakres-pola">
         <input type="hidden" id="przesun-lekcja-id">
+        <input type="hidden" id="przesun-dzien-src">
         <strong>Przesuń jedno zajęcie (cykl zostaje):</strong>
         <label>nowy dzień
           <select id="przesun-dzien">
@@ -153,42 +159,27 @@
       }
 
       var usun = zdarzenie.target.closest('.zakres-usun');
-            var powtorz = zdarzenie.target.closest('.zakres-powtorz');
-            var cofnij = zdarzenie.target.closest('.zakres-cofnij');
-      if (cofnij) {
-        var daneC = new FormData();
-        daneC.append('dzien', cofnij.dataset.dzien);
-        daneC.append('akcja', 'cofnij_powtorzenia');
-        fetch(url, {
-          method: 'POST',
-          body: daneC,
-          headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf() },
-        })
-          .then(function (odp) { return odp.json(); })
-          .then(function (wynik) {
-            if (wynik.blad) { komunikat.textContent = wynik.blad; return; }
-            komunikat.textContent = wynik.komunikat || '';
-            odswiezStrone();
-          });
-        return;
-      }      
-      if (powtorz) {
-        var dane = new FormData();
-        dane.append('dzien', powtorz.dataset.dzien);
-        dane.append('akcja', 'powtorz_tygodniowo');
-        fetch(url, {
-          method: 'POST',
-          body: dane,
-          headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf() },
-        })
-          .then(function (odp) { return odp.json(); })
-          .then(function (wynik) {
-            if (wynik.blad) { komunikat.textContent = wynik.blad; return; }
-            komunikat.textContent = wynik.komunikat || '';
-            odswiezStrone();
-          });
+      var odw = zdarzenie.target.closest('.lekcja-odwolaj');
+      var przywroc = zdarzenie.target.closest('.lekcja-przywroc');
+      if (odw || przywroc) {
+        var przyciskL = odw || przywroc;
+        var dO = new FormData();
+        dO.append('dzien', przyciskL.closest('.dzien-wiersz').dataset.dzien);
+        dO.append('akcja', odw ? 'odwolaj_lekcje' : 'przywroc_lekcje');
+        dO.append('lekcja_id', przyciskL.dataset.lekcjaId);
+        fetch(url, {method: 'POST', body: dO, headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf()}})
+          .then(function (o) { return o.json(); })
+          .then(function (w) { if (w.blad) { komunikat.textContent = w.blad; return; } odswiezStrone(); });
         return;
       }
+      var prz = zdarzenie.target.closest('.lekcja-przesun');
+      if (prz) {
+        document.getElementById('przesun-lekcja-id').value = prz.dataset.lekcjaId;
+        document.getElementById('przesun-dzien-src').value = prz.closest('.dzien-wiersz').dataset.dzien;
+        document.getElementById('przesun-okienko').style.display = 'block';
+        return;
+      }
+
       if (usun) {
         var dane = new FormData();
         dane.append('dzien', usun.dataset.dzien);
@@ -223,8 +214,7 @@
         dane.append('od', od);
         dane.append('do', do_);
         dane.append('akcja', 'zaznacz_zakres');
-        var cykSel = wiersz.querySelector('.zakres-cyklicznosc');
-        dane.append('cyklicznosc', cykSel ? cykSel.value : '0');
+
         fetch(url, {
           method: 'POST',
           body: dane,
@@ -258,7 +248,32 @@
         anuluj.closest('.zakres-okienko').style.display = 'none';
       }
     });
-
+    var okienkoPrzesun = document.getElementById('przesun-okienko');
+    var przyciskPrzesun = document.getElementById('przesun-zapisz');
+    if (okienkoPrzesun && przyciskPrzesun) {
+      document.getElementById('przesun-anuluj').addEventListener('click', function () {
+        okienkoPrzesun.style.display = 'none';
+      });
+      przyciskPrzesun.addEventListener('click', function () {
+        var daneP = new FormData();
+        daneP.append('dzien', document.getElementById('przesun-dzien-src').value);
+        daneP.append('akcja', 'przesun_lekcje');
+        daneP.append('lekcja_id', document.getElementById('przesun-lekcja-id').value);
+        daneP.append('nowy_dzien', document.getElementById('przesun-dzien').value);
+        daneP.append('nowa_godzina', document.getElementById('przesun-godzina').value);
+        fetch(url, {
+          method: 'POST',
+          body: daneP,
+          headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf() },
+        })
+          .then(function (odp) { return odp.json(); })
+          .then(function (wynik) {
+            if (wynik.blad) { komunikat.textContent = wynik.blad; return; }
+            komunikat.textContent = wynik.komunikat || '';
+            odswiezStrone();
+          });
+      });
+    }
     var poleMeet = document.getElementById('link-meet-pole');
     var przyciskMeet = document.getElementById('link-meet-zapisz');
     if (poleMeet && przyciskMeet) {

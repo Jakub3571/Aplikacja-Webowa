@@ -54,7 +54,9 @@ class Command(BaseCommand):
                 for (dzien_tygodnia, godzina), daty_wzorca in wzorce.items():
                     if dzien.weekday() != dzien_tygodnia or dzien > granica:
                         continue
-
+                    data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
+                    if Lekcja.objects.filter(uczen=uczen, data=data_lekcji).exists():
+                        continue
                     if nauczyciel:
                         if kolizja_lekcji_nauczyciela(nauczyciel, dzien, datetime.combine(dzien, godzina)):
                             pominiete += 1
@@ -62,7 +64,8 @@ class Command(BaseCommand):
                         if godzina_w_przerwie(nauczyciel, dzien, godzina):
                             pominiete += 1
                             continue
-                    Lekcja.objects.create(uczen=uczen, data=data_lekcji)
+                    data_lekcji = timezone.make_aware(datetime.combine(dzien, godzina))
+                    Lekcja.objects.get_or_create(uczen=uczen, data=data_lekcji)
                     if nauczyciel:
                         Dostepnosc.objects.get_or_create(
                             nauczyciel=nauczyciel,

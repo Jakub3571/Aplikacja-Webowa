@@ -663,8 +663,10 @@ input[type="radio"], input[type="checkbox"] {
 .edytuj-uklad .karta { margin-top: 0; max-width: none; }
 @media (max-width: 900px) { .edytuj-uklad { grid-template-columns: 1fr; } }
 
-/* przyciski na pigulce lekcji w „Mój tydzień”: odwołaj ✖ / przesuń ↔ (jedno zajęcie, cykl zostaje) */
-.lekcja-odwolaj, .lekcja-przesun { background: none; border: none; cursor: pointer; font-size: .8rem; padding: 0 .15rem; color: inherit; }
+/* przyciski na pigulce lekcji w „Mój tydzień”: odwołaj ✖ / przesuń ↔ / przywróć ↩ (jedno zajęcie, cykl zostaje) */
+.lekcja-odwolaj, .lekcja-przesun, .lekcja-przywroc { background: none; border: none; cursor: pointer; font-size: .8rem; padding: 0 .15rem; color: inherit; }
 .lekcja-odwolaj { color: #ff5a4e; font-weight: 700; }
 .lekcja-przesun { color: var(--akcent); font-weight: 700; }
+.lekcja-przywroc { color: #2e9e5b; font-weight: 700; }
+.pigulka-odwolana { opacity: .55; text-decoration: line-through; }
 #przesun-okienko { margin-top: .75rem; }
