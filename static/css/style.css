@@ -368,6 +368,13 @@ body {
 
 .zakres-usun:hover { color: #d92b1f; transform: scale(1.2); }
 
+.zakres-usun-cykl {
+  background: none; border: none; color: #ffe08a; cursor: pointer; font-size: 0.95rem;
+  padding: 0; line-height: 1;
+}
+
+.zakres-usun-cykl:hover { transform: scale(1.2); }
+
 .instrukcja-kalendarza ul { margin: 0.5rem 0 0 1.2rem; padding: 0; }
 
 .instrukcja-kalendarza li { margin-bottom: 0.35rem; }

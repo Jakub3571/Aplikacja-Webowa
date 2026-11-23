@@ -1303,6 +1303,24 @@ def _rozszerz_cyklicznie(nauczyciel, dzien_data, start, koniec, okres=1):
         Dostepnosc.objects.bulk_create(nowe)
     return len(nowe)
 
+def _prosi_o_koordynatora(request, nauczyciel, dzien_data, akcja_txt, lekcje_txt=''):
+    """Korepetytor (nie-szef) próbował ruszyć zajęcia — blokuje akcję (403)
+    i zapisuje zgłoszenie dla koordynatora/szefa w zakładce Zgłoszenia."""
+    kto = (request.user.get_full_name() or request.user.username).strip() or request.user.username
+    tresc = (f'{kto} chce: {akcja_txt} — korepetytor {nauczyciel.imie} {nauczyciel.nazwisko}, '
+             f'dzień {dzien_data:%d.%m.%Y}.')
+    if lekcje_txt:
+        tresc += f' Zajęcia w zakresie: {lekcje_txt}.'
+    Zgloszenie.objects.create(
+        autor=request.user,
+        kategoria='zajęcia',
+        tresc=tresc,
+        strona=f'/moj-tydzien/{nauczyciel.id}/?dzien={dzien_data.isoformat()}',
+    )
+    return JsonResponse({
+        'blad': ('Nie możesz tego zrobić samodzielnie — w tym terminie są zajęcia. '
+                 'Zgłoszenie wysłane: skontaktuj się z koordynatorem w sprawie zmiany.'),
+    }, status=403)
 
 @login_required
 def kalendarz_dane(request, nauczyciel_id):
@@ -1470,12 +1488,6 @@ def kalendarz_dane(request, nauczyciel_id):
             koniec_zakresu = datetime.strptime(request.POST.get('do', ''), '%H:%M').time()
         except ValueError:
             return JsonResponse({'blad': 'Nieprawidłowy zakres godzin.'}, status=400)
-        usuniete = Dostepnosc.objects.filter(
-            nauczyciel=nauczyciel,
-            data_od=dzien_data,
-            godzina_od__gte=start,
-            godzina_do__lte=koniec_zakresu,
-        ).delete()[0]
         nazwa_n = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
         lekcje_dnia = [
             timezone.localtime(l.data).strftime('%H:%M')
@@ -1483,12 +1495,67 @@ def kalendarz_dane(request, nauczyciel_id):
             if lekcja_jest_u_nauczyciela(l, nazwa_n)
         ]
         z_lekcjami = [g for g in lekcje_dnia if start <= datetime.strptime(g, '%H:%M').time() < koniec_zakresu]
+        if z_lekcjami and not czy_szef(request.user):
+            return _prosi_o_koordynatora(
+                request, nauczyciel, dzien_data,
+                f'usunąć zakres {start:%H:%M}–{koniec_zakresu:%H:%M} (tylko ten dzień)',
+                ', '.join(z_lekcjami),
+            )
+        usuniete = Dostepnosc.objects.filter(
+            nauczyciel=nauczyciel,
+            data_od=dzien_data,
+            godzina_od__gte=start,
+            godzina_do__lte=koniec_zakresu,
+        ).delete()[0]
         komunikat = (f'Godziny {start:%H:%M}–{koniec_zakresu:%H:%M} usunięte tylko w dniu {dzien_data:%d.%m.%Y} '
                      f'({usuniete} terminów) — cykl co tydzień zostaje na kolejne tygodnie.')
         if z_lekcjami:
             lekcje_txt = ', '.join(z_lekcjami)
             komunikat += f' UWAGA: tego dnia w tym zakresie są lekcje ({lekcje_txt}) — odwołaj je osobno (✖ na lekcji).'
+    elif akcja == 'usun_caly_zakres':
+        # CAŁY cykl od tego dnia w przód: ten dzień + wszystkie kolejne tygodnie (do 31.08)
+        try:
+            start = datetime.strptime(request.POST.get('od', ''), '%H:%M').time()
+            koniec_zakresu = datetime.strptime(request.POST.get('do', ''), '%H:%M').time()
+        except ValueError:
+            return JsonResponse({'blad': 'Nieprawidłowy zakres godzin.'}, status=400)
+        nazwa_n = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+        z_lekcjami = [
+            timezone.localtime(l.data).strftime('%d.%m %H:%M')
+            for l in Lekcja.objects.filter(data__date__gte=dzien_data, odwolana=False)
+            if lekcja_jest_u_nauczyciela(l, nazwa_n)
+            and start <= timezone.localtime(l.data).time() < koniec_zakresu
+        ]
+        if z_lekcjami and not czy_szef(request.user):
+            return _prosi_o_koordynatora(
+                request, nauczyciel, dzien_data,
+                f'usunąć CAŁY cykl {start:%H:%M}–{koniec_zakresu:%H:%M} od {dzien_data:%d.%m.%Y} w przód',
+                ', '.join(z_lekcjami),
+            )
+        usuniete = Dostepnosc.objects.filter(
+            nauczyciel=nauczyciel,
+            data_od__gte=dzien_data,
+            godzina_od__gte=start,
+            godzina_do__lte=koniec_zakresu,
+        ).delete()[0]
+        komunikat = (f'Usunięto cały zakres {start:%H:%M}–{koniec_zakresu:%H:%M} od {dzien_data:%d.%m.%Y} w przód '
+                     f'({usuniete} terminów) — ten dzień i wszystkie kolejne tygodnie.')
+        if z_lekcjami:
+            lekcje_txt = ', '.join(z_lekcjami)
+            komunikat += f' UWAGA: w tym zakresie są zajęcia ({lekcje_txt}).'
     elif akcja == 'wyczysc_dzien':
+        nazwa_n = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+        z_lekcjami = [
+            timezone.localtime(l.data).strftime('%H:%M')
+            for l in Lekcja.objects.filter(data__date=dzien_data, odwolana=False)
+            if lekcja_jest_u_nauczyciela(l, nazwa_n)
+        ]
+        if z_lekcjami and not czy_szef(request.user):
+            return _prosi_o_koordynatora(
+                request, nauczyciel, dzien_data,
+                'wyczyścić cały dzień (usunąć wszystkie godziny)',
+                ', '.join(z_lekcjami),
+            )
         usuniete = Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).count()
         Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).delete()
         komunikat = f'Wyczyszczono cały dzień {dzien_data:%d.%m.%Y} — usunięto {usuniete} terminów.'
@@ -1498,6 +1565,11 @@ def kalendarz_dane(request, nauczyciel_id):
         nazwa_n = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
         if not lekcja_jest_u_nauczyciela(lekcja, nazwa_n):
             return JsonResponse({'blad': 'To nie jest lekcja tego korepetytora.'}, status=403)
+        if akcja == 'odwolaj_lekcje' and not lekcja.odwolana and not czy_szef(request.user):
+            return _prosi_o_koordynatora(
+                request, nauczyciel, timezone.localtime(lekcja.data).date(),
+                f'odwołać zajęcia {timezone.localtime(lekcja.data):%d.%m.%Y %H:%M} (uczeń: {lekcja.uczen})',
+            )
         lekcja.odwolana = (akcja == 'odwolaj_lekcje')
         lekcja.save(update_fields=['odwolana'])
         komunikat = (f'Lekcja {timezone.localtime(lekcja.data):%d.%m.%Y %H:%M} odwołana — tylko ten termin, cykl zostaje.'
@@ -1509,6 +1581,11 @@ def kalendarz_dane(request, nauczyciel_id):
         nazwa_n = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
         if not lekcja_jest_u_nauczyciela(lekcja, nazwa_n):
             return JsonResponse({'blad': 'To nie jest lekcja tego korepetytora.'}, status=403)
+        if not czy_szef(request.user):
+            return _prosi_o_koordynatora(
+                request, nauczyciel, timezone.localtime(lekcja.data).date(),
+                f'przesunąć zajęcia {timezone.localtime(lekcja.data):%d.%m.%Y %H:%M} (uczeń: {lekcja.uczen}) na inny dzień tego tygodnia',
+            )
         try:
             nowy_dzien = date.fromisoformat(request.POST.get('nowy_dzien', ''))
             nowa_godzina = datetime.strptime(request.POST.get('nowa_godzina', ''), '%H:%M').time()

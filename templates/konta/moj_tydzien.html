@@ -9,7 +9,7 @@
       <ul>
         <li>Strzałkami <strong>← →</strong> na dole (pod dniami) zmieniasz tydzień.</li>
         <li>Kliknij <strong>＋</strong> przy dniu → wpisz godziny „od — do” i przerwę po każdej lekcji (minimum <strong>5 min</strong>, możesz ustawić więcej: 10/15/30) → <strong>Zapisz</strong>. Możesz dodać kilka zakresów w jednym dniu. <strong>Koniec zakresu jest włączny</strong>: przy „do 20:00” lekcję można też umówić na 20:00.</li>
-        <li>Każdy dodany zakres jest <strong>od razu cykliczny: co tydzień aż do 31.08</strong> (koniec wakacji). Zakres usuwasz czerwonym <strong>✖</strong> obok niego — usuwa się tylko w tym dniu, w kolejnych tygodniach godziny zostają.</li>
+<li>Każdy dodany zakres jest <strong>od razu cykliczny: co tydzień aż do 31.08</strong> (koniec wakacji). Czerwonym <strong>✖</strong> usuwasz zakres tylko w tym dniu (w kolejnych tygodniach godziny zostają), a <strong>🗑</strong> obok cyklicznego zakresu usuwa <strong>cały cykl</strong> — ten dzień i wszystkie kolejne tygodnie.</li>
         <li>Przy lekcji <strong>✖</strong> odwołujesz tylko to jedno zajęcie (cykl zostaje), a <strong>↔</strong> przesuwasz je na inny dzień tego samego tygodnia. Odwołane zajęcie widać przekreślone — można je <strong>↩</strong> przywrócić.</li>
         <li>Przy dodawaniu ucznia (zakładka <strong>Uczniowie</strong>): wybierz przedmiot, poziom i datę — pokażą się wtedy wolne godziny korepetytorów na ten dzień, z uwzględnieniem ich przerw i już umówionych lekcji.</li>
         <li><strong>Zajęcia cykliczne:</strong> wejdź na kartę ucznia i kliknij „Lekcja cykliczna” → wybierz dzień tygodnia i godzinę → lekcje wpiszą się automatycznie co tydzień, a korepetytor będzie miał te godziny zablokowane.</li>
@@ -40,7 +40,10 @@
           <span class="zakres-pigulka">
            {% if zakres.cykliczny %} 🔁 co tydzień{% endif %}
             {% if dzien.przerwa %} · przerwa {{ dzien.przerwa }} min{% endif %}
-            <button type="button" class="zakres-usun" data-dzien="{{ dzien.data|date:'Y-m-d' }}" data-od="{{ zakres.od }}" data-do="{{ zakres.do }}" title="Usuń ten zakres">✖</button>
+            <button type="button" class="zakres-usun" data-dzien="{{ dzien.data|date:'Y-m-d' }}" data-od="{{ zakres.od }}" data-do="{{ zakres.do }}" title="Usuń ten zakres tylko w tym dniu (cykl zostaje)">✖</button>
+            {% if zakres.cykliczny %}
+            <button type="button" class="zakres-usun-cykl" data-dzien="{{ dzien.data|date:'Y-m-d' }}" data-od="{{ zakres.od }}" data-do="{{ zakres.do }}" title="Usuń cały zakres: ten dzień i wszystkie kolejne tygodnie">🗑</button>
+            {% endif %}
           </span>
           {% endfor %}
           {% if not dzien.zakresy %}
@@ -159,6 +162,7 @@
       }
 
       var usun = zdarzenie.target.closest('.zakres-usun');
+      var usunCykl = zdarzenie.target.closest('.zakres-usun-cykl');
       var odw = zdarzenie.target.closest('.lekcja-odwolaj');
       var przywroc = zdarzenie.target.closest('.lekcja-przywroc');
       if (odw || przywroc) {
@@ -198,7 +202,25 @@
           });
         return;
       }
-
+      if (usunCykl) {
+        if (!confirm('Usunąć CAŁY zakres ' + usunCykl.dataset.od + '–' + usunCykl.dataset.do + ' od ' + usunCykl.dataset.dzien + ' w przód (ten dzień i wszystkie kolejne tygodnie)?')) return;
+        var daneC = new FormData();
+        daneC.append('dzien', usunCykl.dataset.dzien);
+        daneC.append('od', usunCykl.dataset.od);
+        daneC.append('do', usunCykl.dataset.do);
+        daneC.append('akcja', 'usun_caly_zakres');
+        fetch(url, {
+          method: 'POST',
+          body: daneC,
+          headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf() },
+        })
+          .then(function (odp) { return odp.json(); })
+          .then(function (wynik) {
+            if (wynik.blad) { komunikat.textContent = wynik.blad; return; }
+            odswiezStrone();
+          });
+        return;
+      }
       var zapisz = zdarzenie.target.closest('.zakres-zapisz');
       if (zapisz) {
         var wiersz = zapisz.closest('.dzien-wiersz');

@@ -54,14 +54,16 @@
 				});
             })();
 
-            // komunikaty znikają po 3 s (nie blokują zakładek)
-            setTimeout(function () {
+            // komunikaty znikają po 7 s albo od razu po kliknięciu gdziekolwiek na stronie
+            function zamknijKomunikaty() {
                 var komunikaty = document.querySelector('.komunikaty');
                 if (!komunikaty) return;
                 komunikaty.style.transition = 'opacity 0.4s ease';
                 komunikaty.style.opacity = '0';
                 setTimeout(function () { komunikaty.style.display = 'none'; }, 400);
-            }, 3000);
+            }
+            setTimeout(zamknijKomunikaty, 7000);
+            document.addEventListener('click', zamknijKomunikaty);
         </script>
 
 

@@ -18,7 +18,7 @@ from konta.models import (
     PrzypomnienieLekcji,
     RaportPlatnosci,
     Uczen,
-   
+    Zgloszenie,
 )
 
 from konta.views import kolizja_lekcji_nauczyciela
@@ -1758,10 +1758,13 @@ class PoprawkiSzefaTests(TestCase):
             )
             d += timedelta(days=1)        
 
-    def test_komunikat_ma_skrypt_znikania_po_3s(self):
+    def test_komunikat_znika_po_7s_i_po_kliknieciu_gdziekolwiek(self):
         r = self.client.get('/')
-        self.assertContains(r, '3000')
+        self.assertContains(r, '7000')
+        self.assertContains(r, 'zamknijKomunikaty')
+        self.assertContains(r, "document.addEventListener('click', zamknijKomunikaty)")
         self.assertContains(r, 'komunikaty')
+        self.assertNotContains(r, '3000')
 
     def test_ajax_wolne_godziny_nauczyciela_rytm(self):
         self.client.force_login(self.user)
@@ -2331,3 +2334,135 @@ class UsuwanieKontTests(TestCase):
         r = self.client.post(f'/uzytkownicy/{self.szef.id}/usun/')
         self.assertEqual(r.status_code, 302)
         self.assertTrue(Pracownik.objects.filter(pk=self.szef.pk).exists())
+
+
+class UsunCalyZakresTests(TestCase):
+    """🗑 Usuń cały zakres (akcja usun_caly_zakres): kasuje cykl od wybranego dnia w przód."""
+
+    def setUp(self):
+        self.szef = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.nauczyciel = Nauczyciel.objects.create(imie='Anna', nazwisko='Kowalska', email='anna@k.pl')
+        self.tutor = Pracownik.objects.create_user('anna', 'anna@f.pl', 'Sup3rHaslo!', nauczyciel=self.nauczyciel)
+        # cykliczny zakres 14:00–16:00 w każdą środę od 07.10.2026 do 31.08.2027 (4 sloty po 30 min)
+        d = date(2026, 10, 7)
+        while d <= date(2027, 8, 31):
+            if d.weekday() == 2:
+                for godz in (time(14, 0), time(14, 30), time(15, 0), time(15, 30)):
+                    Dostepnosc.objects.create(
+                        nauczyciel=self.nauczyciel, data_od=d, data_do=d,
+                        godzina_od=godz,
+                        godzina_do=(datetime.combine(d, godz) + timedelta(minutes=30)).time(),
+                        cykliczny=True, cykliczny_okres=1,
+                    )
+            d += timedelta(days=1)
+        self.adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/'
+
+    def test_szef_usuwa_caly_zakres_od_dnia_w_przod(self):
+        self.client.force_login(self.szef)
+        r = self.client.post(self.adres, {'dzien': '2026-10-14', 'akcja': 'usun_caly_zakres', 'od': '14:00', 'do': '16:00'})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('cały zakres', r.json()['komunikat'])
+        # zostają tylko środy PRZED 14.10 (czyli tylko 07.10) — 4 sloty
+        self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel).count(), 4)
+        self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, data_od=date(2026, 10, 7)).count(), 4)
+        self.assertFalse(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, data_od__gte=date(2026, 10, 14)).exists())
+
+    def test_korepetytor_moze_usunac_caly_zakres_gdy_brak_lekcji(self):
+        self.client.force_login(self.tutor)
+        r = self.client.post(self.adres, {'dzien': '2026-10-14', 'akcja': 'usun_caly_zakres', 'od': '14:00', 'do': '16:00'})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel).count(), 4)
+        self.assertEqual(Zgloszenie.objects.count(), 0)
+
+    def test_strona_moj_tydzien_ma_przycisk_usun_caly_zakres_przy_cyklu(self):
+        self.client.force_login(self.tutor)
+        r = self.client.get(f'/moj-tydzien/{self.nauczyciel.id}/?rok=2026&miesiac=10&dzien=7')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'zakres-usun-cykl')
+        self.assertContains(r, 'usun_caly_zakres')
+
+
+class ZgloszenieKoordynatorTests(TestCase):
+    """Korepetytor (nie-szef) nie rusza zajęć: dostaje 403 + zgłoszenie leci do koordynatora."""
+
+    def setUp(self):
+        self.szef = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.nauczyciel = Nauczyciel.objects.create(imie='Anna', nazwisko='Kowalska', email='anna@k.pl')
+        self.tutor = Pracownik.objects.create_user('anna', 'anna@f.pl', 'Sup3rHaslo!', nauczyciel=self.nauczyciel)
+        self.uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 14, 14)),
+            przedmiot='matematyka', poziom='podstawa', szkola='SP 1',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600', email_glowny='e@f.pl', telefon_dodatkowy='',
+            korepetytor='Anna Kowalska', kto_umowil='szef', umowil=self.szef,
+        )
+        self.lekcja = Lekcja.objects.create(uczen=self.uczen, data=timezone.make_aware(datetime(2026, 10, 14, 14)))
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel, data_od=date(2026, 10, 14), data_do=date(2026, 10, 14),
+            godzina_od=time(14, 0), godzina_do=time(16, 0), cykliczny=True, cykliczny_okres=1,
+        )
+        self.adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/'
+
+    def test_korepetytor_usun_zakres_z_lekcja_dostaje_403_i_zgloszenie(self):
+        self.client.force_login(self.tutor)
+        r = self.client.post(self.adres, {'dzien': '2026-10-14', 'akcja': 'usun_zakres', 'od': '14:00', 'do': '16:00'})
+        self.assertEqual(r.status_code, 403)
+        self.assertIn('koordynatorem', r.json()['blad'])
+        self.assertTrue(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, data_od=date(2026, 10, 14)).exists())
+        zg = Zgloszenie.objects.filter(autor=self.tutor, kategoria='zajęcia')
+        self.assertEqual(zg.count(), 1)
+        self.assertIn('14:00', zg.first().tresc)
+        self.assertIn('/moj-tydzien/', zg.first().strona)
+
+    def test_korepetytor_usun_caly_zakres_z_lekcja_dostaje_403(self):
+        self.client.force_login(self.tutor)
+        r = self.client.post(self.adres, {'dzien': '2026-10-14', 'akcja': 'usun_caly_zakres', 'od': '14:00', 'do': '16:00'})
+        self.assertEqual(r.status_code, 403)
+        self.assertTrue(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel).exists())
+        self.assertEqual(Zgloszenie.objects.filter(autor=self.tutor).count(), 1)
+
+    def test_korepetytor_wyczysc_dzien_z_lekcja_dostaje_403(self):
+        self.client.force_login(self.tutor)
+        r = self.client.post(self.adres, {'dzien': '2026-10-14', 'akcja': 'wyczysc_dzien'})
+        self.assertEqual(r.status_code, 403)
+        self.assertTrue(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel).exists())
+        self.assertEqual(Zgloszenie.objects.filter(autor=self.tutor).count(), 1)
+
+    def test_korepetytor_odwolaj_lekcje_dostaje_403_i_lekcja_zostaje(self):
+        self.client.force_login(self.tutor)
+        r = self.client.post(self.adres, {'dzien': '2026-10-14', 'akcja': 'odwolaj_lekcje', 'lekcja_id': self.lekcja.id})
+        self.assertEqual(r.status_code, 403)
+        self.lekcja.refresh_from_db()
+        self.assertFalse(self.lekcja.odwolana)
+        self.assertEqual(Zgloszenie.objects.filter(autor=self.tutor, kategoria='zajęcia').count(), 1)
+
+    def test_korepetytor_przesun_lekcje_dostaje_403_i_lekcja_zostaje(self):
+        self.client.force_login(self.tutor)
+        r = self.client.post(self.adres, {
+            'dzien': '2026-10-14', 'akcja': 'przesun_lekcje', 'lekcja_id': self.lekcja.id,
+            'nowy_dzien': '2026-10-15', 'nowa_godzina': '14:00',
+        })
+        self.assertEqual(r.status_code, 403)
+        self.lekcja.refresh_from_db()
+        self.assertEqual(timezone.localtime(self.lekcja.data).date(), date(2026, 10, 14))
+        self.assertEqual(Zgloszenie.objects.filter(autor=self.tutor).count(), 1)
+
+    def test_szef_moze_wszystko_bez_zgloszenia(self):
+        self.client.force_login(self.szef)
+        r = self.client.post(self.adres, {'dzien': '2026-10-14', 'akcja': 'usun_zakres', 'od': '14:00', 'do': '16:00'})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('UWAGA', r.json()['komunikat'])
+        self.assertFalse(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, data_od=date(2026, 10, 14)).exists())
+        r = self.client.post(self.adres, {'dzien': '2026-10-14', 'akcja': 'odwolaj_lekcje', 'lekcja_id': self.lekcja.id})
+        self.assertEqual(r.status_code, 200)
+        self.lekcja.refresh_from_db()
+        self.assertTrue(self.lekcja.odwolana)
+        self.assertEqual(Zgloszenie.objects.filter(autor=self.szef).count(), 0)
+
+    def test_korepetytor_moze_dodawac_godziny_i_przerwe_bez_zgloszenia(self):
+        self.client.force_login(self.tutor)
+        r = self.client.post(self.adres, {'dzien': '2026-10-15', 'akcja': 'zapisz_przerwe', 'przerwa': '10'})
+        self.assertEqual(r.status_code, 200)
+        r = self.client.post(self.adres, {'dzien': '2026-10-15', 'akcja': 'zaznacz_zakres', 'od': '18:00', 'do': '20:00'})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Zgloszenie.objects.filter(autor=self.tutor).count(), 0)
