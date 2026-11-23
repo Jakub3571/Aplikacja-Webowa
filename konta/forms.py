@@ -8,6 +8,7 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db import transaction
 
 from .models import (
     POZIOMY_NAUCZYCIELA,
@@ -263,6 +264,12 @@ class FormularzUzytkownika(forms.ModelForm):
         # (reset hasła i powiadomienia działają tylko z prawdziwym adresem)
         if not dane.get('email'):
             dane['email'] = f"{dane.get('username', '')}@konta.local"
+                    # korepetytor: nie dublujemy karty nauczyciela po adresie e-mail
+        if dane.get('rola') == 'nauczyciel' and dane.get('email'):
+            if Nauczyciel.objects.filter(email__iexact=dane['email']).exists():
+                raise forms.ValidationError(
+                    'Istnieje już karta korepetytora z tym adresem e-mail — podaj inny e-mail albo edytuj istniejące konto.'
+                )
         # nauczyciel: walidacja wierszy przedmiotow
         if dane.get('rola') == 'nauczyciel':
             pelne = [w for w in self.wiersze_przedmiotow if w['przedmiot']]
@@ -292,35 +299,35 @@ class FormularzUzytkownika(forms.ModelForm):
         return dane
 
     def zapisz(self):
-        """Tworzy użytkownika z hasłem, rolą, a dla nauczyciela — przedmiotami ze stawkami."""
-        user = self.save(commit=False)
-        rola = self.cleaned_data['rola']
-        user.set_password(self.cleaned_data['haslo1'])
-        user.is_superuser = rola == 'admin'
-        user.is_staff = rola == 'admin'
-        # rola koordynatora zapisana na koncie (pole stanowisko) — dzieki temu
-        # dziala niezaleznie od loginu, a koordynator nie moze byc adminem
-        user.stanowisko = 'koordynator' if rola == 'koordynator' else ''
-        user.save()
-        if rola == 'nauczyciel':
-            nauczyciel = Nauczyciel.objects.create(
-                imie=user.first_name or user.username,
-                nazwisko=user.last_name or user.username,
-                email=user.email,
-            )
-            user.nauczyciel = nauczyciel
+        """Tworzy użytkownika z hasłem, rolą, a dla nauczyciela — przedmiotami ze stawkami.
+        Całość w transakcji: przy błędzie w połowie konto NIE zostaje w bazie."""
+        with transaction.atomic():
+            user = self.save(commit=False)
+            rola = self.cleaned_data['rola']
+            user.set_password(self.cleaned_data['haslo1'])
+            user.is_superuser = rola == 'admin'
+            user.is_staff = rola == 'admin'
+            user.stanowisko = 'koordynator' if rola == 'koordynator' else ''
             user.save()
-            for w in self.wiersze_przedmiotow:
-                if not w['przedmiot']:
-                    continue
-                from decimal import Decimal
-                stawka = Decimal((w['stawka'] or '0').replace(',', '.'))
-                PrzedmiotNauczyciela.objects.update_or_create(
-                    nauczyciel=nauczyciel,
-                    przedmiot=w['przedmiot'],
-                    poziom=w['poziom'],
-                    defaults={'stawka': stawka},
+            if rola == 'nauczyciel':
+                nauczyciel = Nauczyciel.objects.create(
+                    imie=user.first_name or user.username,
+                    nazwisko=user.last_name or user.username,
+                    email=user.email,
                 )
+                user.nauczyciel = nauczyciel
+                user.save()
+                for w in self.wiersze_przedmiotow:
+                    if not w['przedmiot']:
+                        continue
+                    from decimal import Decimal
+                    stawka = Decimal((w['stawka'] or '0').replace(',', '.'))
+                    PrzedmiotNauczyciela.objects.update_or_create(
+                        nauczyciel=nauczyciel,
+                        przedmiot=w['przedmiot'],
+                        poziom=w['poziom'],
+                        defaults={'stawka': stawka},
+                    )
         return user
 
 

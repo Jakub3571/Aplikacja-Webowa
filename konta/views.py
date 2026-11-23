@@ -156,6 +156,15 @@ def lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela):
         return (lekcja.przedmiot_karta.korepetytor or '').strip().lower() == nazwa_nauczyciela
     return (lekcja.uczen.korepetytor or '').strip().lower() == nazwa_nauczyciela
 
+def _przerwa_dnia(nauczyciel, dzien):
+    """Przerwa dnia ustawiona w „Mój tydzień” (PrzerwaDnia); gdy jej nie ma —
+    domyślna przerwa nauczyciela (minimum 5 min)."""
+    if not nauczyciel:
+        return 5
+    wpis = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien).first()
+    if wpis and wpis.minuty:
+        return wpis.minuty
+    return nauczyciel.przerwa or 5
 
 def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None, pomijaj_uczen_id=None):
     """Czy lekcja (60 min od start_lekcji) koliduje z istniejącą lekcją nauczyciela.
@@ -167,7 +176,7 @@ def kolizja_lekcji_nauczyciela(nauczyciel, dzien, start_lekcji, przerwa_min=None
     if not nauczyciel:
         return False
     if przerwa_min is None:
-        przerwa_min = nauczyciel.przerwa or 5
+        przerwa_min = _przerwa_dnia(nauczyciel, dzien)
     nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
     moj_koniec = start_lekcji + timedelta(minutes=GODZINA_LEKCJI + przerwa_min)
     for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien, odwolana=False):
@@ -231,11 +240,20 @@ def wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=None):
     """Godziny startu lekcji dostępne u nauczyciela — PEŁNE GODZINY (co 60 min)
     od początku każdego przedziału, o ile lekcja mieści się w przedziale.
     Koniec przedziału WŁĄCZNY („do 20:00” = można też o 20:00).
-    Przerwa między lekcjami nadal obowiązuje (kolizja zajmuje [start, koniec + przerwa))."""
+    Dodatkowo sloty PRZYLEGŁE do umówionych lekcji, przesunięte o przerwę TEGO DNIA:
+    po lekcji = koniec lekcji + przerwa (lekcja 10:00, przerwa 5 min → 11:05),
+    przed lekcją = start lekcji − 60 min − przerwa (przed 10:00 → 08:55).
+    Kolizja zajmuje [start, koniec + przerwa) — przerwa dnia z „Mój tydzień”."""
     wynik = []
     if not nauczyciel:
         return wynik
-    przerwa = nauczyciel.przerwa or 5
+    przerwa = _przerwa_dnia(nauczyciel, dzien)
+    nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+    lekcje_starty = [
+        timezone.localtime(l.data).replace(tzinfo=None)
+        for l in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien, odwolana=False)
+        if lekcja_jest_u_nauczyciela(l, nazwa_nauczyciela)
+    ]
     for s, e in _zakresy_dnia(nauczyciel, dzien):
         kandydaci = set()
         t = s
@@ -244,6 +262,13 @@ def wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=None):
             t += timedelta(minutes=GODZINA_LEKCJI)
         if s < e:
             kandydaci.add(e)
+        for l_start in lekcje_starty:
+            po = l_start + timedelta(minutes=GODZINA_LEKCJI + przerwa)
+            przed = l_start - timedelta(minutes=GODZINA_LEKCJI + przerwa)
+            if s <= po <= e:
+                kandydaci.add(po)
+            if s <= przed <= e:
+                kandydaci.add(przed)
         for start in sorted(kandydaci):
             if kolizja_lekcji_nauczyciela(nauczyciel, dzien, start, przerwa_min=przerwa, pomijaj_uczen_id=pomijaj_uczen_id):
                 continue
@@ -1490,6 +1515,11 @@ def kalendarz_dane(request, nauczyciel_id):
         start = timezone.localtime(lekcja.data).replace(tzinfo=None)
         for minuty in range(0, GODZINA_LEKCJI, 30):
             zajete.add((start + timedelta(minutes=minuty)).strftime('%H:%M'))
+                    # przerwa dnia po lekcji pokazuje się jako „przerwa”, nie jako wolny slot
+        for minuty in range(GODZINA_LEKCJI, GODZINA_LEKCJI + przerwa_min, 30):
+            etykieta_przerwy = (start + timedelta(minutes=minuty)).strftime('%H:%M')
+            if etykieta_przerwy not in zaznaczone:
+                sloty_przerwy.add(etykieta_przerwy)
     kafelki = []
     for h in range(6, 21):
         for m in (0, 30):
@@ -1803,7 +1833,8 @@ def uzytkownicy(request):
         try:
             nowy_uzytkownik = form.zapisz()
         except Exception as e:
-            messages.error(request, f'Nie udało się utworzyć konta ({e}).')
+            zapisz_blad_maila('utworzenie_konta', e)
+            messages.error(request, 'Nie udało się utworzyć konta — konto nie zostało zapisane. Spróbuj ponownie; jeśli problem wróci, zgłoś to w zakładce Zgłoszenia.')
             return redirect('uzytkownicy')
         nowy_uzytkownik.utworzyl = request.user
         nowy_uzytkownik.save(update_fields=['utworzyl'])
