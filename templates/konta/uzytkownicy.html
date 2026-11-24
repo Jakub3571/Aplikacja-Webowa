@@ -145,10 +145,10 @@ pracowniczy{% endblock %} {% block panel %}
                                 >
                                 {% if czy_szef %}{% if u.id != request.user.id %}
                                 <a
-                                    class="przycisk-umowa umowa-nie"
+                                    class="ikona-kalendarza"
                                     href="{% url 'przelacz_konto' u.id %}"
                                     title="Dezaktywuj konto (zapyta „czy na pewno”) — trafi do Archiwum"
-                                    >wyłącz</a
+                                    >✖</a
                                 >
                                 {% endif %}{% endif %}
                             </td>
@@ -198,10 +198,10 @@ pracowniczy{% endblock %} {% block panel %}
                                 >
                                 {% endif %} {% if czy_szef %} {% if u.id != request.user.id %}
                                 <a
-                                    class="przycisk-umowa umowa-nie"
+                                    class="ikona-kalendarza"
                                     href="{% url 'przelacz_konto' u.id %}"
                                     title="Dezaktywuj konto (zapyta „czy na pewno”) — trafi do Archiwum"
-                                    >wyłącz</a
+                                    >✖</a
                                 >
                                 {% endif %} {% elif czy_koordynator %}
                                 <span class="podpowiedz">dezaktywacja kont: tylko szef</span>
@@ -324,10 +324,10 @@ pracowniczy{% endblock %} {% block panel %}
                                 >
                                 {% endif %} {% if czy_szef %} {% if u.id != request.user.id %}
                                 <a
-                                    class="przycisk-umowa umowa-nie"
+                                    class="ikona-kalendarza"
                                     href="{% url 'przelacz_konto' u.id %}"
                                     title="Dezaktywuj konto (zapyta „czy na pewno”) — trafi do Archiwum"
-                                    >wyłącz</a
+                                    >✖</a
                                 >
                                 {% endif %} {% elif czy_koordynator %}
                                 <span class="podpowiedz">dezaktywacja kont: tylko szef</span>
