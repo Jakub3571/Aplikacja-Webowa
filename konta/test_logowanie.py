@@ -2767,6 +2767,17 @@ class PlatnosciHistoriaTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn(b'Kasia Nowak', r.content)
 
+    def test_raport_nie_usuwa_lekcji_uczen_zostaje_w_zakladce_lekcje(self):
+        Lekcja.objects.create(uczen=self.uczen, data=timezone.make_aware(datetime(2026, 10, 14, 14)))
+        Lekcja.objects.create(uczen=self.uczen, data=timezone.make_aware(datetime(2026, 10, 21, 14)))
+        przed = Lekcja.objects.filter(uczen=self.uczen).count()
+        self.client.post('/platnosci/', {'wyslij_raport': '1', 'email_raportu': 'biuro@f.pl'})
+        self.assertEqual(Lekcja.objects.filter(uczen=self.uczen).count(), przed)
+        self.assertTrue(Uczen.objects.filter(pk=self.uczen.pk, zakonczona=False).exists())
+        r = self.client.get('/lekcje/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Kasia Nowak')
+
 
 class KontaArchiwumTests(TestCase):
     """Użytkownicy: bez przycisków admin/usuń/zakończ współpracę; X dezaktywuje

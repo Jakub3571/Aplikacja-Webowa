@@ -254,20 +254,12 @@ pracowniczy{% endblock %} {% block panel %}
                                 >
                                 {% endif %} {% if czy_szef %} {% if u.id != request.user.id %}
                                 <a
-                                    class="przycisk-umowa umowa-tak"
-                                    href="{% url 'przelacz_szefa' u.id %}"
-                                    title="Nadaj uprawnienia admina"
-                                    >nadaj admina</a
-                                >
-                                <a
-                                    class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}"
+                                    class="ikona-kalendarza"
                                     href="{% url 'przelacz_konto' u.id %}"
-                                    title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}"
-                                    >{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a
-                                >
-                                <a class="ikona-kalendarza" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">✖</a>
+                                    title="Dezaktywuj konto (zapyta „czy na pewno”) — trafi do Archiwum"
+                                    >✖</a
                                 {% endif %} {% elif czy_koordynator %}
-                                <span class="podpowiedz">nadawanie admina: tylko szef</span>
+                                <span class="podpowiedz">dezaktywacja kont: tylko szef</span>
                                 {% endif %}
                             </td>
                         </tr>
