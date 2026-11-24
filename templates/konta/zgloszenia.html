@@ -4,7 +4,7 @@
 <section class="karta">
    
   <h2>Zgłoszenia (zażalenia / pomysły)</h2>
-  <p class="podpowiedz">Przycisk ✉ w prawym dolnym rogu. „✔ zrealizowane” przenosi do prawej kolumny (widać do końca miesiąca).</p>
+  <p class="podpowiedz">Przycisk ✉ w prawym dolnym rogu. Zgłoszenia zajęć: „🔍 rozpatrz” → zatwierdź (zmiana od razu wchodzi do wszystkich kalendarzy) lub odrzuć. Inne: „✔ zrealizowane” przenosi do prawej kolumny (widać do końca miesiąca).</p>
 </section>
 <div class="zgloszenia-kolumny">
   <section class="karta" style="flex:1">
@@ -13,11 +13,19 @@
     <div style="border-bottom:1px solid #e2e8f0; padding:0.5rem 0;">
       <p style="margin:0 0 0.25rem;"><strong>[{{ z.kategoria }}]</strong> {{ z.tresc }}</p>
       <p class="podpowiedz" style="margin:0 0 0.25rem;">{{ z.autor.get_full_name|default:z.autor.username }} · {{ z.utworzone|date:'d.m.Y H:i' }}{% if z.strona %} · z: {{ z.strona }}{% endif %}</p>
+      {% if z.kategoria == 'zajęcia' and z.dane.akcja %}
+      <a class="przycisk-kalendarz" href="{% url 'rozpatrz_zgloszenie' z.id %}">🔍 rozpatrz (zatwierdź / odrzuć)</a>
+      {% if z.dane.uczen_id %}
+      <a class="przycisk-kalendarz" href="{% url 'edytuj_ucznia' z.dane.uczen_id %}">🔧 rozwiąż sprawę (przepisz ucznia do innego korepetytora)</a>
+      {% elif z.strona %}
+      <a class="przycisk-kalendarz" href="{{ z.strona }}">🔧 rozwiąż sprawę (kalendarz korepetytora)</a>
+      {% endif %}
+      {% else %}
       <form method="post" style="display:inline;">{% csrf_token %}
         <input type="hidden" name="zgloszenie_id" value="{{ z.id }}">
-        
         <button type="submit" name="zrealizuj" value="1" class="przycisk-kalendarz">✔ zrealizowane</button>
       </form>
+      {% endif %}
     </div>
     {% empty %}<p class="podpowiedz">Brak aktywnych zgłoszeń.</p>{% endfor %}
   </section>

@@ -1,4 +1,5 @@
 import calendar
+import json
 import re
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
@@ -841,8 +842,9 @@ def edytuj_ucznia(request, uczen_id):
 
     # --- dodatkowe przedmioty ucznia: usuwanie ---
     if request.method == 'POST' and 'usun_przedmiot' in request.POST:
-        if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
-            raise PermissionDenied
+        # usuwanie przedmiotu = usuwanie zajęć ucznia u korepetytora — TYLKO szef
+        if not czy_szef(request.user):
+            raise PermissionDenied  
         karta_id = request.POST.get('przedmiot_ucznia_id')
         karta = PrzedmiotUcznia.objects.filter(pk=karta_id, uczen=uczen).first()
         if karta:
@@ -856,6 +858,8 @@ def edytuj_ucznia(request, uczen_id):
                         data_od=start.date(),
                         godzina_od=start.time(),
                     ).delete()
+            # lekcje tego przedmiotu usuwamy razem z kartą (FK jest SET_NULL)
+            Lekcja.objects.filter(uczen=uczen, przedmiot_karta=karta).delete()
             karta.delete()
             messages.success(request, f'Usunięto przedmiot {karta} wraz z jego lekcjami.')
         return redirect('edytuj_ucznia', uczen_id=uczen.id)
@@ -912,7 +916,7 @@ def edytuj_ucznia(request, uczen_id):
         'form_przedmiotu': FormularzPrzedmiotuUcznia(prefix='przedmiotdod'),
         'uczen': uczen,
         'przedmioty_ucznia': list(uczen.przedmioty_ucznia.all()),
-        'moze_usuwac': czy_szef(request.user) or uczen.umowil_id == request.user.id,
+        'moze_usuwac': czy_szef(request.user),
     })
 
 
@@ -982,9 +986,10 @@ def archiwum_uczniow(request):
 
 @login_required
 def zakoncz_ucznia(request, uczen_id):
-    """Archiwizuje ucznia: znika z list bieżących, ale zostaje w archiwum (dane i lekcje nietknięte)."""
+    """Archiwizuje ucznia: znika z list bieżących, ale zostaje w archiwum (dane i lekcje nietknięte).
+    TYLKO szef — koordynator i osoba umawiająca mogą tylko edytować, nie kończą współpracy."""
     uczen = get_object_or_404(Uczen, pk=uczen_id)
-    if not czy_szef(request.user) and uczen.umowil_id != request.user.id:
+    if not czy_szef(request.user):
         raise PermissionDenied
     if request.method == 'POST':
         zwolnij_blokady_ucznia(uczen)
@@ -1303,9 +1308,11 @@ def _rozszerz_cyklicznie(nauczyciel, dzien_data, start, koniec, okres=1):
         Dostepnosc.objects.bulk_create(nowe)
     return len(nowe)
 
-def _prosi_o_koordynatora(request, nauczyciel, dzien_data, akcja_txt, lekcje_txt=''):
+def _prosi_o_koordynatora(request, nauczyciel, dzien_data, akcja_txt, lekcje_txt='', dane=None):
     """Korepetytor (nie-szef) próbował ruszyć zajęcia — blokuje akcję (403)
-    i zapisuje zgłoszenie dla koordynatora/szefa w zakładce Zgłoszenia."""
+    i zapisuje zgłoszenie dla koordynatora/szefa w zakładce Zgłoszenia.
+    dane: opcjonalny słownik strukturalny akcji (podaje go kalendarz_dane),
+    żeby koordynator mógł później ZATWIERDZIĆ zgłoszenie automatycznie."""
     kto = (request.user.get_full_name() or request.user.username).strip() or request.user.username
     tresc = (f'{kto} chce: {akcja_txt} — korepetytor {nauczyciel.imie} {nauczyciel.nazwisko}, '
              f'dzień {dzien_data:%d.%m.%Y}.')
@@ -1316,6 +1323,7 @@ def _prosi_o_koordynatora(request, nauczyciel, dzien_data, akcja_txt, lekcje_txt
         kategoria='zajęcia',
         tresc=tresc,
         strona=f'/moj-tydzien/{nauczyciel.id}/?dzien={dzien_data.isoformat()}',
+        dane=dane or {},
     )
     return JsonResponse({
         'blad': ('Nie możesz tego zrobić samodzielnie — w tym terminie są zajęcia. '
@@ -1500,6 +1508,8 @@ def kalendarz_dane(request, nauczyciel_id):
                 request, nauczyciel, dzien_data,
                 f'usunąć zakres {start:%H:%M}–{koniec_zakresu:%H:%M} (tylko ten dzień)',
                 ', '.join(z_lekcjami),
+                dane={'akcja': 'usun_zakres', 'nauczyciel_id': nauczyciel.id,
+            'dzien': dzien_data.isoformat(), 'od': f'{start:%H:%M}', 'do': f'{koniec_zakresu:%H:%M}'},
             )
         usuniete = Dostepnosc.objects.filter(
             nauczyciel=nauczyciel,
@@ -1530,7 +1540,11 @@ def kalendarz_dane(request, nauczyciel_id):
             return _prosi_o_koordynatora(
                 request, nauczyciel, dzien_data,
                 f'usunąć CAŁY cykl {start:%H:%M}–{koniec_zakresu:%H:%M} od {dzien_data:%d.%m.%Y} w przód',
+                                dane={'akcja': 'usun_caly_zakres', 'nauczyciel_id': nauczyciel.id,
+                      'dzien': dzien_data.isoformat(), 'od': f'{start:%H:%M}', 'do': f'{koniec_zakresu:%H:%M}'},
                 ', '.join(z_lekcjami),
+                dane={'akcja': 'usun_caly_zakres', 'nauczyciel_id': nauczyciel.id,
+                      'dzien': dzien_data.isoformat(), 'od': f'{start:%H:%M}', 'do': f'{koniec_zakresu:%H:%M}'}
             )
         usuniete = Dostepnosc.objects.filter(
             nauczyciel=nauczyciel,
@@ -1554,6 +1568,7 @@ def kalendarz_dane(request, nauczyciel_id):
             return _prosi_o_koordynatora(
                 request, nauczyciel, dzien_data,
                 'wyczyścić cały dzień (usunąć wszystkie godziny)',
+                dane={'akcja': 'wyczysc_dzien', 'nauczyciel_id': nauczyciel.id, 'dzien': dzien_data.isoformat()},
                 ', '.join(z_lekcjami),
             )
         usuniete = Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).count()
@@ -1569,6 +1584,9 @@ def kalendarz_dane(request, nauczyciel_id):
             return _prosi_o_koordynatora(
                 request, nauczyciel, timezone.localtime(lekcja.data).date(),
                 f'odwołać zajęcia {timezone.localtime(lekcja.data):%d.%m.%Y %H:%M} (uczeń: {lekcja.uczen})',
+                                dane={'akcja': 'odwolaj_lekcje', 'nauczyciel_id': nauczyciel.id,
+                      'dzien': timezone.localtime(lekcja.data).date().isoformat(),
+                      'lekcja_id': lekcja.id, 'uczen_id': lekcja.uczen_id, 'uczen': str(lekcja.uczen)},
             )
         lekcja.odwolana = (akcja == 'odwolaj_lekcje')
         lekcja.save(update_fields=['odwolana'])
@@ -1585,6 +1603,9 @@ def kalendarz_dane(request, nauczyciel_id):
             return _prosi_o_koordynatora(
                 request, nauczyciel, timezone.localtime(lekcja.data).date(),
                 f'przesunąć zajęcia {timezone.localtime(lekcja.data):%d.%m.%Y %H:%M} (uczeń: {lekcja.uczen}) na inny dzień tego tygodnia',
+                                dane={'akcja': 'przesun_lekcje', 'nauczyciel_id': nauczyciel.id,
+                      'dzien': timezone.localtime(lekcja.data).date().isoformat(),
+                      'lekcja_id': lekcja.id, 'uczen_id': lekcja.uczen_id, 'uczen': str(lekcja.uczen)},
             )
         try:
             nowy_dzien = date.fromisoformat(request.POST.get('nowy_dzien', ''))
@@ -2850,6 +2871,142 @@ def zgloszenia(request):
     return render(request, 'konta/zgloszenia.html', {
         'aktywne': Zgloszenie.objects.filter(zrealizowane=False).select_related('autor'),
         'zrealizowane': Zgloszenie.objects.filter(zrealizowane=True, zrealizowane_kiedy__date__gte=granica).select_related('autor', 'zrealizowane_przez'),
+    })
+
+def _zastosuj_zgloszenie(zg, post=None):
+    """Stosuje do kalendarzy akcję zapisaną w zgłoszeniu kategorii 'zajęcia'
+    (ta sama logika co akcje szefa w kalendarz_dane). Zwraca (ok, komunikat)."""
+    dane = zg.dane or {}
+    akcja = dane.get('akcja')
+    nauczyciel = Nauczyciel.objects.filter(pk=dane.get('nauczyciel_id')).first()
+    if not nauczyciel:
+        return False, 'Brak karty korepetytora powiązanego ze zgłoszeniem.'
+    nazwa_n = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
+    try:
+        dzien_data = date.fromisoformat(dane.get('dzien', ''))
+    except ValueError:
+        return False, 'Nieprawidłowa data w zgłoszeniu.'
+    if akcja == 'odwolaj_lekcje':
+        lekcja = Lekcja.objects.filter(pk=dane.get('lekcja_id')).first()
+        if not lekcja or not lekcja_jest_u_nauczyciela(lekcja, nazwa_n):
+            return False, 'Nie znaleziono lekcji do odwołania.'
+        lekcja.odwolana = True
+        lekcja.save(update_fields=['odwolana'])
+        return True, (f'Odwołano zajęcia {timezone.localtime(lekcja.data):%d.%m.%Y %H:%M} '
+                      f'(uczeń: {lekcja.uczen}) — widoczne we wszystkich kalendarzach.')
+    if akcja == 'przesun_lekcje':
+        lekcja = Lekcja.objects.filter(pk=dane.get('lekcja_id')).first()
+        if not lekcja or not lekcja_jest_u_nauczyciela(lekcja, nazwa_n):
+            return False, 'Nie znaleziono lekcji do przesunięcia.'
+        post = post or {}
+        try:
+            nowy_dzien = date.fromisoformat(post.get('nowy_dzien', ''))
+            nowa_godzina = datetime.strptime(post.get('nowa_godzina', ''), '%H:%M').time()
+        except ValueError:
+            return False, 'Wybierz nowy dzień i godzinę.'
+        stara = timezone.localtime(lekcja.data)
+        pon = stara.date() - timedelta(days=stara.date().weekday())
+        if not (pon <= nowy_dzien <= pon + timedelta(days=6)):
+            return False, 'Nowy termin musi być w tym samym tygodniu co lekcja.'
+        if nowy_dzien == stara.date() and nowa_godzina == stara.time():
+            return False, 'To już jest ten termin.'
+        if nowa_godzina.strftime('%H:%M') not in wolne_godziny_nauczyciela(nauczyciel, nowy_dzien, pomijaj_uczen_id=lekcja.uczen_id):
+            return False, f'Korepetytor nie ma wolnej godziny {nowy_dzien:%d.%m} o {nowa_godzina:%H:%M}.'
+        lekcja.data = timezone.make_aware(datetime.combine(nowy_dzien, nowa_godzina))
+        lekcja.save(update_fields=['data'])
+        return True, (f'Przesunięto zajęcia: {stara:%d.%m.%Y %H:%M} → {nowy_dzien:%d.%m.%Y} {nowa_godzina:%H:%M} '
+                      '— weszło do wszystkich kalendarzy.')
+    if akcja in ('usun_zakres', 'usun_caly_zakres', 'wyczysc_dzien'):
+        try:
+            start = datetime.strptime(dane.get('od') or '00:00', '%H:%M').time()
+            koniec = datetime.strptime(dane.get('do') or '23:59', '%H:%M').time()
+        except ValueError:
+            return False, 'Nieprawidłowy zakres godzin w zgłoszeniu.'
+        q = Lekcja.objects.filter(odwolana=False)
+        if akcja == 'usun_caly_zakres':
+            q = q.filter(data__date__gte=dzien_data)
+        else:
+            q = q.filter(data__date=dzien_data)
+        lekcje = [
+            l for l in q.select_related('uczen', 'przedmiot_karta')
+            if lekcja_jest_u_nauczyciela(l, nazwa_n)
+            and (akcja == 'wyczysc_dzien' or start <= timezone.localtime(l.data).time() < koniec)
+        ]
+        # zajęcia w zakresie odwołujemy, żeby zniknęły ze wszystkich kalendarzy
+        for l in lekcje:
+            l.odwolana = True
+            l.save(update_fields=['odwolana'])
+        dostep_q = Dostepnosc.objects.filter(nauczyciel=nauczyciel)
+        if akcja == 'usun_caly_zakres':
+            dostep_q = dostep_q.filter(data_od__gte=dzien_data, godzina_od__gte=start, godzina_do__lte=koniec)
+        elif akcja == 'usun_zakres':
+            dostep_q = dostep_q.filter(data_od=dzien_data, godzina_od__gte=start, godzina_do__lte=koniec)
+        else:
+            dostep_q = dostep_q.filter(data_od=dzien_data)
+        usuniete = dostep_q.delete()[0]
+        teksty = {
+            'usun_zakres': f'usunięto zakres {start:%H:%M}–{koniec:%H:%M} tylko dnia {dzien_data:%d.%m.%Y}',
+            'usun_caly_zakres': f'usunięto CAŁY zakres {start:%H:%M}–{koniec:%H:%M} od {dzien_data:%d.%m.%Y} w przód',
+            'wyczysc_dzien': f'wyczyszczono cały dzień {dzien_data:%d.%m.%Y}',
+        }
+        return True, (f'{teksty[akcja]} ({usuniete} terminów); odwołano {len(lekcje)} zajęć w tym zakresie '
+                      '— weszło do wszystkich kalendarzy.')
+    return False, f'Nieznana akcja zgłoszenia: {akcja}'
+
+
+@login_required
+def rozpatrz_zgloszenie(request, zgloszenie_id):
+    """Rozpatrywanie zgłoszenia kategorii 'zajęcia' — TYLKO szef/koordynator.
+    GET: szczegóły zgłoszenia + formularz (dla przesunięcia: wybór nowego dnia/godziny).
+    POST 'zatwierdz': stosuje akcję do wszystkich kalendarzy i zamyka zgłoszenie.
+    POST 'odrzuc': zamyka zgłoszenie bez wprowadzania zmian."""
+    if not (czy_szef(request.user) or czy_koordynator(request.user)):
+        raise PermissionDenied
+    zg = get_object_or_404(Zgloszenie.objects.select_related('autor'), pk=zgloszenie_id)
+    dane = zg.dane or {}
+    nauczyciel = Nauczyciel.objects.filter(pk=dane.get('nauczyciel_id')).first()
+    lekcja = None
+    if dane.get('lekcja_id'):
+        lekcja = Lekcja.objects.filter(pk=dane['lekcja_id']).select_related('uczen', 'przedmiot_karta').first()
+    dni_tygodnia = []
+    wolne_per_dzien = {}
+    if lekcja and nauczyciel and dane.get('akcja') == 'przesun_lekcje':
+        stara = timezone.localtime(lekcja.data)
+        pon = stara.date() - timedelta(days=stara.date().weekday())
+        for i in range(7):
+            d = pon + timedelta(days=i)
+            dni_tygodnia.append(d)
+            wolne_per_dzien[d.isoformat()] = wolne_godziny_nauczyciela(nauczyciel, d, pomijaj_uczen_id=lekcja.uczen_id)
+    if request.method == 'POST' and not zg.zrealizowane:
+        if 'zatwierdz' in request.POST:
+            ok, komunikat = _zastosuj_zgloszenie(zg, request.POST)
+            if not ok:
+                messages.error(request, komunikat)
+                return redirect('rozpatrz_zgloszenie', zgloszenie_id=zg.id)
+            zg.zrealizowane = True
+            zg.zrealizowane_kiedy = timezone.now()
+            zg.zrealizowane_przez = request.user
+            zg.save(update_fields=['zrealizowane', 'zrealizowane_kiedy', 'zrealizowane_przez'])
+            messages.success(request, f'Zatwierdzono zgłoszenie. {komunikat}')
+            return redirect('zgloszenia')
+        if 'odrzuc' in request.POST:
+            kto = request.user.get_full_name() or request.user.username
+            zg.tresc += f' [ODRZUCONE {timezone.now():%d.%m.%Y %H:%M} przez {kto}]'
+            zg.zrealizowane = True
+            zg.zrealizowane_kiedy = timezone.now()
+            zg.zrealizowane_przez = request.user
+            zg.save(update_fields=['tresc', 'zrealizowane', 'zrealizowane_kiedy', 'zrealizowane_przez'])
+            messages.info(request, 'Zgłoszenie odrzucone — zmiany NIE weszły do kalendarzy.')
+            return redirect('zgloszenia')
+        return redirect('rozpatrz_zgloszenie', zgloszenie_id=zg.id)
+    return render(request, 'konta/rozpatrz_zgloszenia.html', {
+        'zg': zg,
+        'dane': dane,
+        'nauczyciel': nauczyciel,
+        'lekcja': lekcja,
+        'dni_tygodnia': dni_tygodnia,
+        'wolne_json': json.dumps(wolne_per_dzien),
+        'czy_szef': czy_szef(request.user),
     })
 
 @login_required

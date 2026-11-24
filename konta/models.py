@@ -57,6 +57,12 @@ class Zgloszenie(models.Model):
     zrealizowane = models.BooleanField('zrealizowane', default=False)
     zrealizowane_kiedy = models.DateTimeField('zrealizowane kiedy', null=True, blank=True)
     zrealizowane_przez = models.ForeignKey(Pracownik, on_delete=models.SET_NULL, null=True, blank=True, related_name='zrealizowane_zgloszenia', verbose_name='zrealizowane przez')
+    # dane strukturalne akcji (dla zgłoszeń kategorii 'zajęcia') — pozwalają
+    # koordynatorowi/szefowi ZATWIERDZIĆ zgłoszenie automatycznie (weszło do kalendarzy):
+    # {'akcja': 'odwolaj_lekcje'|'przesun_lekcje'|'usun_zakres'|'usun_caly_zakres'|'wyczysc_dzien',
+    #  'nauczyciel_id': ..., 'dzien': 'YYYY-MM-DD', 'od': 'HH:MM', 'do': 'HH:MM',
+    #  'lekcja_id': ..., 'uczen_id': ..., 'uczen': '...'}
+    dane = models.JSONField('dane akcji', default=dict, blank=True)
 
     class Meta:
         verbose_name = 'zgłoszenie'
