@@ -57,7 +57,7 @@ class ApiContactTests(TestCase):
         self.assertEqual(len(mail.outbox), 5)
         r = self.client.post(
             '/api/contact',
-            data=json.dumps({'name': 'Inny', 'phone': '600111222'}),
+            data=json.dumps({'name': 'Inny Nowak', 'phone': '600111222'}),
             content_type='application/json',
             REMOTE_ADDR='10.9.8.7',
         )
@@ -74,10 +74,27 @@ class ApiContactTests(TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_walidacja_pol(self):
-        self.assertEqual(self._post(name='A').status_code, 400)          # za krótkie imię
+        self.assertEqual(self._post(name='A').status_code, 400)          # za krótkie imię  
+        self.assertEqual(self._post(name='Solo').status_code, 400)       # tylko jedno słowo
+        self.assertEqual(self._post(name='A B').status_code, 400)        # słowa < 2 litery
         self.assertEqual(self._post(phone='abc!!!').status_code, 400)     # zły telefon
         self.assertEqual(self._post(email='nie-email').status_code, 400)  # zły e-mail
         self.assertEqual(len(mail.outbox), 0)
+
+    def test_jedno_slowo_dostaje_komunikat_o_imie_i_nazwisko(self):
+        r = self._post(name='Solo')
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json()['error'], 'Podaj imię i nazwisko.')
+        self.assertEqual(len(mail.outbox), 0)
+        # dwa słowa po min. 2 litery przechodzą
+        r = self._post(name='Al Bo')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {'ok': True})
+
+    def test_w_mailu_pole_nazywa_sie_imie_i_nazwisko(self):
+        self._post()
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Imię i nazwisko: Anna Kowal', mail.outbox[0].body)
 
     def test_get_odrzucony(self):
         r = self.client.get('/api/contact')

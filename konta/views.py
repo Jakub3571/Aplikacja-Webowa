@@ -2688,8 +2688,10 @@ def api_contact(request):
     goal = _pole('goal', 500)
     phone = _pole('phone', 20)
     email = _pole('email', 254)
-    if len(name) < 2:
-        return _JsonResponse({'ok': False, 'error': 'Podaj imię (min. 2 znaki).'}, status=400)
+    slowa_imienia = name.split()
+    litery_slowa = [len(re.sub(r'[^A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ]', '', s)) for s in slowa_imienia]
+    if len(slowa_imienia) < 2 or any(l < 2 for l in litery_slowa):
+        return _JsonResponse({'ok': False, 'error': 'Podaj imię i nazwisko.'}, status=400)
     if phone and not re.fullmatch(r'[0-9+\- ]{5,20}', phone):
         return _JsonResponse({'ok': False, 'error': 'Nieprawidłowy numer telefonu.'}, status=400)
     if email:
@@ -2699,7 +2701,7 @@ def api_contact(request):
         except Exception:
             return _JsonResponse({'ok': False, 'error': 'Nieprawidłowy adres e-mail.'}, status=400)
     tresc = (
-        f"Imię: {name}\n"
+        f"Imię i nazwisko: {name}\n"
         f"Przedmiot: {subject}\n"
         f"Poziom/klasa: {level}\n"
         f"Cel nauki: {goal}\n"
@@ -2740,18 +2742,22 @@ STRONY_CMS = [
     ('matematyka', 'Przedmiot: Matematyka'), ('angielski', 'Przedmiot: Angielski'),
     ('hiszpanski', 'Przedmiot: Hiszpański'), ('biologia', 'Przedmiot: Biologia'),
     ('chemia', 'Przedmiot: Chemia'), ('fizyka', 'Przedmiot: Fizyka'),
-    ('polski', 'Przedmiot: Polski'), ('geografia', 'Przedmiot: Geografia'),
+    ('polski', 'Przedmiot: Polski'), ('geografia', 'Przedmiot: Geography'),
+    ('niemiecki', 'Przedmiot: Język niemiecki'), ('informatyka', 'Przedmiot: Informatyka'),
+    ('filozofia', 'Przedmiot: Filozofia'),
 ]
 
 
 def _domyslny_content():
     return {
         'copy': {'home-headline': '', 'home-intro': ''},
-        'stats': {'tutors': 40, 'students': 500, 'retention': 93},
+        'stats': {'tutors': 50, 'students': 550, 'retention': 93},
         'images': {},
         'prices': {
-            'matematyka': [90, 110, 170], 'angielski': [90, 110], 'hiszpanski': [90],
-            'biologia': [90], 'chemia': [90], 'fizyka': [90], 'polski': [90, 110], 'geografia': [90, 110],
+            'matematyka': [90, 120, 170], 'angielski': [90, 120, 170, 200], 'hiszpanski': [90, 120],
+            'biologia': [90, 120], 'chemia': [90, 120], 'fizyka': [90], 'polski': [90, 120, 170],
+            'geografia': [90, 120], 'niemiecki': [90, 120], 'informatyka': [90, 120],
+            'filozofia': [90, 120, 170],
         },
         'subjects': [], 'pages': [], 'reviews': [],
     }
