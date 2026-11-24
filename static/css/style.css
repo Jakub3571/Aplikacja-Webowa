@@ -677,3 +677,12 @@ input[type="radio"], input[type="checkbox"] {
 .lekcja-przywroc { color: #2e9e5b; font-weight: 700; }
 .pigulka-odwolana { opacity: .55; text-decoration: line-through; }
 #przesun-okienko { margin-top: .75rem; }
+
+/* Legenda kolorów poziomów — TYLKO zakładka Uczniowie (kalendarz dostępności) */
+.przedmiot-poziom { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .72rem; font-weight: 700; margin: 0 1px; white-space: nowrap; }
+.poziom-podstawowka { background: #dcfce7; color: #166534; }
+.poziom-srednia-podstawa { background: #dbeafe; color: #1d4ed8; }
+.poziom-srednia-rozszerzenie { background: #ffedd5; color: #c2410c; }
+.poziom-studia { background: #fee2e2; color: #b91c1c; }
+.poziom-inne { background: #e5e7eb; color: #374151; }
+.legenda-poziomow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ramka); font-size: .8rem; }

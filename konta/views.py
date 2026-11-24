@@ -54,6 +54,19 @@ DNI_TYGODNIA = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd']
 
 GODZINA_LEKCJI = 60
 
+# Kolory poziomów w zakładce Uczniowie (kalendarz dostępności) — tylko tu, nie globalnie
+MAPA_KLAS_POZIOMOW = {
+    'podstawowka': 'poziom-podstawowka',          # zielony
+    'srednia podstawa': 'poziom-srednia-podstawa',  # niebieski
+    'srednia rozszerzenie': 'poziom-srednia-rozszerzenie',  # pomarańczowy
+    'studia': 'poziom-studia',                      # czerwony
+}
+
+
+def _klasa_poziomu(poziom):
+    """Klasa CSS koloru dla danego poziomu nauczania (zakładka Uczniowie)."""
+    return MAPA_KLAS_POZIOMOW.get((poziom or '').strip().lower(), 'poziom-inne')
+
 MAX_PROB_LOGOWANIA = 5
 
 
@@ -462,9 +475,12 @@ def dostepnosci_tygodnia(dni):
         .prefetch_related('przedmioty')
         .order_by('nazwisko', 'imie')
     )
-    # przedmioty nauczyciela (same nazwy, bez poziomów) — raz na nauczyciela, bez N+1
+    # przedmioty nauczyciela z klasą koloru poziomu (legenda w zakładce Uczniowie) — raz na nauczyciela, bez N+1
     przedmioty_na_nauczyciela = {
-        n.id: ', '.join(sorted({p.przedmiot for p in n.przedmioty.all()}))
+        n.id: [
+            {'przedmiot': p.przedmiot, 'klasa': _klasa_poziomu(p.poziom)}
+            for p in sorted(n.przedmioty.all(), key=lambda p: p.przedmiot)
+        ]
         for n in nauczyciele
     }
     terminy = (
@@ -1509,7 +1525,7 @@ def kalendarz_dane(request, nauczyciel_id):
                 f'usunąć zakres {start:%H:%M}–{koniec_zakresu:%H:%M} (tylko ten dzień)',
                 ', '.join(z_lekcjami),
                 dane={'akcja': 'usun_zakres', 'nauczyciel_id': nauczyciel.id,
-            'dzien': dzien_data.isoformat(), 'od': f'{start:%H:%M}', 'do': f'{koniec_zakresu:%H:%M}'},
+                      'dzien': dzien_data.isoformat(), 'od': f'{start:%H:%M}', 'do': f'{koniec_zakresu:%H:%M}'},
             )
         usuniete = Dostepnosc.objects.filter(
             nauczyciel=nauczyciel,
@@ -1540,11 +1556,9 @@ def kalendarz_dane(request, nauczyciel_id):
             return _prosi_o_koordynatora(
                 request, nauczyciel, dzien_data,
                 f'usunąć CAŁY cykl {start:%H:%M}–{koniec_zakresu:%H:%M} od {dzien_data:%d.%m.%Y} w przód',
-                                dane={'akcja': 'usun_caly_zakres', 'nauczyciel_id': nauczyciel.id,
-                      'dzien': dzien_data.isoformat(), 'od': f'{start:%H:%M}', 'do': f'{koniec_zakresu:%H:%M}'},
                 ', '.join(z_lekcjami),
                 dane={'akcja': 'usun_caly_zakres', 'nauczyciel_id': nauczyciel.id,
-                      'dzien': dzien_data.isoformat(), 'od': f'{start:%H:%M}', 'do': f'{koniec_zakresu:%H:%M}'}
+                      'dzien': dzien_data.isoformat(), 'od': f'{start:%H:%M}', 'do': f'{koniec_zakresu:%H:%M}'},
             )
         usuniete = Dostepnosc.objects.filter(
             nauczyciel=nauczyciel,
@@ -1568,8 +1582,8 @@ def kalendarz_dane(request, nauczyciel_id):
             return _prosi_o_koordynatora(
                 request, nauczyciel, dzien_data,
                 'wyczyścić cały dzień (usunąć wszystkie godziny)',
-                dane={'akcja': 'wyczysc_dzien', 'nauczyciel_id': nauczyciel.id, 'dzien': dzien_data.isoformat()},
                 ', '.join(z_lekcjami),
+                dane={'akcja': 'wyczysc_dzien', 'nauczyciel_id': nauczyciel.id, 'dzien': dzien_data.isoformat()},
             )
         usuniete = Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).count()
         Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien_data).delete()
@@ -1584,7 +1598,7 @@ def kalendarz_dane(request, nauczyciel_id):
             return _prosi_o_koordynatora(
                 request, nauczyciel, timezone.localtime(lekcja.data).date(),
                 f'odwołać zajęcia {timezone.localtime(lekcja.data):%d.%m.%Y %H:%M} (uczeń: {lekcja.uczen})',
-                                dane={'akcja': 'odwolaj_lekcje', 'nauczyciel_id': nauczyciel.id,
+                dane={'akcja': 'odwolaj_lekcje', 'nauczyciel_id': nauczyciel.id,
                       'dzien': timezone.localtime(lekcja.data).date().isoformat(),
                       'lekcja_id': lekcja.id, 'uczen_id': lekcja.uczen_id, 'uczen': str(lekcja.uczen)},
             )
@@ -1603,7 +1617,7 @@ def kalendarz_dane(request, nauczyciel_id):
             return _prosi_o_koordynatora(
                 request, nauczyciel, timezone.localtime(lekcja.data).date(),
                 f'przesunąć zajęcia {timezone.localtime(lekcja.data):%d.%m.%Y %H:%M} (uczeń: {lekcja.uczen}) na inny dzień tego tygodnia',
-                                dane={'akcja': 'przesun_lekcje', 'nauczyciel_id': nauczyciel.id,
+                dane={'akcja': 'przesun_lekcje', 'nauczyciel_id': nauczyciel.id,
                       'dzien': timezone.localtime(lekcja.data).date().isoformat(),
                       'lekcja_id': lekcja.id, 'uczen_id': lekcja.uczen_id, 'uczen': str(lekcja.uczen)},
             )

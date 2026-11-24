@@ -447,7 +447,9 @@ class NauczycieleTests(TestCase):
         )
         r = self.client.get('/uczniowie/', {'rok': 2026, 'miesiac': 10, 'dzien': 5})
         self.assertContains(r, 'Jan Kowalski')
-        self.assertContains(r, '(angielski, matematyka)')
+        # przedmioty sa teraz kolorowane wg poziomu (span.przedmiot-poziom)
+        self.assertContains(r, 'przedmiot-poziom poziom-podstawowka">angielski')
+        self.assertContains(r, '>matematyka</span>')
         self.assertContains(r, 'nauczyciel-grupa') # nazwisko + przedmioty w jednej grupie z lewej
 
 class PlatnosciTests(TestCase):
@@ -2695,3 +2697,31 @@ class RozpatrzZgloszeniaTests(TestCase):
         r = self.client.get('/zgloszenia/')
         self.assertContains(r, 'rozpatrz')
         self.assertContains(r, 'rozwiąż sprawę')
+
+
+class LegendaPoziomowUczniowieTests(TestCase):
+    """Zakładka Uczniowie: kalendarz dostępności pokazuje przedmioty korepetytora
+    w kolorze poziomu + legenda kolorów na samym dole panelu."""
+
+    def setUp(self):
+        self.szef = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.nauczyciel = Nauczyciel.objects.create(imie='Anna', nazwisko='Kowalska', email='anna@k.pl', aktywny=True)
+        PrzedmiotNauczyciela.objects.create(nauczyciel=self.nauczyciel, przedmiot='matematyka', poziom='podstawowka', stawka=100)
+        PrzedmiotNauczyciela.objects.create(nauczyciel=self.nauczyciel, przedmiot='fizyka', poziom='studia', stawka=150)
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel, data_od=date.today(), data_do=date.today(),
+            godzina_od=time(14, 0), godzina_do=time(16, 0),
+        )
+
+    def test_strona_uczniowie_ma_legende_i_kolory_poziomow(self):
+        self.client.force_login(self.szef)
+        r = self.client.get('/uczniowie/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'legenda-poziomow')
+        self.assertContains(r, 'poziom-podstawowka')
+        self.assertContains(r, 'poziom-srednia-podstawa')
+        self.assertContains(r, 'poziom-srednia-rozszerzenie')
+        self.assertContains(r, 'poziom-studia')
+        # przedmioty nauczyciela pokolorowane wg poziomu, jaki uczy
+        self.assertContains(r, 'przedmiot-poziom poziom-podstawowka">matematyka')
+        self.assertContains(r, 'przedmiot-poziom poziom-studia">fizyka')
