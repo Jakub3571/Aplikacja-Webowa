@@ -146,17 +146,10 @@ pracowniczy{% endblock %} {% block panel %}
                                 {% if czy_szef %}{% if u.id != request.user.id %}
                                 <a
                                     class="przycisk-umowa umowa-nie"
-                                    href="{% url 'przelacz_szefa' u.id %}"
-                                    title="Odbierz uprawnienia admina"
-                                    >odebrać admina</a
-                                >
-                                <a
-                                    class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}"
                                     href="{% url 'przelacz_konto' u.id %}"
-                                    title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}"
-                                    >{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a
+                                    title="Dezaktywuj konto (zapyta „czy na pewno”) — trafi do Archiwum"
+                                    >wyłącz</a
                                 >
-                                <a class="ikona-usun" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">✖</a>
                                 {% endif %}{% endif %}
                             </td>
                         </tr>
@@ -205,20 +198,13 @@ pracowniczy{% endblock %} {% block panel %}
                                 >
                                 {% endif %} {% if czy_szef %} {% if u.id != request.user.id %}
                                 <a
-                                    class="przycisk-umowa umowa-tak"
-                                    href="{% url 'przelacz_szefa' u.id %}"
-                                    title="Nadaj uprawnienia admina"
-                                    >nadaj admina</a
-                                >
-                                <a
-                                    class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}"
+                                    class="przycisk-umowa umowa-nie"
                                     href="{% url 'przelacz_konto' u.id %}"
-                                    title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}"
-                                    >{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a
+                                    title="Dezaktywuj konto (zapyta „czy na pewno”) — trafi do Archiwum"
+                                    >wyłącz</a
                                 >
-                                <a class="ikona-kalendarza" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">✖</a>
                                 {% endif %} {% elif czy_koordynator %}
-                                <span class="podpowiedz">nadawanie admina: tylko szef</span>
+                                <span class="podpowiedz">dezaktywacja kont: tylko szef</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -345,23 +331,14 @@ pracowniczy{% endblock %} {% block panel %}
                                     >✏️</a
                                 >
                                 {% endif %} {% if czy_szef %} {% if u.id != request.user.id %}
-                                {% if u.nauczyciel_id %}
                                 <a
-                                    class="przycisk-umowa {% if u.nauczyciel.aktywny %}umowa-nie{% else %}umowa-tak{% endif %}"
-                                    href="{% if u.nauczyciel.aktywny %}{% url 'zakoncz_wspolprace' u.nauczyciel_id %}{% else %}{% url 'przywroc_wspolprace' u.nauczyciel_id %}{% endif %}"
-                                    title="{% if u.nauczyciel.aktywny %}Zakończ współpracę z korepetytorem{% else %}Przywróć współpracę{% endif %}"
-                                    >{% if u.nauczyciel.aktywny %}zakończ współpracę{% else %}przywróć{% endif %}</a
-                                >
-                                {% endif %}
-                                <a
-                                    class="przycisk-umowa {% if u.is_active %}umowa-nie{% else %}umowa-tak{% endif %}"
+                                    class="przycisk-umowa umowa-nie"
                                     href="{% url 'przelacz_konto' u.id %}"
-                                    title="{% if u.is_active %}Wyłącz konto{% else %}Włącz konto{% endif %}"
-                                    >{% if u.is_active %}wyłącz{% else %}włącz{% endif %}</a
+                                    title="Dezaktywuj konto (zapyta „czy na pewno”) — trafi do Archiwum"
+                                    >wyłącz</a
                                 >
-                                <a class="ikona-kalendarza" href="{% url 'usun_konto' u.id %}" title="Usuń konto na stałe">✖</a>
                                 {% endif %} {% elif czy_koordynator %}
-                                <span class="podpowiedz">nadawanie admina: tylko szef</span>
+                                <span class="podpowiedz">dezaktywacja kont: tylko szef</span>
                                 {% endif %}
                             </td>
                         </tr>

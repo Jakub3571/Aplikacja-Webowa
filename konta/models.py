@@ -100,6 +100,9 @@ class Uczen(models.Model):
     )
     link_meet = models.CharField('stały link Google Meet', max_length=200, blank=True)
     zaplacone = models.BooleanField('zapłacone', default=False)
+    # ustawiane, gdy uczeń trafia do wysłanego/pobranego raportu płatności —
+    # wtedy znika z kafelka „Zapłacone”, NIE wraca do nieopłaconych, tylko do historii
+    rozliczono_kiedy = models.DateTimeField('rozliczono w raporcie', null=True, blank=True)
     zakonczona = models.BooleanField('współpraca zakończona (archiwum)', default=False)
     dodano = models.DateTimeField('data dodania', auto_now_add=True)
 

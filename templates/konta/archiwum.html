@@ -185,21 +185,12 @@
 								title="Edytuj dane konta"
 								>✏️</a
 							>
-							{% if u.is_active %}
-							<a
-								class="przycisk-umowa umowa-nie"
-								href="{% url 'przelacz_konto' u.id %}"
-								title="Wyłącz konto (nie będzie się mogło logować)"
-								>wyłącz</a
-							>
-							{% else %}
-							<a
-								class="przycisk-umowa umowa-tak"
-								href="{% url 'przelacz_konto' u.id %}"
-								title="Włącz konto"
-								>włącz</a
-							>
-							{% endif %}
+                                {% if not u.is_active %}<a
+                                    class="przycisk-umowa umowa-tak"
+                                    href="{% url 'przywroc_konto' u.id %}"
+                                    title="Przywróć konto do zakładki Użytkownicy (możliwość logowania wraca)"
+                                    >przywróć konto</a
+                                >{% endif %}
 						</td>
 					</tr>
 					{% endfor %}
@@ -230,6 +221,7 @@
             <th>Użytkownik</th>
             <th>Imię i nazwisko</th>
             <th>Email</th>
+            <th>Akcje</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -239,6 +231,10 @@
             <td>{{ u.username }}</td>
             <td>{{ u.first_name }} {{ u.last_name }}</td>
             <td>{{ u.email }}</td>
+            <td>
+              <a class="przycisk-umowa umowa-tak" href="{% url 'przywroc_konto' u.id %}"
+                 title="Przywróć konto do zakładki Użytkownicy">przywróć konto</a>
+            </td>
             <td>
               {% if u.is_active %}
                 <span class="umowa-tak">✔ aktywne</span>

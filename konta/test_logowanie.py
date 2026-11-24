@@ -2725,3 +2725,96 @@ class LegendaPoziomowUczniowieTests(TestCase):
         # przedmioty nauczyciela pokolorowane wg poziomu, jaki uczy
         self.assertContains(r, 'przedmiot-poziom poziom-podstawowka">matematyka')
         self.assertContains(r, 'przedmiot-poziom poziom-studia">fizyka')
+
+
+class PlatnosciHistoriaTests(TestCase):
+    """Raport płatności (mail lub plik): opłacone pozycje trafiają do HISTORII,
+    a nie wracają do tabeli nieopłaconych."""
+
+    def setUp(self):
+        self.szef = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 14, 14)),
+            przedmiot='matematyka', poziom='podstawa', szkola='SP 1',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600', email_glowny='e@f.pl', telefon_dodatkowy='',
+            korepetytor='Anna Kowalska', kto_umowil='szef', umowil=self.szef,
+            zaplacone=True,
+        )
+        self.client.force_login(self.szef)
+
+    def test_wyslij_raport_mailowy_idzie_do_historii_nie_do_nieoplaconych(self):
+        r = self.client.post('/platnosci/', {'wyslij_raport': '1', 'email_raportu': 'biuro@f.pl'}, follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.uczen.refresh_from_db()
+        self.assertFalse(self.uczen.zaplacone)
+        self.assertIsNotNone(self.uczen.rozliczono_kiedy)
+        self.assertEqual(RaportPlatnosci.objects.count(), 1)
+        r = self.client.get('/platnosci/')
+        self.assertContains(r, 'Historia płatności')
+        self.assertContains(r, 'Kasia Nowak')
+
+    def test_pobranie_raportu_pliku_tez_idzie_do_historii(self):
+        r = self.client.get('/raport-platnosci/')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('raport_platnosci.txt', r['Content-Disposition'])
+        self.uczen.refresh_from_db()
+        self.assertFalse(self.uczen.zaplacone)
+        self.assertIsNotNone(self.uczen.rozliczono_kiedy)
+        self.assertEqual(RaportPlatnosci.objects.count(), 1)
+        rid = RaportPlatnosci.objects.first().id
+        r = self.client.get(f'/raport-platnosci/{rid}/')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'Kasia Nowak', r.content)
+
+
+class KontaArchiwumTests(TestCase):
+    """Użytkownicy: bez przycisków admin/usuń/zakończ współpracę; X dezaktywuje
+    z potwierdzeniem i konto ląduje w Archiwum (bez logowania); przywrócenie
+    z Archiwum wraca do Użytkowników i logowanie działa."""
+
+    def setUp(self):
+        self.szef = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.prac = Pracownik.objects.create_user('prac', 'p@f.pl', 'Sup3rHaslo!')
+        self.client.force_login(self.szef)
+
+    def test_uzytkownicy_bez_niebezpiecznych_przyciskow(self):
+        r = self.client.get('/uzytkownicy/')
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, 'przelacz_szefa')
+        self.assertNotContains(r, 'usun_konto')
+        self.assertNotContains(r, 'zakoncz_wspolprace')
+        self.assertNotContains(r, 'nadaj admina')
+        self.assertNotContains(r, 'odebrać admina')
+        self.assertContains(r, f'/uzytkownicy/{self.prac.id}/konto/')
+
+    def test_dezaktywacja_z_potwierdzeniem_i_bez_logowania(self):
+        r = self.client.get(f'/uzytkownicy/{self.prac.id}/konto/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Czy na pewno chcesz dezaktywować konto?')
+        r = self.client.post(f'/uzytkownicy/{self.prac.id}/konto/', follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.prac.refresh_from_db()
+        self.assertFalse(self.prac.is_active)
+        r = self.client.get('/uzytkownicy/')
+        self.assertNotContains(r, 'p@f.pl')
+        r = self.client.get('/archiwum/')
+        self.assertContains(r, 'prac')
+        self.assertContains(r, 'przywróć konto')
+        self.client.logout()
+        self.assertFalse(self.client.login(username='prac', password='Sup3rHaslo!'))
+
+    def test_przywrocenie_z_archiwum_wraca_do_uzytkownikow_i_logowanie_dziala(self):
+        self.client.post(f'/uzytkownicy/{self.prac.id}/konto/')
+        self.prac.refresh_from_db()
+        self.assertFalse(self.prac.is_active)
+        r = self.client.get(f'/uzytkownicy/{self.prac.id}/przywroc/', follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.prac.refresh_from_db()
+        self.assertTrue(self.prac.is_active)
+        r = self.client.get('/uzytkownicy/')
+        self.assertContains(r, 'p@f.pl')
+        r = self.client.get('/archiwum/')
+        self.assertNotContains(r, '>prac</td>')
+        self.client.logout()
+        self.assertTrue(self.client.login(username='prac', password='Sup3rHaslo!'))

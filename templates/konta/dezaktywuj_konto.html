@@ -1,0 +1,21 @@
+{% extends 'konta/panel.html' %}
+
+{% block tytul %}Dezaktywuj konto — {{ uzytkownik.username }}{% endblock %}
+
+{% block panel %}
+<section class="karta">
+  <h2>⚠️ Czy na pewno chcesz dezaktywować konto?</h2>
+  <p>Konto: <strong>{{ uzytkownik.username }}</strong> ({{ uzytkownik.get_full_name|default:"—" }}, {{ uzytkownik.email|default:"bez e-maila" }})</p>
+  <p class="podpowiedz">
+    Po dezaktywacji konto <strong>nie będzie mogło się zalogować</strong> i zniknie z zakładki
+    Użytkownicy — trafi do <strong>Archiwum</strong>. Wszystkie dane i uprawnienia zostają w bazie.
+    Z poziomu Archiwum możesz je przywrócić — wtedy konto wraca do Użytkowników
+    i wszystkie funkcje (także admin) działają tak jak wcześniej.
+  </p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="przycisk-usun">Tak, dezaktywuj konto</button>
+    <a href="{% url 'uzytkownicy' %}" class="powrot">← Anuluj</a>
+  </form>
+</section>
+{% endblock %}

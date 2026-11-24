@@ -1157,18 +1157,39 @@ def edytuj_uzytkownika(request, user_id):
 @login_required
 @tylko_szef
 def przelacz_konto(request, user_id):
-    """Włącza/wyłącza konto: wyłączone konto nie może się logować (dane zostają w bazie)."""
+    """Dezaktywacja konta z potwierdzeniem: GET pokazuje „czy na pewno?”,
+    POST wyłącza konto (is_active=False) — trafia do Archiwum, nie można się logować.
+    Włączenie z powrotem tylko z Archiwum (przywroc_konto)."""
     uzytkownik = get_object_or_404(Pracownik, pk=user_id)
     if uzytkownik.id == request.user.id:
         messages.error(request, 'Nie możesz wyłączyć konta samemu sobie.')
         return redirect('uzytkownicy')
-    uzytkownik.is_active = not uzytkownik.is_active
-    uzytkownik.save()
-    if uzytkownik.is_active:
-        messages.success(request, f'Konto {uzytkownik.username} zostało włączone.')
-    else:
-        messages.info(request, f'Konto {uzytkownik.username} zostało wyłączone — nie może się logować.')
-    return redirect('uzytkownicy')
+    if request.method == 'POST':
+        uzytkownik.is_active = False
+        uzytkownik.save(update_fields=['is_active'])
+        messages.info(
+            request,
+            f'Konto {uzytkownik.username} zostało dezaktywowane — trafiło do Archiwum '
+            'i nie można się na nie zalogować. Przywrócisz je z poziomu Archiwum.',
+        )
+        return redirect('uzytkownicy')
+    return render(request, 'konta/dezaktywuj_konto.html', {'uzytkownik': uzytkownik})
+
+
+@login_required
+@tylko_szef
+def przywroc_konto(request, user_id):
+    """Przywraca konto z Archiwum: is_active=True — konto wraca do zakładki
+    Użytkownicy z wszystkimi wcześniejszymi funkcjami i może się znów logować."""
+    uzytkownik = get_object_or_404(Pracownik, pk=user_id)
+    uzytkownik.is_active = True
+    uzytkownik.save(update_fields=['is_active'])
+    messages.success(
+        request,
+        f'Konto {uzytkownik.username} zostało przywrócone — wróciło do zakładki Użytkownicy '
+        'i można się na nie ponownie zalogować.',
+    )
+    return redirect('archiwum')
 
 @login_required
 @tylko_szef
@@ -1195,8 +1216,9 @@ def usun_konto(request, user_id):
 
 @login_required
 def pobierz_raport(request):
-    """Raport zapłaconych płatności jako plik tekstowy do pobrania (zamiast e-maila).
-    Szef i koordynator."""
+    """Raport zapłaconych płatności jako plik tekstowy do pobrania.
+    Szef i koordynator. Pobranie raportu też archiwizuje pozycje do historii
+    (nie wracają do nieopłaconych)."""
     if not (czy_szef(request.user) or czy_koordynator(request.user)):
         raise PermissionDenied
     zaplaconi = Uczen.objects.filter(zaplacone=True, zakonczona=False)
@@ -1210,8 +1232,30 @@ def pobierz_raport(request):
     linie.append('')
     linie.append(f'Razem zapłaconych płatności: {len(zaplaconi)}.')
     tresc = '\n'.join(linie)
+    # archiwizacja jak przy wysyłce mailem: pozycje do historii, nie do nieopłaconych
+    teraz = timezone.now()
+    for u in zaplaconi:
+        u.zaplacone = False
+        u.rozliczono_kiedy = teraz
+        u.save(update_fields=['zaplacone', 'rozliczono_kiedy'])
+    RaportPlatnosci.objects.create(
+        zawartosc=tresc,
+        email_odbiorcy='(pobranie pliku)',
+        wyslal=request.user.get_full_name() or request.user.username,
+    )
     odpowiedz = HttpResponse(tresc, content_type='text/plain; charset=utf-8')
     odpowiedz['Content-Disposition'] = 'attachment; filename="raport_platnosci.txt"'
+    return odpowiedz
+
+
+@login_required
+def pobierz_raport_id(request, raport_id):
+    """Pobiera zapisaną treść raportu płatności z historii (plik .txt). Szef i koordynator."""
+    if not (czy_szef(request.user) or czy_koordynator(request.user)):
+        raise PermissionDenied
+    raport = get_object_or_404(RaportPlatnosci, pk=raport_id)
+    odpowiedz = HttpResponse(raport.zawartosc, content_type='text/plain; charset=utf-8')
+    odpowiedz['Content-Disposition'] = f'attachment; filename="raport_platnosci_{raport.id}.txt"'
     return odpowiedz
 
 
@@ -1825,8 +1869,10 @@ def platnosci(request):
     Szef i koordynator (edycja i raporty, bez usuwania uczniów)."""
     if not (czy_szef(request.user) or czy_koordynator(request.user)):
         raise PermissionDenied
-    uczniowie_lista = Uczen.objects.filter(zaplacone=False, zakonczona=False)
+    uczniowie_lista = Uczen.objects.filter(zaplacone=False, zakonczona=False, rozliczono_kiedy__isnull=True)
     zaplaconi = Uczen.objects.filter(zaplacone=True, zakonczona=False)
+    historia = Uczen.objects.filter(zakonczona=False, rozliczono_kiedy__isnull=False).order_by('-rozliczono_kiedy')
+    raporty = list(RaportPlatnosci.objects.all()[:20])
     wszyscy_uczniowie = list(Uczen.objects.filter(zakonczona=False).prefetch_related('przedmioty_ucznia'))
     email_odbiorcy = request.POST.get('email_raportu', '').strip()
 
@@ -1888,11 +1934,17 @@ def platnosci(request):
             email_odbiorcy=email_odbiorcy,
             wyslal=request.user.get_full_name() or request.user.username,
         )
-        Uczen.objects.filter(zaplacone=True).update(zaplacone=False)
+        # rozliczone pozycje: znikają z kafelka „Zapłacone”, ale NIE wracają do nieopłaconych —
+        # trafiają do „Historii płatności” na dole zakładki (pole rozliczono_kiedy)
+        teraz = timezone.now()
+        for u in zaplaconi:
+            u.zaplacone = False
+            u.rozliczono_kiedy = teraz
+            u.save(update_fields=['zaplacone', 'rozliczono_kiedy'])
         messages.success(
             request,
-            f'Raport wysłano na {email_odbiorcy}. Rozliczone pozycje wyczyszczono z listy — '
-            'uczniowie zostają w aplikacji (bez zmiany zajęć).',
+            f'Raport wysłano na {email_odbiorcy}. Rozliczone pozycje trafiły do „Historii płatności” '
+            'na dole zakładki — nie wrócą do nieopłaconych.',
         )
         return redirect('platnosci')
     teraz = timezone.now()
@@ -1982,6 +2034,8 @@ def platnosci(request):
     return render(request, 'konta/platnosci.html', {
         'uczniowie': uczniowie_lista,
         'zaplaconi': zaplaconi,
+        'historia': historia,
+        'raporty': raporty,
         'email_raportu': email_odbiorcy,
         'rozliczenia': rozliczenia,
         'rozliczenia_pracownikow': rozliczenia_pracownikow,
@@ -1996,7 +2050,8 @@ def uzytkownicy(request):
     Konta podzielone na kategorie: admini, koordynatorzy, osoby umawiające, korepetytorzy."""
     if not (czy_szef(request.user) or czy_koordynator(request.user)):
         raise PermissionDenied
-    lista = Pracownik.objects.all().order_by('username')
+        # w zakładce Użytkownicy tylko aktywne konta — wyłączone są w Archiwum
+    lista = Pracownik.objects.filter(is_active=True).order_by('username')
     form = FormularzUzytkownika(request.POST or None, bez_admina=not czy_szef(request.user))
     if request.method == 'POST' and not form.is_valid():
         messages.error(request, 'Nie udało się dodać użytkownika — popraw błędy w formularzu (czerwona ramka u góry).')

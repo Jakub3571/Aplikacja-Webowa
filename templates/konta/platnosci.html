@@ -221,18 +221,79 @@
     <h2>Wyślij raport</h2>
     {% if zaplaconi %}
     <p class="podtytul">
-        Raport obejmie tylko płatności z kafelka „Zapłacone". Po wysłaniu znikną one
-        z listy, a niezapłacone zostaną.
+        Raport obejmie tylko płatności z kafelka „Zapłacone”. Po wysłaniu (lub pobraniu pliku)
+        znikną one z kafelka „Zapłacone” i trafią do <strong>„Historii płatności”</strong> na dole
+        tej zakładki — <strong>nie wrócą</strong> do tabeli nieopłaconych.
     </p>
     <form method="post" class="formularz">
         {% csrf_token %}
         <input type="hidden" name="wyslij_raport" value="1" />
         <label for="id_email_raportu">Email odbiorcy raportu</label>
         <input type="email" name="email_raportu" id="id_email_raportu" required />
-        <button type="submit">Wyślij raport</button>
+        <button type="submit">Wyślij raport e-mailem</button>
+        <a class="przycisk-kalendarz" href="{% url 'pobierz_raport' %}">⬇ Pobierz raport jako plik</a>
     </form>
     {% else %}
     <p class="podtytul">Brak zapłaconych płatności — nie ma czego wysyłać.</p>
+    {% endif %}
+</section>
+
+<section class="karta">
+    <h2>Historia płatności (lekcje z przeszłości)</h2>
+    <p class="podtytul">Wszystkie opłacone pozycje, które trafiły do wysłanych/pobranych raportów. Nie wracają już do tabeli nieopłaconych.</p>
+    {% if historia %}
+    <div class="tabela-wrapper">
+        <table class="tabela" id="tabela-platnosci-historia">
+            <thead>
+                <tr>
+                    <th>Uczeń</th>
+                    <th>Przedmiot</th>
+                    <th>Nauczyciel</th>
+                    <th>1. lekcja</th>
+                    <th>Rozliczono w raporcie</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for uczen in historia %}
+                <tr>
+                    <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
+                    <td>{{ uczen.przedmiot }}</td>
+                    <td>{{ uczen.korepetytor }}</td>
+                    <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+                    <td>{{ uczen.rozliczono_kiedy|date:"d.m.Y H:i" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="podtytul">Brak historii — tu pojawią się pozycje z wysłanych raportów.</p>
+    {% endif %}
+
+    {% if raporty %}
+    <h3 style="margin-top: 1.5rem;">Wysłane / pobrane raporty</h3>
+    <div class="tabela-wrapper">
+        <table class="tabela">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Odbiorca</th>
+                    <th>Wysłał</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in raporty %}
+                <tr>
+                    <td>{{ r.wyslano|date:"d.m.Y H:i" }}</td>
+                    <td>{{ r.email_odbiorcy }}</td>
+                    <td>{{ r.wyslal }}</td>
+                    <td><a class="przycisk-kalendarz" href="{% url 'pobierz_raport_id' r.id %}">⬇ pobierz .txt</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% endif %}
 </section>
 {% endblock %}
