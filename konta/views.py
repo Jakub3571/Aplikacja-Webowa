@@ -290,9 +290,9 @@ def wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=None):
     for s, e in _zakresy_dnia(nauczyciel, dzien):
         kandydaci = set()
         t = s
-        # rytm idzie też o jeden krok POZA koniec zakresu (zakres 6:00-15:00, przerwa 10
-        # -> ...14:10, 15:20) — korepetytorowi nie przeszkadza, że zostanie 20 min dłużej
-        while t < e + krok:
+        # rytm może wyjść poza koniec zakresu, ale max 30 min (15:20 przy "do 15:00" OK,
+        # 19:00 przy "do 18:00" już nie — byłoby 60 min poza zakresem)
+        while t <= e + timedelta(minutes=30):
             kandydaci.add(t)
             t += krok
         for l_start in lekcje_starty:

@@ -2199,7 +2199,7 @@ class SiatkaRytmuTests(TestCase):
         self.assertIn('12:05', self.wolne(self.n, self.dzien))
         PrzerwaDnia.objects.create(nauczyciel=self.n, data=self.dzien, minuty=10)
         wolne = self.wolne(self.n, self.dzien)
-        self.assertEqual(wolne, ['12:10', '12:20', '13:30', '14:40'])
+        self.assertEqual(wolne, ['12:10', '12:20', '13:30'])  # 14:40 jest 40 min poza zakresem
 
     def test_slot_przed_lekcja_z_przerwa(self):
         # zakres od 6:00: przed lekcją 11:00 przy przerwie 5 min wolne 09:55 (10:00 zajęte)
@@ -2220,6 +2220,19 @@ class SiatkaRytmuTests(TestCase):
         self.assertNotIn('10:00', wolne)
         self.assertNotIn('10:20', wolne)
         self.assertIn('12:05', wolne)
+
+    def test_slot_poza_zakresem_maksymalnie_30_min(self):
+        # zakres 6:00-18:00, przerwa 5 min: ostatni slot rytmu to 17:55,
+        # kolejny 19:00 byłby 60 min poza zakresem -> odpada (max 30 min poza zakresem)
+        k = datetime.combine(self.dzien, self.czas(6, 0))
+        koniec = datetime.combine(self.dzien, self.czas(18, 0))
+        while k < koniec:
+            Dostepnosc.objects.create(nauczyciel=self.n, data_od=self.dzien, data_do=self.dzien,
+                                      godzina_od=k.time(), godzina_do=(k + timedelta(minutes=30)).time())
+            k += timedelta(minutes=30)
+        wolne = self.wolne(self.n, self.dzien)
+        self.assertIn('17:55', wolne)
+        self.assertNotIn('19:00', wolne)
 
     def test_nie_mozna_umowic_dwoch_nachodzacych_lekcji(self):
         # zgłoszony bug: po lekcji 18:00 dało się ustawić 18:30 u tego samego korepetytora
