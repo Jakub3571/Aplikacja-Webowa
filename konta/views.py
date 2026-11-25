@@ -1750,7 +1750,7 @@ def kalendarz_dane(request, nauczyciel_id):
                 sloty_przerwy.add(etykieta_przerwy)
     kafelki = []
     for h in range(6, 21):
-        for m in (0, 30):
+        for m in (0,):
             etykieta = f'{h:02d}:{m:02d}'
             kafelki.append({
                 'etykieta': etykieta,
@@ -2264,9 +2264,10 @@ def moj_tydzien(request, nauczyciel_id=None):
             'dzisiaj': dzien == dzisiaj,
         })
 
-    godziny = [f'{h:02d}:{m:02d}' for h in range(6, 22) for m in (0, 30)]
+    godziny = [f'{h:02d}:00' for h in range(6, 22)]
 
     return render(request, 'konta/moj_tydzien.html', {
+        'czy_szef': czy_szef(request.user),
         'nauczyciel': nauczyciel,
         'link_meet': nauczyciel.link_meet or '',
         'dni': dni,

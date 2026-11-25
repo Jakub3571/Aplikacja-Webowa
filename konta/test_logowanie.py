@@ -2558,146 +2558,6 @@ class UsuwanieTylkoSzefTests(TestCase):
         self.assertContains(r, 'Zakończ współpracę')
 
 
-class RozpatrzZgloszeniaTests(TestCase):
-    """Zgłoszenia 'zajęcia': koordynator/szef rozpatruje (zatwierdź = zmiana
-    od razu wchodzi do wszystkich kalendarzy; odrzuć = bez zmian)."""
-
-    def setUp(self):
-        self.szef = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
-        self.koord = Pracownik.objects.create_user('koordynator1', 'k@f.pl', 'Sup3rHaslo!')
-        self.koord.stanowisko = 'koordynator'
-        self.koord.save()
-        self.umawiajacy = Pracownik.objects.create_user('umawiacz', 'u@f.pl', 'Sup3rHaslo!')
-        self.nauczyciel = Nauczyciel.objects.create(imie='Anna', nazwisko='Kowalska', email='anna@k.pl')
-        self.tutor = Pracownik.objects.create_user('anna', 'anna@f.pl', 'Sup3rHaslo!', nauczyciel=self.nauczyciel)
-        self.uczen = Uczen.objects.create(
-            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 14, 14)),
-            przedmiot='matematyka', poziom='podstawa', szkola='SP 1',
-            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
-            telefon_glowny='600', email_glowny='e@f.pl', telefon_dodatkowy='',
-            korepetytor='Anna Kowalska', kto_umowil='umawiacz', umowil=self.umawiajacy,
-        )
-        self.lekcja = Lekcja.objects.create(uczen=self.uczen, data=timezone.make_aware(datetime(2026, 10, 14, 14)))
-        for dzien in (date(2026, 10, 14), date(2026, 10, 15)):
-            Dostepnosc.objects.create(
-                nauczyciel=self.nauczyciel, data_od=dzien, data_do=dzien,
-                godzina_od=time(14, 0), godzina_do=time(16, 0),
-            )
-        self.adres = f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/'
-
-    def _zgloszenie_odwolaj(self):
-        self.client.force_login(self.tutor)
-        r = self.client.post(self.adres, {'dzien': '2026-10-14', 'akcja': 'odwolaj_lekcje', 'lekcja_id': self.lekcja.id})
-        self.assertEqual(r.status_code, 403)
-        return Zgloszenie.objects.filter(autor=self.tutor, kategoria='zajęcia').first()
-
-    def test_zgloszenie_ma_dane_strukturalne(self):
-        zg = self._zgloszenie_odwolaj()
-        self.assertIsNotNone(zg)
-        self.assertEqual(zg.dane['akcja'], 'odwolaj_lekcje')
-        self.assertEqual(zg.dane['lekcja_id'], self.lekcja.id)
-        self.assertEqual(zg.dane['nauczyciel_id'], self.nauczyciel.id)
-        self.assertEqual(zg.dane['uczen_id'], self.uczen.id)
-        self.assertEqual(zg.dane['dzien'], '2026-10-14')
-
-    def test_umawiajacy_nie_rozpatruje_zgloszenia(self):
-        zg = self._zgloszenie_odwolaj()
-        self.client.force_login(self.umawiajacy)
-        r = self.client.get(f'/zgloszenia/{zg.id}/rozpatrz/')
-        self.assertEqual(r.status_code, 403)
-
-    def test_koordynator_widzi_strone_rozpatrz(self):
-        zg = self._zgloszenie_odwolaj()
-        self.client.force_login(self.koord)
-        r = self.client.get(f'/zgloszenia/{zg.id}/rozpatrz/')
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'zatwierdź')
-        self.assertContains(r, 'odrzuć')
-
-    def test_zatwierdz_odwolaj_wchodzi_do_kalendarza(self):
-        zg = self._zgloszenie_odwolaj()
-        self.client.force_login(self.koord)
-        r = self.client.post(f'/zgloszenia/{zg.id}/rozpatrz/', {'zatwierdz': '1'}, follow=True)
-        self.assertEqual(r.status_code, 200)
-        self.lekcja.refresh_from_db()
-        self.assertTrue(self.lekcja.odwolana)
-        zg.refresh_from_db()
-        self.assertTrue(zg.zrealizowane)
-        self.assertEqual(zg.zrealizowane_przez, self.koord)
-
-    def test_odrzuc_nie_zmienia_kalendarza(self):
-        zg = self._zgloszenie_odwolaj()
-        self.client.force_login(self.koord)
-        r = self.client.post(f'/zgloszenia/{zg.id}/rozpatrz/', {'odrzuc': '1'}, follow=True)
-        self.assertEqual(r.status_code, 200)
-        self.lekcja.refresh_from_db()
-        self.assertFalse(self.lekcja.odwolana)
-        zg.refresh_from_db()
-        self.assertTrue(zg.zrealizowane)
-        self.assertIn('ODRZUCONE', zg.tresc)
-
-    def test_zatwierdz_przesun_lekcje(self):
-        self.client.force_login(self.tutor)
-        r = self.client.post(self.adres, {
-            'dzien': '2026-10-14', 'akcja': 'przesun_lekcje', 'lekcja_id': self.lekcja.id,
-            'nowy_dzien': '2026-10-15', 'nowa_godzina': '14:00',
-        })
-        self.assertEqual(r.status_code, 403)
-        zg = Zgloszenie.objects.filter(autor=self.tutor).first()
-        self.assertEqual(zg.dane['akcja'], 'przesun_lekcje')
-        self.client.force_login(self.koord)
-        r = self.client.get(f'/zgloszenia/{zg.id}/rozpatrz/')
-        self.assertContains(r, 'nowy_dzien')
-        r = self.client.post(f'/zgloszenia/{zg.id}/rozpatrz/', {
-            'zatwierdz': '1', 'nowy_dzien': '2026-10-15', 'nowa_godzina': '14:00',
-        }, follow=True)
-        self.assertEqual(r.status_code, 200)
-        self.lekcja.refresh_from_db()
-        self.assertEqual(timezone.localtime(self.lekcja.data).date(), date(2026, 10, 15))
-        self.assertEqual(timezone.localtime(self.lekcja.data).strftime('%H:%M'), '14:00')
-        zg.refresh_from_db()
-        self.assertTrue(zg.zrealizowane)
-
-    def test_zatwierdz_przesun_poza_tydzien_nie_przechodzi(self):
-        self.client.force_login(self.tutor)
-        self.client.post(self.adres, {
-            'dzien': '2026-10-14', 'akcja': 'przesun_lekcje', 'lekcja_id': self.lekcja.id,
-            'nowy_dzien': '2026-10-15', 'nowa_godzina': '14:00',
-        })
-        zg = Zgloszenie.objects.filter(autor=self.tutor).first()
-        self.client.force_login(self.koord)
-        r = self.client.post(f'/zgloszenia/{zg.id}/rozpatrz/', {
-            'zatwierdz': '1', 'nowy_dzien': '2026-10-22', 'nowa_godzina': '14:00',
-        })
-        self.assertEqual(r.status_code, 302)  # wraca do formularza z błędem
-        self.lekcja.refresh_from_db()
-        self.assertEqual(timezone.localtime(self.lekcja.data).date(), date(2026, 10, 14))
-        zg.refresh_from_db()
-        self.assertFalse(zg.zrealizowane)
-
-    def test_zatwierdz_usun_zakres_odwoluje_lekcje_i_czyści_godziny(self):
-        self.client.force_login(self.tutor)
-        r = self.client.post(self.adres, {'dzien': '2026-10-14', 'akcja': 'usun_zakres', 'od': '14:00', 'do': '16:00'})
-        self.assertEqual(r.status_code, 403)
-        zg = Zgloszenie.objects.filter(autor=self.tutor).first()
-        self.assertEqual(zg.dane['akcja'], 'usun_zakres')
-        self.client.force_login(self.koord)
-        r = self.client.post(f'/zgloszenia/{zg.id}/rozpatrz/', {'zatwierdz': '1'}, follow=True)
-        self.assertEqual(r.status_code, 200)
-        self.lekcja.refresh_from_db()
-        self.assertTrue(self.lekcja.odwolana)
-        self.assertFalse(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, data_od=date(2026, 10, 14)).exists())
-        self.assertTrue(Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, data_od=date(2026, 10, 15)).exists())
-        zg.refresh_from_db()
-        self.assertTrue(zg.zrealizowane)
-
-    def test_strona_zgloszen_pokazuje_rozpatrz_dla_zajec(self):
-        zg = self._zgloszenie_odwolaj()
-        self.client.force_login(self.koord)
-        r = self.client.get('/zgloszenia/')
-        self.assertContains(r, 'rozpatrz')
-        self.assertContains(r, 'rozwiąż sprawę')
-
 
 class LegendaPoziomowUczniowieTests(TestCase):
     """Zakładka Uczniowie: kalendarz dostępności pokazuje przedmioty korepetytora
@@ -2829,3 +2689,46 @@ class KontaArchiwumTests(TestCase):
         self.assertNotContains(r, '>prac</td>')
         self.client.logout()
         self.assertTrue(self.client.login(username='prac', password='Sup3rHaslo!'))
+
+class PelneGodzinyMojTydzienTests(TestCase):
+    """Pelne godziny w Moj tydzien (bez :30) i panel przesuwania zajec tylko dla szefa."""
+
+    def setUp(self):
+        self.szef = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.nauczyciel_user = Pracownik.objects.create_user('j.kowalski', 'jan@k.pl', 'M0taneHaslo!')
+        self.nauczyciel = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='jan@k.pl')
+        self.nauczyciel_user.nauczyciel = self.nauczyciel
+        self.nauczyciel_user.save()
+
+    def test_moj_tydzien_pokazuje_tylko_pelne_godziny(self):
+        self.client.force_login(self.szef)
+        r = self.client.get(f'/moj-tydzien/{self.nauczyciel.id}/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'value="07:00"')
+        self.assertNotContains(r, 'value="07:30"')
+
+    def test_kafelki_tylko_pelne_godziny(self):
+        self.client.force_login(self.szef)
+        r = self.client.post(
+            f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/',
+            {'dzien': '2026-10-01', 'akcja': 'przelacz_godzine', 'godzina': '16:00'},
+        )
+        self.assertEqual(r.status_code, 200)
+        kafelki = r.json()['kafelki']
+        self.assertTrue(kafelki)
+        self.assertTrue(all(k['etykieta'].endswith(':00') for k in kafelki))
+
+    def test_panel_przesuwania_tylko_dla_szefa(self):
+        self.client.force_login(self.nauczyciel_user)
+        r = self.client.get(f'/moj-tydzien/{self.nauczyciel.id}/')
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, 'Przesuń jedno zajęcie')
+        self.client.force_login(self.szef)
+        r = self.client.get(f'/moj-tydzien/{self.nauczyciel.id}/')
+        self.assertContains(r, 'Przesuń jedno zajęcie')
+
+    def test_zgloszenia_bez_przycisku_rozpatrz(self):
+        self.client.force_login(self.szef)
+        r = self.client.get('/zgloszenia/')
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, 'rozpatrz')

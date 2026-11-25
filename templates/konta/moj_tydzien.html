@@ -96,6 +96,7 @@
       {% endfor %}
     </div>
 
+    {% if czy_szef %}
     <div class="zakres-okienko" id="przesun-okienko" style="display: none;">
       <div class="zakres-pola">
         <input type="hidden" id="przesun-lekcja-id">
@@ -115,6 +116,7 @@
         <button type="button" class="przycisk-kalendarz" id="przesun-anuluj">✖ Anuluj</button>
       </div>
     </div>
+    {% endif %}
 
     <div class="kalendarz-naglowek kalendarz-dol">
       <a class="strzalka" href="?rok={{ poprzedni_tydzien.year }}&miesiac={{ poprzedni_tydzien.month }}&dzien={{ poprzedni_tydzien.day }}">&larr;</a>
