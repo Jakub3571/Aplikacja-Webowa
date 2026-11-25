@@ -258,7 +258,7 @@ class DodawanieUczniaTests(TestCase):
         )
         etykiety = [g['godzina'] for g in r.json()['godziny']]
         self.assertIn('19:05', etykiety)    # 18:00 + 60 min + 5 min przerwy
-        self.assertIn('20:00', etykiety)
+        self.assertIn('20:10', etykiety)
         self.assertNotIn('18:00', etykiety)
         self.assertNotIn('18:30', etykiety)
         self.assertNotIn('19:00', etykiety)
@@ -306,6 +306,7 @@ class DodawanieUczniaTests(TestCase):
         etykiety = [g['godzina'] for g in r.json()['godziny']]
         self.assertIn('12:05', etykiety)
         self.assertNotIn('12:00', etykiety)
+        self.assertNotIn('11:00', etykiety)
         # druga lekcja o 12:05 przechodzi
         dane['godzina_pierwszej_lekcji'] = '12:05'
         dane['imie_ucznia'] = 'Ola'
@@ -315,6 +316,7 @@ class DodawanieUczniaTests(TestCase):
         # i kolejna wolna godzina idzie dalej o przerwe: 13:10
         from konta.views import wolne_godziny_nauczyciela
         self.assertIn('13:10', wolne_godziny_nauczyciela(self.nauczyciel, date(2026, 10, 5)))
+        self.assertNotIn('13:00', wolne_godziny_nauczyciela(self.nauczyciel, date(2026, 10, 5)))
 
 class NauczycieleTests(TestCase):
     def setUp(self):
@@ -1032,7 +1034,7 @@ class LekcjeCykliczneTests(TestCase):
         self.client.force_login(self.pracownik)
         dane = {
             'slot_dzien': ['1'],
-            'slot_godzina': ['17:00'],
+            'slot_godzina': ['16:00'],
             'okres': 'rok',
             'link_meet': 'https://meet.google.com/abc-defg-hij',
         }
@@ -1061,7 +1063,8 @@ class LekcjeCykliczneTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn('https://meet.google.com/abc-defg-hij', mail.outbox[0].body)
         # blokady u korepetytora: tyle samo co lekcji
-        blokady = Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='17:00')
+        # blokada = slot 60 min (16:00-17:00); w setUp sa tylko zakresy 16:00-20:00
+        blokady = Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od=time(16, 0), godzina_do=time(17, 0))
         self.assertEqual(blokady.count(), lekcje.count())
     def test_okres_rok_startujacy_w_wakacje_lipiec_sierpien(self):
         # start w lipcu: "do końca roku szkolnego" musi kończyć się 30.06.2027,
@@ -1071,7 +1074,7 @@ class LekcjeCykliczneTests(TestCase):
         dane = {
             'data_poczatkowa': start.isoformat(),
             'slot_dzien': [str(start.weekday())],
-            'slot_godzina': ['17:00'],
+            'slot_godzina': ['16:00'],
             'okres': 'rok',
             'link_meet': '',
         }
@@ -1125,7 +1128,7 @@ class LekcjeCykliczneTests(TestCase):
             'okres': 'miesiac',
             'data_poczatkowa': dzis.isoformat(),
             'slot_dzien': [str(dzis.weekday()), str(dzis.weekday())],
-            'slot_godzina': ['17:00', '17:00'],
+            'slot_godzina': ['16:00', '16:00'],
             'link_meet': '',
         }, follow=True)
         self.assertContains(r, 'umówione')
@@ -1133,7 +1136,7 @@ class LekcjeCykliczneTests(TestCase):
         qs = Lekcja.objects.filter(uczen=self.uczen)
         self.assertEqual(qs.count(), qs.values('data').distinct().count(), 'nie może być duplikatów terminów')
         godziny = {timezone.localtime(l.data).strftime('%H:%M') for l in qs}
-        self.assertEqual(godziny, {'17:00'})
+        self.assertEqual(godziny, {'16:00'})
     def test_cykliczna_dla_przedmiotu_dodatkowego_przez_karta(self):
         # karta przedmiotu dodatkowego u INNEGO nauczyciela + cykliczna przez ?karta=ID:
         # lekcje powstają z przedmiot_karta i blokują grafik tego nauczyciela
@@ -1157,7 +1160,7 @@ class LekcjeCykliczneTests(TestCase):
                 'okres': 'miesiac',
                 'data_poczatkowa': dzis.isoformat(),
                 'slot_dzien': [str(dzis.weekday())],
-                'slot_godzina': ['17:00'],
+                'slot_godzina': ['16:00'],
                 'link_meet': '',
             },
             follow=True,
@@ -1165,7 +1168,7 @@ class LekcjeCykliczneTests(TestCase):
         self.assertEqual(r.status_code, 200)
         lekcje = Lekcja.objects.filter(uczen=self.uczen, przedmiot_karta=karta)
         self.assertTrue(lekcje.exists())
-        self.assertTrue(Dostepnosc.objects.filter(nauczyciel=anna, godzina_od=time(17, 0)).exists())
+        self.assertTrue(Dostepnosc.objects.filter(nauczyciel=anna, godzina_od=time(16, 0)).exists())
         self.assertFalse(Lekcja.objects.filter(uczen=self.uczen, przedmiot_karta__isnull=True).exists())
 
     def test_ajax_godziny_zwraca_date_i_dni_pracy(self):
@@ -1346,7 +1349,7 @@ class StaleLekcjeMultiSlotTests(TestCase):
         self.client.force_login(self.pracownik)
         dane = {
             'slot_dzien': ['1', '3'],      # wtorek + czwartek
-            'slot_godzina': ['17:00', '18:00'],
+            'slot_godzina': ['16:00', '17:05'],
             'okres': 'rok',
         }
         r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', dane, follow=True)
@@ -1366,21 +1369,21 @@ class StaleLekcjeMultiSlotTests(TestCase):
         godziny = set(
             _tz.localtime(l.data).strftime('%H:%M') for l in lekcje
         )
-        self.assertIn('17:00', godziny)
-        self.assertIn('18:00', godziny)
+        self.assertIn('16:00', godziny)
+        self.assertIn('17:05', godziny)
         # blokady u korepetytora na obie godziny
         self.assertTrue(
-            Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='17:00').exists()
+            Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='16:00').exists()
         )
         self.assertTrue(
-            Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='18:00').exists()
+            Dostepnosc.objects.filter(nauczyciel=self.nauczyciel, godzina_od='17:05').exists()
         )
 
     def test_preset_rok_szkolny(self):
         self.client.force_login(self.pracownik)
         dane = {
             'slot_dzien': ['1'],
-            'slot_godzina': ['17:00'],
+            'slot_godzina': ['16:00'],
             'okres': 'rok',
         }
         r = self.client.post(f'/uczniowie/{self.uczen.id}/lekcja-cykliczna/', dane, follow=True)
@@ -1402,7 +1405,7 @@ class StaleLekcjeMultiSlotTests(TestCase):
         stara = dzis - timedelta(days=21)
         dane = {
             'slot_dzien': ['1'],
-            'slot_godzina': ['17:00'],
+            'slot_godzina': ['16:00'],
             'okres': 'zawsze',
             'data_poczatkowa': stara.isoformat(),
         }
@@ -1656,9 +1659,8 @@ class KalendarzKorepetytoraTests(TestCase):
         )
         Lekcja.objects.create(uczen=uczen, data=uczen.pierwsza_lekcja)
         wolne = self.wolne_godziny(self.nauczyciel, self.dzien)
-        for etykieta in ('11:00', '12:00'):
-            self.assertNotIn(etykieta, wolne)
-        self.assertIn('13:00', wolne)
+        # rytm z przerwą: zakres 11:00-14:00, przerwa 5 min, zajęta 11:00 -> 12:05, 13:10, 14:00, 14:15
+        self.assertEqual(wolne, ['12:05', '13:10', '14:15'])
         for h in range(6, 21):
             for m in range(0, 60, 5):
                 etykieta = f'{h:02d}:{m:02d}'
@@ -1690,8 +1692,11 @@ class KalendarzKorepetytoraTests(TestCase):
         self.assertTrue(all('Kowalska' in g['korepetytor'] for g in godziny))
         etykiety = [g['godzina'] for g in godziny]
         self.assertNotIn('11:00', etykiety)
+        self.assertIn('12:05', etykiety)
+        self.assertIn('13:10', etykiety)
+        self.assertIn('14:15', etykiety)
         self.assertNotIn('12:00', etykiety)
-        self.assertIn('13:00', etykiety)
+        self.assertNotIn('14:00', etykiety)
 
     def _dane_ucznia(self, godzina):
         return {
@@ -1721,7 +1726,7 @@ class KalendarzKorepetytoraTests(TestCase):
     def test_dodanie_ucznia_w_wolna_godzine_przechodzi(self):
         self._sloty('11:00', '14:00')
         self.client.force_login(self.user)
-        r = self.client.post('/uczniowie/', self._dane_ucznia('13:00'), follow=True)
+        r = self.client.post('/uczniowie/', self._dane_ucznia('13:10'), follow=True)
         self.assertContains(r, 'został dodany')
         self.assertEqual(Uczen.objects.count(), 1)
 
@@ -1777,7 +1782,7 @@ class PoprawkiSzefaTests(TestCase):
         self.assertEqual(r.status_code, 200)
         godziny = [g['godzina'] for g in r.json()['godziny']]
         # siatka rytmu 65 min (60 lekcja + 5 przerwy) od 11:00; 12:05+60 wychodzi poza 13:00
-        self.assertEqual(godziny, ['11:00', '12:00', '13:00'])
+        self.assertEqual(godziny, ['11:00', '12:05', '13:10'])
 
     def test_cykliczna_co_2_tyg_usunieta_zawsze_co_tydzien(self):
         # opcja „co 2 tygodnie” usunięta: mimo wysłania co_2_tygodnie=on lekcje idą co TYDZIEŃ
@@ -1841,19 +1846,19 @@ class PoprawkiSzefaTests(TestCase):
         # przesunięcie w tym samym tygodniu (pon 09.11 11:00 → wt 10.11 12:00) — działa
         r = self.client.post(adres, {
             'dzien': '2026-11-09', 'akcja': 'przesun_lekcje', 'lekcja_id': lekcja.id,
-            'nowy_dzien': '2026-11-10', 'nowa_godzina': '12:00',
+            'nowy_dzien': '2026-11-10', 'nowa_godzina': '12:05',
         })
         self.assertEqual(r.status_code, 200)
         lekcja.refresh_from_db()
         self.assertEqual(timezone.localtime(lekcja.data).date(), date(2026, 11, 10))
-        self.assertEqual(timezone.localtime(lekcja.data).strftime('%H:%M'), '12:00')
+        self.assertEqual(timezone.localtime(lekcja.data).strftime('%H:%M'), '12:05')
         # cykl zostaje: liczba lekcji i pozostałe poniedziałki bez zmian
         self.assertEqual(Lekcja.objects.filter(uczen=self.uczen).count(), 4)
         self.assertTrue(Lekcja.objects.filter(uczen=self.uczen, data__date=date(2026, 11, 16)).exists())
         # przesunięcie poza ten tydzień → odrzucone (400)
         r = self.client.post(adres, {
             'dzien': '2026-11-10', 'akcja': 'przesun_lekcje', 'lekcja_id': lekcja.id,
-            'nowy_dzien': '2026-11-17', 'nowa_godzina': '12:00',
+            'nowy_dzien': '2026-11-17', 'nowa_godzina': '12:05',
         })
         self.assertEqual(r.status_code, 400)
 
@@ -1947,7 +1952,7 @@ class komunikatBleduKalendarzaTests(TestCase):
     def test_komunikat_mowi_o_zakresie(self):
         self.client.force_login(self.user)
         dane = {
-            'data_pierwszej_lekcji': '2026-11-06', 'godzina_pierwszej_lekcji': '06:00',
+            'data_pierwszej_lekcji': '2026-11-06', 'godzina_pierwszej_lekcji': '08:00',
             'przedmiot': 'matematyka', 'poziom': 'podstawowka',
             'imie_ucznia': 'Kasia', 'nazwisko_rodzica': 'Nowak', 'rodzic': 'Ewa Nowak',
             'telefon_glowny': '600100200', 'email_glowny': 'ewa@f.pl',
@@ -2121,8 +2126,9 @@ class PrzypomnieniaJutroTests(TestCase):
         self.assertFalse(any(m.to == ['ewa@f.pl'] for m in mail.outbox))
 
 class SiatkaRytmuTests(TestCase):
-    """Krok 4: siatka rytmu (60 min lekcji + przerwa) od początku każdego przedziału;
-    zajęta lekcja blokuje 1h + przerwa w obie strony (po 18:00 nie ma 18:30)."""
+    """Formularz dodawania ucznia: rytm dnia (60 min lekcji + przerwa) od początku każdego
+    przedziału + koniec przedziału włączny + sloty przesunięte o przerwę obok lekcji.
+    Zajęta lekcja blokuje 1h + przerwa w obie strony (po 18:00 nie ma 18:30)."""
 
     def setUp(self):
         from datetime import time as czas
@@ -2140,13 +2146,15 @@ class SiatkaRytmuTests(TestCase):
             k += timedelta(minutes=30)
 
     def test_siatka_rytmu_od_poczatku_zakresu(self):
-        # przedział 10:00-14:00, przerwa 5 min -> rytm 65 min: 10:00, 11:05, 12:10
+        # przedział 10:00-14:00, przerwa 5 min -> rytm 65 min: 10:00, 11:05, 12:10, 13:15 + koniec 14:00 + 14:20
         wolne = self.wolne(self.n, self.dzien)
-        self.assertEqual(wolne, ['10:00', '11:00', '12:00', '13:00', '14:00'])
+        self.assertEqual(wolne, ['10:00', '11:05', '12:10', '13:15', '14:20'])
 
-    def test_koniec_zakresu_jako_start_lekcji(self):
-        # „do 14:00” oznacza, że lekcję można ustawić też na 14:00
-        self.assertTrue(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(14, 0))))
+    def test_ostatni_slot_rytmu_moze_wyjsc_poza_zakres(self):
+        # „do 14:00”: sam koniec 14:00 NIE jest slotem (od 13:15 nie minęło pełne 60+przerwa),
+        # ale ostatni slot rytmu 14:20 już tak
+        self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(14, 0))))
+        self.assertTrue(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(14, 20))))
     def test_zajeta_lekcja_blokuje_1h_plus_przerwa(self):
         u = Uczen.objects.create(
             pierwsza_lekcja=timezone.make_aware(datetime.combine(self.dzien, self.czas(11, 0))),
@@ -2155,17 +2163,11 @@ class SiatkaRytmuTests(TestCase):
             telefon_dodatkowy='', korepetytor='Tomek Tomek', kto_umowil='szef')
         Lekcja.objects.create(uczen=u, data=u.pierwsza_lekcja)
         wolne = self.wolne(self.n, self.dzien)
-        # zajęta 11:00; odpada też 10:00 i 12:00 (przerwa 5 min po 11:00),
+        # zajęta 11:00 (z przerwą do 12:05); odpada też 10:00 i 11:05,
         # a tuż po lekcji pokazuje się slot przesunięty o przerwę: 12:05
-        self.assertNotIn('10:00', wolne)
-        self.assertNotIn('11:00', wolne)
-        self.assertNotIn('11:30', wolne)
-        self.assertNotIn('12:00', wolne)
-        self.assertIn('12:05', wolne)
-        self.assertIn('13:00', wolne)
-        self.assertIn('14:00', wolne)
+        self.assertEqual(wolne, ['12:05', '12:10', '13:15', '14:20'])
         self.assertTrue(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(12, 5))))
-        self.assertTrue(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(13, 0))))
+        self.assertTrue(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(13, 15))))
         self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(11, 0))))
         self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(11, 30))))
         self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(12, 0))))
@@ -2181,6 +2183,7 @@ class SiatkaRytmuTests(TestCase):
         Lekcja.objects.create(uczen=u, data=u.pierwsza_lekcja)
         wolne = self.wolne(self.n, self.dzien)
         self.assertIn('12:05', wolne)
+        self.assertIn('12:10', wolne)
         self.assertNotIn('12:00', wolne)
         self.assertNotIn('09:55', wolne)
 
@@ -2196,8 +2199,7 @@ class SiatkaRytmuTests(TestCase):
         self.assertIn('12:05', self.wolne(self.n, self.dzien))
         PrzerwaDnia.objects.create(nauczyciel=self.n, data=self.dzien, minuty=10)
         wolne = self.wolne(self.n, self.dzien)
-        self.assertIn('12:10', wolne)
-        self.assertNotIn('12:05', wolne)
+        self.assertEqual(wolne, ['12:10', '12:20', '13:30', '14:40'])
 
     def test_slot_przed_lekcja_z_przerwa(self):
         # zakres od 6:00: przed lekcją 11:00 przy przerwie 5 min wolne 09:55 (10:00 zajęte)
@@ -2216,6 +2218,8 @@ class SiatkaRytmuTests(TestCase):
         wolne = self.wolne(self.n, self.dzien)
         self.assertIn('09:55', wolne)  # 11:00 - 60 min lekcji - 5 min przerwy
         self.assertNotIn('10:00', wolne)
+        self.assertNotIn('10:20', wolne)
+        self.assertIn('12:05', wolne)
 
     def test_nie_mozna_umowic_dwoch_nachodzacych_lekcji(self):
         # zgłoszony bug: po lekcji 18:00 dało się ustawić 18:30 u tego samego korepetytora
@@ -2230,12 +2234,13 @@ class SiatkaRytmuTests(TestCase):
         wolne = self.wolne(self.n, self.dzien)
         self.assertNotIn('18:00', wolne)
         self.assertNotIn('18:30', wolne)   # nachodzi na 18:00-19:00
-        self.assertNotIn('17:00', wolne)
-        self.assertNotIn('19:00', wolne)
-        self.assertIn('16:00', wolne)
-        self.assertIn('20:00', wolne)
+        self.assertNotIn('17:35', wolne)    # nachodzi na przerwę przed lekcją 18:00
+        self.assertIn('16:55', wolne)       # 16:55-18:00 tylko styka się z 18:00
+        self.assertIn('19:05', wolne)       # 18:00 + 60 + 5 min przerwy
+        self.assertIn('16:30', wolne)
+        self.assertNotIn('21:00', wolne)    # sam koniec zakresu nie jest osobnym slotem
         self.assertFalse(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(18, 30))))
-        self.assertTrue(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(20, 0))))
+        self.assertTrue(self.wolny_o(self.n, self.dzien, datetime.combine(self.dzien, self.czas(19, 5))))
 
 class DodatkowyPrzedmiotZGrafikiemTests(TestCase):
     """Dodatkowy przedmiot z datą+godziną od razu zajmuje grafik korepetytora."""
@@ -2720,6 +2725,45 @@ class PelneGodzinyMojTydzienTests(TestCase):
         kafelki = r.json()['kafelki']
         self.assertTrue(kafelki)
         self.assertTrue(all(k['etykieta'].endswith(':00') for k in kafelki))
+
+    def test_kafelki_zajete_i_przerwa_dla_lekcji_spoza_pelnej_godziny(self):
+        # lekcja 11:50-12:50, przerwa dnia 30 min: kafelki 11:00 i 12:00 zajete, 13:00 = przerwa
+        from konta.models import PrzerwaDnia
+        u = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 1, 11, 50)),
+            przedmiot='matematyka', poziom='podstawowka', szkola='SP', imie_ucznia='K',
+            nazwisko_rodzica='N', rodzic='R', telefon_glowny='6', email_glowny='e@f.pl',
+            telefon_dodatkowy='', korepetytor='Jan Kowalski', kto_umowil='admin',
+        )
+        Lekcja.objects.create(uczen=u, data=u.pierwsza_lekcja)
+        PrzerwaDnia.objects.create(nauczyciel=self.nauczyciel, data=date(2026, 10, 1), minuty=30)
+        self.client.force_login(self.szef)
+        r = self.client.post(
+            f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/',
+            {'dzien': '2026-10-01', 'akcja': 'przelacz_godzine', 'godzina': '16:00'},
+        )
+        self.assertEqual(r.status_code, 200)
+        kafelki = {k['etykieta']: k for k in r.json()['kafelki']}
+        self.assertTrue(kafelki['11:00']['zajety'])
+        self.assertTrue(kafelki['12:00']['zajety'])
+        self.assertFalse(kafelki['13:00']['zajety'])
+        self.assertTrue(kafelki['13:00']['przerwa'])   # przerwa 12:50-13:20 zahacza o 13:00
+        self.assertFalse(kafelki['14:00']['przerwa'])
+
+    def test_moj_tydzien_pokazuje_zaznaczony_zakres_i_przerwe(self):
+        # poprawka testera: korepetytor widzi, jaki zakres godzin zaznaczył (i jaka przerwa)
+        from konta.models import PrzerwaDnia
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel, data_od=date(2026, 10, 5), data_do=date(2026, 10, 5),
+            godzina_od=time(6, 0), godzina_do=time(15, 0),
+        )
+        PrzerwaDnia.objects.create(nauczyciel=self.nauczyciel, data=date(2026, 10, 5), minuty=10)
+        self.client.force_login(self.szef)
+        r = self.client.get(f'/moj-tydzien/{self.nauczyciel.id}/?rok=2026&miesiac=10&dzien=5')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, '06:00–15:00')          # zakres w pigulce dnia
+        self.assertContains(r, 'Zaznaczone w tym dniu:')  # podpowiedź w okienku "+"
+        self.assertContains(r, 'przerwa: 10 min')
 
     def test_panel_przesuwania_tylko_dla_szefa(self):
         self.client.force_login(self.nauczyciel_user)

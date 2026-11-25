@@ -44,12 +44,13 @@ class SzybkaLekcjaTests(TestCase):
         })
 
     def test_korepetytor_dodaje_lekcje_i_blokuje_godzine(self):
-        r = self._post(self.uczen.id, self.dzien, '11:00')
+        # zakres 10:00-14:00, przerwa 5 min -> rytm: 10:00, 11:05, 12:10, 13:15, 14:00
+        r = self._post(self.uczen.id, self.dzien, '11:05')
         self.assertEqual(r.status_code, 302)
-        start = timezone.make_aware(datetime.combine(self.dzien, time(11, 0)))
+        start = timezone.make_aware(datetime.combine(self.dzien, time(11, 5)))
         self.assertTrue(Lekcja.objects.filter(uczen=self.uczen, data=start).exists())
         self.assertTrue(Dostepnosc.objects.filter(
-            nauczyciel=self.nauczyciel, data_od=self.dzien, godzina_od=time(11, 0),
+            nauczyciel=self.nauczyciel, data_od=self.dzien, godzina_od=time(11, 5),
         ).exists())
 
     def test_nie_mozna_dodac_cudzego_ucznia(self):
@@ -67,11 +68,11 @@ class SzybkaLekcjaTests(TestCase):
         r = self._post(self.uczen.id, self.dzien, '11:00')
         self.assertEqual(r.status_code, 302)
         self.assertFalse(Lekcja.objects.filter(uczen=self.uczen, data__date=self.dzien).exists())
-        # ale wolna godzina dalej od kolizji przechodzi (13:00, przerwa 5 min po 11:00)
-        r = self._post(self.uczen.id, self.dzien, '13:00')
+        # ale wolna godzina dalej od kolizji przechodzi (12:05 = 11:00 + 60 + 5 min przerwy)
+        r = self._post(self.uczen.id, self.dzien, '12:05')
         self.assertEqual(r.status_code, 302)
         self.assertTrue(Lekcja.objects.filter(
-            uczen=self.uczen, data=timezone.make_aware(datetime.combine(self.dzien, time(13, 0))),
+            uczen=self.uczen, data=timezone.make_aware(datetime.combine(self.dzien, time(12, 5))),
         ).exists())
 
     def test_godzina_poza_grafikiem_odrzucona(self):

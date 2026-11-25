@@ -286,14 +286,15 @@ def wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=None):
         for l in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien, odwolana=False)
         if lekcja_jest_u_nauczyciela(l, nazwa_nauczyciela)
     ]
+    krok = timedelta(minutes=GODZINA_LEKCJI + przerwa)
     for s, e in _zakresy_dnia(nauczyciel, dzien):
         kandydaci = set()
         t = s
-        while t < e:
+        # rytm idzie też o jeden krok POZA koniec zakresu (zakres 6:00-15:00, przerwa 10
+        # -> ...14:10, 15:20) — korepetytorowi nie przeszkadza, że zostanie 20 min dłużej
+        while t < e + krok:
             kandydaci.add(t)
-            t += timedelta(minutes=GODZINA_LEKCJI + przerwa)
-        if s < e:
-            kandydaci.add(e)
+            t += krok
         for l_start in lekcje_starty:
             po = l_start + timedelta(minutes=GODZINA_LEKCJI + przerwa)
             przed = l_start - timedelta(minutes=GODZINA_LEKCJI + przerwa)
