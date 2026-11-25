@@ -21,6 +21,9 @@ from konta.models import (
     Zgloszenie,
 )
 
+import os
+from unittest import mock
+
 from konta.views import kolizja_lekcji_nauczyciela
 
 class PrzeplywLogowaniaTests(TestCase):
@@ -2732,3 +2735,103 @@ class PelneGodzinyMojTydzienTests(TestCase):
         r = self.client.get('/zgloszenia/')
         self.assertEqual(r.status_code, 200)
         self.assertNotContains(r, 'rozpatrz')
+
+
+class DiscordPierwszaLekcjaTests(TestCase):
+    """Discord: korepetytor sam wpisuje swoje ID (Mój tydzień); przy 1. lekcji leci webhook ze wzmianką."""
+
+    def setUp(self):
+        self.szef = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.nauczyciel_user = Pracownik.objects.create_user('j.kowalski', 'jan@k.pl', 'M0taneHaslo!')
+        self.nauczyciel = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='jan@k.pl')
+        self.nauczyciel_user.nauczyciel = self.nauczyciel
+        self.nauczyciel_user.save()
+        PrzedmiotNauczyciela.objects.create(
+            nauczyciel=self.nauczyciel, przedmiot='matematyka', poziom='srednia rozszerzenie',
+        )
+
+    def _dane_ucznia(self):
+        return {
+            'data_pierwszej_lekcji': '2026-10-05',
+            'godzina_pierwszej_lekcji': '16:00',
+            'przedmiot': 'matematyka',
+            'poziom': 'srednia rozszerzenie',
+            'imie_ucznia': 'Kasia',
+            'nazwisko_rodzica': 'Nowak',
+            'rodzic': 'Ewa Nowak',
+            'telefon_glowny': '600100200',
+            'email_glowny': 'ewa@f.pl',
+            'korepetytor': 'Jan Kowalski',
+        }
+
+    def _dodaj_dostepnosc(self):
+        Dostepnosc.objects.create(
+            nauczyciel=self.nauczyciel,
+            data_od=date(2026, 10, 5), data_do=date(2026, 10, 5),
+            godzina_od='16:00', godzina_do='19:00',
+        )
+
+    def test_nauczyciel_sam_zapisuje_discord_id(self):
+        self.client.force_login(self.nauczyciel_user)
+        r = self.client.post(
+            f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/',
+            {'dzien': '2026-10-05', 'akcja': 'zapisz_discord_id', 'discord_id': '111222333444555666'},
+        )
+        self.assertEqual(r.status_code, 200)
+        self.nauczyciel.refresh_from_db()
+        self.assertEqual(self.nauczyciel.discord_id, '111222333444555666')
+
+    def test_zapisz_discord_id_odrzuca_niecyfry(self):
+        self.client.force_login(self.nauczyciel_user)
+        r = self.client.post(
+            f'/nauczyciele/{self.nauczyciel.id}/kalendarz/dane/',
+            {'dzien': '2026-10-05', 'akcja': 'zapisz_discord_id', 'discord_id': 'abc'},
+        )
+        self.assertEqual(r.status_code, 400)
+        self.nauczyciel.refresh_from_db()
+        self.assertEqual(self.nauczyciel.discord_id, '')
+
+    def test_pierwsza_lekcja_wysyla_webhook_ze_wzmianka(self):
+        self._dodaj_dostepnosc()
+        self.nauczyciel.discord_id = '111222333444555666'
+        self.nauczyciel.save()
+        self.client.force_login(self.szef)
+        with mock.patch.dict(os.environ, {'DISCORD_WEBHOOK_URL': 'https://discord.com/api/webhooks/test/abc'}):
+            with mock.patch('urllib.request.urlopen') as urlopen:
+                odp = mock.MagicMock()
+                odp.status = 204
+                urlopen.return_value.__enter__.return_value = odp
+                r = self.client.post('/uczniowie/', self._dane_ucznia(), follow=True)
+        self.assertContains(r, 'został dodany')
+        self.assertEqual(urlopen.call_count, 1)
+        cialo = urlopen.call_args[0][0].data.decode('utf-8')
+        self.assertIn('<@111222333444555666>', cialo)
+        self.assertIn('Kasia', cialo)
+        self.assertIn('05.10.2026', cialo)
+
+    def test_bez_discord_id_wysyla_bez_wzmianki(self):
+        self._dodaj_dostepnosc()
+        self.client.force_login(self.szef)
+        with mock.patch.dict(os.environ, {'DISCORD_WEBHOOK_URL': 'https://discord.com/api/webhooks/test/abc'}):
+            with mock.patch('urllib.request.urlopen') as urlopen:
+                odp = mock.MagicMock()
+                odp.status = 204
+                urlopen.return_value.__enter__.return_value = odp
+                r = self.client.post('/uczniowie/', self._dane_ucznia(), follow=True)
+        self.assertContains(r, 'został dodany')
+        self.assertEqual(urlopen.call_count, 1)
+        cialo = urlopen.call_args[0][0].data.decode('utf-8')
+        self.assertNotIn('<@', cialo)
+        self.assertIn('Kasia', cialo)
+
+    def test_bez_webhooka_nie_pada(self):
+        self._dodaj_dostepnosc()
+        self.nauczyciel.discord_id = '111222333444555666'
+        self.nauczyciel.save()
+        self.client.force_login(self.szef)
+        env = {k: v for k, v in os.environ.items() if k != 'DISCORD_WEBHOOK_URL'}
+        with mock.patch.dict(os.environ, env, clear=True):
+            with mock.patch('urllib.request.urlopen') as urlopen:
+                r = self.client.post('/uczniowie/', self._dane_ucznia(), follow=True)
+        self.assertContains(r, 'został dodany')
+        urlopen.assert_not_called()

@@ -23,7 +23,17 @@
       <div class="zakres-pola">
         <input type="text" id="link-meet-pole" class="meet-input" placeholder="https://meet.google.com/abc-defg-hij"
                value="{{ link_meet }}">
-        <button type="button" class="przycisk-kalendarz" id="link-meet-zapisz">✔ Zapisz link</button>
+    <button type="button" class="przycisk-kalendarz" id="link-meet-zapisz">✔ Zapisz link</button>
+      </div>
+    </div>
+
+    <div class="przerwa-form meet-form">
+      <h3>🔔 Twój Discord (ID użytkownika)</h3>
+      <p class="podpowiedz">Wpisz swoje ID Discorda — dostaniesz na nie powiadomienie, gdy ktoś wpisze Ci pierwszą lekcję. Jak znaleźć ID: Discord → Ustawienia (zębatka przy nazwie) → Zaawansowane → włącz „Tryb deweloperski” → PPM na swoją nazwę na liście członków → „Kopiuj ID użytkownika”.</p>
+      <div class="zakres-pola">
+        <input type="text" id="discord-id-pole" class="meet-input" placeholder="np. 123456789012345678"
+               value="{{ discord_id }}">
+        <button type="button" class="przycisk-kalendarz" id="discord-id-zapisz">✔ Zapisz ID</button>
       </div>
     </div>
 
@@ -299,6 +309,25 @@
       });
     }
     var poleMeet = document.getElementById('link-meet-pole');
+        var poleDiscord = document.getElementById('discord-id-pole');
+    var przyciskDiscord = document.getElementById('discord-id-zapisz');
+    if (poleDiscord && przyciskDiscord) {
+      przyciskDiscord.addEventListener('click', function () {
+        var dane = new FormData();
+        dane.append('dzien', new Date().toISOString().slice(0, 10));
+        dane.append('akcja', 'zapisz_discord_id');
+        dane.append('discord_id', poleDiscord.value.trim());
+        fetch(url, {
+          method: 'POST',
+          body: dane,
+          headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': tokenCsrf() },
+        })
+          .then(function (odp) { return odp.json(); })
+          .then(function (wynik) {
+            komunikat.textContent = wynik.blad || wynik.komunikat || '';
+          });
+      });
+    }
     var przyciskMeet = document.getElementById('link-meet-zapisz');
     if (poleMeet && przyciskMeet) {
       przyciskMeet.addEventListener('click', function () {

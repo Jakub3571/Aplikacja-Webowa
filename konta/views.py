@@ -445,6 +445,37 @@ def wyslij_powiadomienie_nauczycielowi(request, uczen):
     except Exception as e:
         zapisz_blad_maila('powiadomienie_nauczycielowi', e)
 
+def wyslij_discord_pierwsza_lekcja(request, uczen):
+    """POST na DISCORD_WEBHOOK_URL: info o nowym uczniu i 1. lekcji ze wzmianką <@discord_id>
+    korepetytora (jeśli podał ID na swoim koncie w „Mój tydzień")."""
+    import os as _os
+    webhook = _os.environ.get('DISCORD_WEBHOOK_URL', '')
+    if not webhook:
+        return
+    nauczyciel = nauczyciel_z_korepetytora(uczen.korepetytor)
+    if not nauczyciel:
+        return
+    discord_id = (getattr(nauczyciel, 'discord_id', '') or '').strip()
+    wzmianka = f'<@{discord_id}> ' if discord_id else ''
+    tresc = (
+        f'{wzmianka}**Nowy uczeń u {nauczyciel.imie} {nauczyciel.nazwisko}** — {uczen.imie_ucznia} {uczen.nazwisko_rodzica}\n'
+        f'Przedmiot: {uczen.przedmiot} — poziom: {uczen.poziom}\n'
+        f'Rodzic: {uczen.rodzic} (tel. {uczen.telefon_glowny})\n'
+        f'1. lekcja: {uczen.pierwsza_lekcja:%d.%m.%Y o godz. %H:%M}\n'
+        f'Wpisał: {uczen.kto_umowil}'
+    )
+    try:
+        import urllib.request as _urllib
+        zadanie = _urllib.Request(
+            webhook,
+            data=json.dumps({'content': tresc}).encode('utf-8'),
+            headers={'Content-Type': 'application/json', 'User-Agent': 'NowoczesneKorepetycje-Panel/1.0'},
+            method='POST',
+        )
+        with _urllib.urlopen(zadanie, timeout=10) as odp:
+            odp.read()
+    except Exception as e:
+        zapisz_blad_maila('discord_pierwsza_lekcja', e)
 
 @login_required
 def wyloguj(request):
@@ -762,6 +793,7 @@ def uczniowie(request):
         messages.success(request, 'Uczeń został dodany do systemie.')
         wyslij_powiadomienie_o_uczniu(request, uczen)
         wyslij_powiadomienie_nauczycielowi(request, uczen)
+        wyslij_discord_pierwsza_lekcja(request, uczen)
         wyslij_potwierdzenie_rodzicowi(request, uczen)
         messages.info(
             request,
@@ -1549,6 +1581,13 @@ def kalendarz_dane(request, nauczyciel_id):
         nauczyciel.link_meet = link
         nauczyciel.save()
         komunikat = 'Link Google Meet zapisany.' if link else 'Link Google Meet usunięty.'
+    elif akcja == 'zapisz_discord_id':
+        discord_id = (request.POST.get('discord_id') or '').strip()
+        if discord_id and not re.fullmatch(r'\d{5,32}', discord_id):
+            return JsonResponse({'blad': 'ID Discorda to same cyfry (Discord → ustawienia → tryb deweloperski → PPM na sobie → „Kopiuj ID użytkownika”).'}, status=400)
+        nauczyciel.discord_id = discord_id
+        nauczyciel.save()
+        komunikat = 'ID Discorda zapisane — będziesz dostawać powiadomienia o pierwszych lekcjach.' if discord_id else 'ID Discorda usunięte.'
     elif akcja == 'usun_zakres':
         # TYLKO ten dzień staje się wolny — cykl co tydzień zostaje na kolejne tygodnie
         try:
@@ -2270,6 +2309,7 @@ def moj_tydzien(request, nauczyciel_id=None):
         'czy_szef': czy_szef(request.user),
         'nauczyciel': nauczyciel,
         'link_meet': nauczyciel.link_meet or '',
+        'discord_id': nauczyciel.discord_id or '',
         'dni': dni,
         'godziny': godziny,
         'poprzedni_tydzien': poprzedni,

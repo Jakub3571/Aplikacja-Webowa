@@ -187,6 +187,13 @@ class Nauczyciel(models.Model):
         blank=True,
         help_text='Twój osobisty link do spotkań — używany dla wszystkich Twoich uczniów.',
     )
+    discord_id = models.CharField(
+        'ID użytkownika Discord',
+        max_length=32,
+        blank=True,
+        default='',
+        help_text='Twoje ID z Discorda (tryb deweloperski → PPM na sobie → „Kopiuj ID”) — dostajesz na nie powiadomienie o pierwszej lekcji.',
+    )
     dodano = models.DateTimeField('data dodania', auto_now_add=True)
 
     class Meta:
