@@ -268,13 +268,14 @@ def nauczyciel_wolny_o(nauczyciel, dzien, start_lekcji):
 
 
 def wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=None):
-    """Godziny startu lekcji dostępne u nauczyciela — PEŁNE GODZINY (co 60 min)
-    od początku każdego przedziału, o ile lekcja mieści się w przedziale.
-    Koniec przedziału WŁĄCZNY („do 20:00” = można też o 20:00).
-    Dodatkowo sloty PRZYLEGŁE do umówionych lekcji, przesunięte o przerwę TEGO DNIA:
-    po lekcji = koniec lekcji + przerwa (lekcja 10:00, przerwa 5 min → 11:05),
-    przed lekcją = start lekcji − 60 min − przerwa (przed 10:00 → 08:55).
-    Kolizja zajmuje [start, koniec + przerwa) — przerwa dnia z „Mój tydzień”."""
+    """Godziny startu lekcji pokazywane w FORMULARZU dodawania ucznia (i w AJAX) —
+    RYTM dnia korepetytora: lekcja 60 min + przerwa TEGO DNIA, liczony od początku
+    każdego przedziału dostępności. Przykład: zakres 6:00–15:00, przerwa 10 min
+    → 6:00, 7:10, 8:20, 9:30, 10:40, 11:50, 13:00, 14:10. Dodatkowo KONIEC przedziału
+    WŁĄCZNY („do 15:00” = można też o 15:00) oraz sloty PRZYLEGŁE do umówionych lekcji,
+    przesunięte o przerwę: po lekcji = koniec + przerwa (lekcja 11:50, przerwa 10 → 13:00),
+    przed lekcją = start − 60 min − przerwa. Kolizja zajmuje [start, koniec + przerwa).
+    Sztywne pełne godziny są TYLKO w kafelkach „Mój tydzień” u korepetytora."""
     wynik = []
     if not nauczyciel:
         return wynik
@@ -288,9 +289,9 @@ def wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=None):
     for s, e in _zakresy_dnia(nauczyciel, dzien):
         kandydaci = set()
         t = s
-        while t + timedelta(minutes=GODZINA_LEKCJI) <= e:
+        while t < e:
             kandydaci.add(t)
-            t += timedelta(minutes=GODZINA_LEKCJI)
+            t += timedelta(minutes=GODZINA_LEKCJI + przerwa)
         if s < e:
             kandydaci.add(e)
         for l_start in lekcje_starty:
@@ -1780,13 +1781,20 @@ def kalendarz_dane(request, nauczyciel_id):
         if not lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela_dane):
             continue
         start = timezone.localtime(lekcja.data).replace(tzinfo=None)
-        for minuty in range(0, GODZINA_LEKCJI, 30):
-            zajete.add((start + timedelta(minutes=minuty)).strftime('%H:%M'))
-                    # przerwa dnia po lekcji pokazuje się jako „przerwa”, nie jako wolny slot
-        for minuty in range(GODZINA_LEKCJI, GODZINA_LEKCJI + przerwa_min, 30):
-            etykieta_przerwy = (start + timedelta(minutes=minuty)).strftime('%H:%M')
-            if etykieta_przerwy not in zaznaczone:
+        koniec = start + timedelta(minutes=GODZINA_LEKCJI)
+        # kafelki PELNYCH GODZIN nachodzące na lekcję są zajęte (lekcja 11:50-12:50 -> kafelki 11:00 i 12:00)
+        kursor = start.replace(minute=0)
+        while kursor < koniec:
+            zajete.add(kursor.strftime('%H:%M'))
+            kursor += timedelta(hours=1)
+        # przerwa po lekcji też zajmuje kafelki pełnych godzin (jeśli nie są zaznaczone jako dostępne)
+        koniec_przerwy = koniec + timedelta(minutes=przerwa_min)
+        kursor = koniec.replace(minute=0)
+        while kursor < koniec_przerwy:
+            etykieta_przerwy = kursor.strftime('%H:%M')
+            if etykieta_przerwy not in zaznaczone and etykieta_przerwy not in zajete:
                 sloty_przerwy.add(etykieta_przerwy)
+            kursor += timedelta(hours=1)
     kafelki = []
     for h in range(6, 21):
         for m in (0,):

@@ -48,6 +48,7 @@
         <div class="dzien-zakresy">
           {% for zakres in dzien.zakresy %}
           <span class="zakres-pigulka">
+            <strong>{{ zakres.od }}–{{ zakres.do }}</strong>
            {% if zakres.cykliczny %} 🔁 co tydzień{% endif %}
             {% if dzien.przerwa %} · przerwa {{ dzien.przerwa }} min{% endif %}
             <button type="button" class="zakres-usun" data-dzien="{{ dzien.data|date:'Y-m-d' }}" data-od="{{ zakres.od }}" data-do="{{ zakres.do }}" title="Usuń ten zakres tylko w tym dniu (cykl zostaje)">✖</button>
@@ -75,6 +76,7 @@
 
 
         <div class="zakres-okienko" style="display: none;">
+          {% if dzien.zakresy %}<p class="podpowiedz">Zaznaczone w tym dniu: {% for zakres in dzien.zakresy %}<strong>{{ zakres.od }}–{{ zakres.do }}</strong>{% if not forloop.last %}, {% endif %}{% endfor %} (przerwa: {{ dzien.przerwa }} min)</p>{% endif %}
           <div class="zakres-pola">
             <label>pracuję od
               <select class="zakres-od">
