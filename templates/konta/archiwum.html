@@ -115,10 +115,14 @@
 							<a
 								class="przycisk-umowa umowa-tak"
 								href="{% url 'przywroc_wspolprace' n.id %}"
-								title="Przywróć współpracę"
-								>↩ przywróć</a
-							>
-							{% endif %}
+                                title="Przywróć współpracę"
+                                >↩ przywróć</a
+                            >
+                            {% if n.konto_uzytkownika and not n.konto_uzytkownika.is_active %}
+                            <a class="przycisk-umowa umowa-tak" href="{% url 'przywroc_konto' n.konto_uzytkownika.id %}" title="Przywróć konto korepetytora do Użytkowników">przywróć konto</a>
+                            {% if czy_szef %}<a class="ikona-usun" href="{% url 'usun_konto' n.konto_uzytkownika.id %}" title="Usuń konto na zawsze — tylko z Archiwum, z potwierdzeniem">🗑</a>{% endif %}
+                            {% endif %}
+                            {% endif %}
 						</td>
 					</tr>
 					{% endfor %}
@@ -241,7 +245,7 @@
               {% if u.is_active %}
                 <span class="umowa-tak">✔ aktywne</span>
               {% else %}
-                <span class="umowa-nie">wyłączone</span>
+                <span class="podpowiedz">wyłączone</span>
               {% endif %}
             </td>
           </tr>
