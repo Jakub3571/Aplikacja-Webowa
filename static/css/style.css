@@ -37,7 +37,9 @@ body {
 
 .logowanie-wrapper { min-height: 100vh; display: grid; place-items: center; padding: 1rem; }
 
-.opakowanie { max-width: 60rem; margin: 0 auto; padding: 1rem; }
+/* było 60rem (960px) — rozszerzone do 90rem (1440px), żeby panel wykorzystywał
+   więcej szerokiego ekranu (ok. połowa pustego miejsca po bokach) */
+.opakowanie { max-width: 90rem; margin: 0 auto; padding: 1rem; }
 
 .opakowanie .karta { margin-top: 1rem; }
 
@@ -690,3 +692,10 @@ input[type="radio"], input[type="checkbox"] {
 /* siatka: pionowe linie między kolumnami w tabelach Użytkownicy / Archiwum */
 .tabela-siata th, .tabela-siata td { border-right: 1px solid var(--ramka); }
 .tabela-siata th:last-child, .tabela-siata td:last-child { border-right: none; }
+
+/* mini-kalendarz miesięczny w kolumnie "Lekcje cykliczne" (Płatności) */
+.mini-kal { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.mini-strz { border: 1px solid var(--ramka); background: var(--karta); color: inherit; border-radius: 6px; padding: 0 8px; cursor: pointer; font-size: 1rem; line-height: 1.6; }
+.mini-strz:disabled { opacity: 0.35; cursor: default; }
+.mini-miesiac { min-width: 5.5rem; text-align: center; }
+.mini-terminy { flex-basis: 100%; }

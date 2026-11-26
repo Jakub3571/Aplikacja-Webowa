@@ -618,6 +618,20 @@ class PlatnosciTests(TestCase):
         self.assertContains(r, 'Historia płatności')
         self.assertContains(r, f'{d1.day:02d}.{d1.month:02d} 17:00')      # historia pokazuje terminy
 
+    def test_kolumna_lekcje_cykliczne_ma_mini_kalendarz_miesieczny(self):
+        # komórka "Lekcje cykliczne" = mini-kalendarz: strzałki ‹ › + dane JSON w data-lekcje,
+        # a pierwszy miesiąc jest też wyrenderowany serwerowo jako tekst (działa bez JS)
+        self.client.force_login(self.user)
+        uczen = self.dodaj_ucznia()
+        dzis = timezone.localdate()
+        d1 = dzis + timedelta(days=3)
+        Lekcja.objects.create(uczen=uczen, data=timezone.make_aware(datetime(d1.year, d1.month, d1.day, 17, 0)))
+        r = self.client.get('/platnosci/')
+        self.assertContains(r, 'mini-kal')
+        self.assertContains(r, 'data-lekcje=')
+        self.assertContains(r, 'mini-strz')
+        self.assertContains(r, f'{d1.day:02d}.{d1.month:02d} 17:00')   # pierwszy miesiąc jako tekst
+
 class UzytkownicyTests(TestCase):
     """Zakładka użytkownicy: dodawanie kont i uprawnienia (tylko szef)."""
 

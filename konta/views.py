@@ -1941,6 +1941,30 @@ def _lekcje_cykliczne_tekst(uczen, limit_miesiecy=2):
     )
 
 
+def _lekcje_cykliczne_dane(uczen):
+    """Przyszłe lekcje ucznia (od teraz, bez odwołanych) jako lista słowników
+    {y, m, d, g} — dane do mini-kalendarza miesięcznego w Płatnościach (JS grupuje
+    je po miesiącu i można strzałkami ‹ › przesuwać miesiące jak w kalendarzu)."""
+    lekcje = Lekcja.objects.filter(uczen=uczen, odwolana=False, data__gte=timezone.now()).order_by('data')
+    wynik = []
+    for l in lekcje:
+        lok = timezone.localtime(l.data)
+        wynik.append({'y': lok.year, 'm': lok.month, 'd': f'{lok.day:02d}.{lok.month:02d}', 'g': f'{lok:%H:%M}'})
+    return wynik
+
+
+def _lekcje_cykliczne_dane(uczen):
+    """Przyszłe lekcje ucznia (od teraz, bez odwołanych) jako lista słowników
+    {y, m, d, g} — dane do mini-kalendarza miesięcznego w Płatnościach (JS grupuje
+    je po miesiącu i można strzałkami ‹ › przesuwać miesiące jak w kalendarzu)."""
+    lekcje = Lekcja.objects.filter(uczen=uczen, odwolana=False, data__gte=timezone.now()).order_by('data')
+    wynik = []
+    for l in lekcje:
+        lok = timezone.localtime(l.data)
+        wynik.append({'y': lok.year, 'm': lok.month, 'd': f'{lok.day:02d}.{lok.month:02d}', 'g': f'{lok:%H:%M}'})
+    return wynik
+
+
 @login_required
 def platnosci(request):
     """Zakładka płatności: lista uczniów, statusy zapłacone i wysyłka raportu.
@@ -2109,12 +2133,10 @@ def platnosci(request):
             'nauczyciele': sorted(nauczyciele_set),
         })
     rozliczenia_pracownikow.sort(key=lambda p: p['pracownik'].username)
-    for u in uczniowie_lista:
-        u.lekcje_cykliczne_tekst = _lekcje_cykliczne_tekst(u)
-    for u in zaplaconi:
-        u.lekcje_cykliczne_tekst = _lekcje_cykliczne_tekst(u)
-    for u in historia:
-        u.lekcje_cykliczne_tekst = _lekcje_cykliczne_tekst(u)
+    for u in list(uczniowie_lista) + list(zaplaconi) + list(historia):
+        u.lekcje_dane = _lekcje_cykliczne_dane(u)
+        u.lekcje_json = json.dumps(u.lekcje_dane, ensure_ascii=False)
+        u.lekcje_cykliczne_tekst = _lekcje_cykliczne_tekst(u)   # pierwszy miesiąc jako tekst (fallback bez JS)
     return render(request, 'konta/platnosci.html', {
         'uczniowie': uczniowie_lista,
         'zaplaconi': zaplaconi,

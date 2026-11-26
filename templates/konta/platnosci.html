@@ -40,7 +40,16 @@
                         <td>{{ uczen.korepetytor }}</td>
                         <td>{{ uczen.kto_umowil }}</td>
                         <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
-                        <td>{{ uczen.lekcje_cykliczne_tekst }}</td>
+                                                <td>
+                            {% if uczen.lekcje_dane %}
+                            <div class="mini-kal" data-lekcje='{{ uczen.lekcje_json }}'>
+                                <button type="button" class="mini-strz" data-krok="-1" title="Poprzedni miesiąc">‹</button>
+                                <strong class="mini-miesiac"></strong>
+                                <button type="button" class="mini-strz" data-krok="1" title="Następny miesiąc">›</button>
+                                <div class="mini-terminy podpowiedz">{{ uczen.lekcje_cykliczne_tekst }}</div>
+                            </div>
+                            {% else %}—{% endif %}
+                        </td>
                         <td><span class="status-niezaplacone">❌ niezapłacone</span></td>
                         <td>
                             {% if czy_szef %}
@@ -194,7 +203,16 @@
                         <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
                                                 <td>{{ uczen.korepetytor }}</td>
                         <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
-                        <td>{{ uczen.lekcje_cykliczne_tekst }}</td>
+                                                <td>
+                            {% if uczen.lekcje_dane %}
+                            <div class="mini-kal" data-lekcje='{{ uczen.lekcje_json }}'>
+                                <button type="button" class="mini-strz" data-krok="-1" title="Poprzedni miesiąc">‹</button>
+                                <strong class="mini-miesiac"></strong>
+                                <button type="button" class="mini-strz" data-krok="1" title="Następny miesiąc">›</button>
+                                <div class="mini-terminy podpowiedz">{{ uczen.lekcje_cykliczne_tekst }}</div>
+                            </div>
+                            {% else %}—{% endif %}
+                        </td>
                         <td><span class="status-zaplacone">✅ zapłacone</span></td>
                         <td>
                             {% if czy_szef %}
@@ -264,7 +282,16 @@
                     <td>{{ uczen.przedmiot }}</td>
                                         <td>{{ uczen.korepetytor }}</td>
                     <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
-                    <td>{{ uczen.lekcje_cykliczne_tekst }}</td>
+                                            <td>
+                            {% if uczen.lekcje_dane %}
+                            <div class="mini-kal" data-lekcje='{{ uczen.lekcje_json }}'>
+                                <button type="button" class="mini-strz" data-krok="-1" title="Poprzedni miesiąc">‹</button>
+                                <strong class="mini-miesiac"></strong>
+                                <button type="button" class="mini-strz" data-krok="1" title="Następny miesiąc">›</button>
+                                <div class="mini-terminy podpowiedz">{{ uczen.lekcje_cykliczne_tekst }}</div>
+                            </div>
+                            {% else %}—{% endif %}
+                        </td>
                     <td>{{ uczen.rozliczono_kiedy|date:"d.m.Y H:i" }}</td>
                 </tr>
                 {% endfor %}
@@ -302,4 +329,39 @@
     {% endif %}
 </section>
 </div>
+
+<script>
+  // mini-kalendarz miesięczny w kolumnie "Lekcje cykliczne" (Płatności):
+  // strzałki ‹ › przesuwają miesiące między pierwszym a ostatnim miesiącem z lekcjami
+  (function () {
+    var miesiace = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
+    function klucz(x) { return x.y * 12 + x.m; }
+    document.querySelectorAll('.mini-kal').forEach(function (el) {
+      var dane;
+      try { dane = JSON.parse(el.dataset.lekcje || '[]'); } catch (e) { return; }
+      if (!dane.length) return;
+      var klucze = dane.map(klucz);
+      var minK = Math.min.apply(null, klucze);
+      var maxK = Math.max.apply(null, klucze);
+      var biezacy = minK;
+      var etykieta = el.querySelector('.mini-miesiac');
+      var lista = el.querySelector('.mini-terminy');
+      var strzL = el.querySelector('[data-krok="-1"]');
+      var strzP = el.querySelector('[data-krok="1"]');
+      function pokaz(k) {
+        biezacy = k;
+        var y = Math.floor((k - 1) / 12);
+        var m = ((k - 1) % 12) + 1;
+        etykieta.textContent = miesiace[m - 1] + ' ' + y;
+        var wTym = dane.filter(function (x) { return x.y === y && x.m === m; });
+        lista.textContent = wTym.length ? wTym.map(function (x) { return x.d + ' ' + x.g; }).join(', ') : '—';
+        strzL.disabled = (k <= minK);
+        strzP.disabled = (k >= maxK);
+      }
+      strzL.addEventListener('click', function () { if (biezacy > minK) pokaz(biezacy - 1); });
+      strzP.addEventListener('click', function () { if (biezacy < maxK) pokaz(biezacy + 1); });
+      pokaz(minK);
+    });
+  })();
+</script>
 {% endblock %}
