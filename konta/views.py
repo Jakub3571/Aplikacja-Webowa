@@ -259,7 +259,19 @@ def _zakresy_dnia(nauczyciel, dzien):
             zakresy[-1] = (zakresy[-1][0], max(zakresy[-1][1], e))
         else:
             zakresy.append((s, e))
-    return zakresy
+        return zakresy
+
+
+def _rytm_zakresu(s, e, krok):
+    """Sloty rytmu JEDNEGO zakresu (start, koniec): od startu co krok (60 min + przerwa),
+    ostatni slot może wyjść max 30 min poza koniec zakresu. Każdy zakres liczy własny rytm —
+    zakresy nie „dostosowują się” do siebie nawzajem."""
+    sloty = []
+    t = s
+    while t <= e + timedelta(minutes=30):
+        sloty.append(t)
+        t += krok
+    return sloty
 
 
 def nauczyciel_wolny_o(nauczyciel, dzien, start_lekcji):
@@ -1957,6 +1969,8 @@ def lekcje(request):
         u.liczba_lekcji = liczba_lekcji.get(u.id, 0)
     uczniowie_cykliczni = [u for u in uczniowie_lista if u.zajecia_cykliczne]
     uczniowie_pierwsze = [u for u in uczniowie_lista if not u.zajecia_cykliczne]
+    for u in uczniowie_lista:
+        u.lekcje_terminy = _lekcje_cykliczne_tekst(u)
     return render(request, 'konta/lekcje.html', {
         'uczniowie': uczniowie_lista,
         'uczniowie_cykliczni': uczniowie_cykliczni,
@@ -2527,6 +2541,7 @@ def kalendarz_zbiorczy(request):
                                 f"{start.strftime('%H:%M')}–{(start + timedelta(minutes=GODZINA_LEKCJI)).strftime('%H:%M')} "
                                 f"{n.imie} {n.nazwisko} · {lekcja.uczen.imie_ucznia} {lekcja.uczen.nazwisko_rodzica} · "
                                 f"{lekcja.przedmiot_karta.przedmiot if lekcja.przedmiot_karta_id else lekcja.uczen.przedmiot}"
+                                f" · umówił: {lekcja.uczen.kto_umowil}"
                             ),
                         })
                 else:
@@ -2575,6 +2590,7 @@ def kalendarz_zbiorczy(request):
                     'przedmiot': karta_l.przedmiot if karta_l else lekcja.uczen.przedmiot,
                     'poziom': karta_l.poziom if karta_l else lekcja.uczen.poziom,
                     'cykliczna': lekcja.uczen.zajecia_cykliczne,
+                    'umowil': lekcja.uczen.kto_umowil,
                 })
             szczegoly.append({
                 'nauczyciel': n,
@@ -2583,9 +2599,18 @@ def kalendarz_zbiorczy(request):
             })
 
     # rozwinięty dzień z podziałem na godziny (jak w zwykłym kalendarzu)
-    godziny_dnia = []
+        godziny_dnia = []
     if wybrany_dzien:
-        for h in range(6, 21):
+        # wiersze godzinowe: godziny 6:00–20:00 PLUS każda godzina, w której zaczyna się
+        # lekcja lub zakres (np. 17:05 z rytmu 60 min + przerwa) — lekcja ląduje w wierszu
+        # swojej pełnej godziny (17:05 → wiersz 17:00), a dokładny czas jest w tekście chipa
+        godziny_set = set(range(6, 21))
+        for blok in szczegoly:
+            for z in blok['zakresy']:
+                godziny_set.add(int(z.split('–')[0].split(':')[0]))
+            for l in blok['lekcje']:
+                godziny_set.add(int(l['godzina'].split(':')[0]))
+        for h in sorted(godziny_set):
             etykieta = f'{h:02d}:00'
             wpisy_g = []
             for blok in szczegoly:
@@ -2597,15 +2622,17 @@ def kalendarz_zbiorczy(request):
                             'tekst': f"{blok['nauczyciel'].imie} {blok['nauczyciel'].nazwisko} wolny: {z}",
                         })
                 for l in blok['lekcje']:
-                    if l['godzina'] == etykieta:
+                    if int(l['godzina'].split(':')[0]) == h:
                         wpisy_g.append({
                             'typ': 'lekcja',
                             'cykliczna': l['cykliczna'],
-                             'tekst': (
+                            'tekst': (
                                 f"{l['godzina']}–{l['koniec']} · {blok['nauczyciel'].imie} {blok['nauczyciel'].nazwisko} "
                                 f"z {l['uczen']} — {l['przedmiot']} ({l['poziom']})"
+                                f" · umówił: {l['umowil']}"
                             ),
                         })
+            wpisy_g.sort(key=lambda w: w['tekst'])
             godziny_dnia.append({'etykieta': etykieta, 'wpisy': wpisy_g})
     poprzedni_dzien = nastepny_dzien = None
     if wybrany_dzien:

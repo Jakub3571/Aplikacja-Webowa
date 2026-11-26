@@ -43,7 +43,8 @@
             <th>Uczeń</th>
             <th>Korepetytor</th>
             <th>Przedmiot</th>
-            <th>Lekcje w tym miesiącu</th>
+                        <th>Lekcje w tym miesiącu</th>
+            <th>Najbliższe terminy</th>
 
             {% if not jest_nauczycielem %}
             <th>Dodaj kolejne</th>
@@ -56,8 +57,9 @@
           <tr>
             <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
             <td>{{ uczen.korepetytor }}</td>
-            <td>{{ uczen.przedmioty_tekst }}</td>
+                        <td>{{ uczen.przedmioty_tekst }}</td>
             <td>{{ uczen.liczba_lekcji }}</td>
+            <td>{{ uczen.lekcje_terminy }}</td>
 
             {% if not jest_nauczycielem %}
             <td>

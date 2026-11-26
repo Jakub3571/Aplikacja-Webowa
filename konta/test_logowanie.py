@@ -1399,6 +1399,17 @@ class LekcjeCykliczneTests(TestCase):
         # JS pobiera dni_pracy i chowa dni tygodnia, w ktorych korepetytor nie pracuje
         self.assertContains(r, 'dni_pracy')
 
+    def test_lekcje_pokazuja_terminy_cyklicznych(self):
+        # w zakładce Lekcje przy zajęciach cyklicznych widać najbliższe terminy (kiedy lekcja)
+        self.uczen.zajecia_cykliczne = True
+        self.uczen.save(update_fields=['zajecia_cykliczne'])
+        d = date.today() + timedelta(days=3)
+        Lekcja.objects.create(uczen=self.uczen, data=timezone.make_aware(datetime.combine(d, time(17, 0))))
+        self.client.force_login(self.pracownik)
+        r = self.client.get('/lekcje/')
+        self.assertContains(r, 'Zajęcia cykliczne')
+        self.assertContains(r, f'{d.day:02d}.{d.month:02d} 17:00')
+
 class NauczycielTylkoKalendarzTests(TestCase):
     """Konto nauczyciela widzi wyłącznie swój kalendarz — bez zakładki Uczniowie."""
 
@@ -2242,6 +2253,24 @@ class KalendarzZbiorczyTests(TestCase):
         self.assertContains(r, 'grudzień 2026')
         r = self.client.get('/kalendarz/?rok=2026&miesiac=1')
         self.assertContains(r, 'styczeń 2026')
+
+    def test_dzien_pokazuje_lekcje_spoza_pelnej_godziny(self):
+        # lekcja o 17:05 (slot z rytmu 60 min + przerwa) też ma być w widoku dnia (wiersz 17:00)
+        self.client.force_login(self.admin)
+        d = date.today() + timedelta(days=1)
+        Lekcja.objects.create(
+            uczen=self.uczen,
+            data=timezone.make_aware(datetime.combine(d, time(17, 5))),
+        )
+        r = self.client.get(f'/kalendarz/?rok={d.year}&miesiac={d.month}&dzien={d.day}')
+        self.assertContains(r, '17:05')
+
+    def test_dzien_pokazuje_kto_umowil(self):
+        # w widoku dnia przy lekcji widać, kto ją zapisał (umówił)
+        self.client.force_login(self.admin)
+        dzis = date.today()
+        r = self.client.get(f'/kalendarz/?rok={dzis.year}&miesiac={dzis.month}&dzien={dzis.day}')
+        self.assertContains(r, 'umówił: prac')
 
 
 class PrzypomnieniaJutroTests(TestCase):
