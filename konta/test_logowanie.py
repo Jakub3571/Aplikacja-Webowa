@@ -3069,3 +3069,36 @@ class DiscordPierwszaLekcjaTests(TestCase):
                 r = self.client.post('/uczniowie/', self._dane_ucznia(), follow=True)
         self.assertContains(r, 'został dodany')
         urlopen.assert_not_called()
+
+
+class SiatkaWszedzieTests(TestCase):
+    """Wszystkie tabele w panelu mają siatkę (tabela-siata) — żadna nie zostaje
+    jako samo class="tabela" (bez linii między kolumnami)."""
+
+    def setUp(self):
+        self.szef = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.client.force_login(self.szef)
+
+    def test_wszystkie_strony_panelu_bez_tabel_bez_siatki(self):
+        for adres in ['/pulpit/', '/uczniowie/', '/archiwum/', '/lekcje/', '/kalendarz/', '/platnosci/', '/uzytkownicy/', '/zgloszenia/']:
+            with self.subTest(adres=adres):
+                r = self.client.get(adres)
+                self.assertEqual(r.status_code, 200)
+                self.assertNotContains(r, 'class="tabela"')   # każda tabela to "tabela tabela-siata"
+
+    def test_strony_edycji_tez_maja_siatke(self):
+        uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 5, 17)),
+            przedmiot='matematyka', poziom='rozszerzony',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='e@f.pl',
+            telefon_dodatkowy='', email_dodatkowy='',
+            korepetytor='Jan Kowalski', notatka_od_rodzica='ok', kto_umowil='Jan',
+        )
+        n = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='j@f.pl')
+        tutor = Pracownik.objects.create_user('ola', 'o@f.pl', 'Sup3rHaslo!', nauczyciel=n)
+        for adres in [f'/uczniowie/{uczen.id}/edytuj/', f'/uzytkownicy/{tutor.id}/edytuj/']:
+            with self.subTest(adres=adres):
+                r = self.client.get(adres)
+                self.assertEqual(r.status_code, 200)
+                self.assertNotContains(r, 'class="tabela"')
