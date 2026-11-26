@@ -19,6 +19,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
+from .tokens import token_generator_resetu
 from .forms import (
 
     FormularzLogowania,
@@ -69,6 +70,7 @@ def _klasa_poziomu(poziom):
     return MAPA_KLAS_POZIOMOW.get((poziom or '').strip().lower(), 'poziom-inne')
 
 MAX_PROB_LOGOWANIA = 5
+OKNO_PROB_SEK = 10 * 60  # okno czasowe: max 5 prób na 10 minut (a nie do końca sesji)
 
 
 def moze_edytowac_kalendarz(user, nauczyciel_id):
@@ -370,16 +372,26 @@ def _bezpieczny_next(request):
 
 def logowanie(request):
     """Wyświetla formularz logowania i loguje pracownika po poprawnych danych.
-    Po 5 nieudanych próbach z rzędu blokuje logowanie do wygaśnięcia sesji
-    (ochrona przed zgadywaniem haseł). Po zalogowaniu wraca do ?next= (np. /cms/)."""
+    Ochrona przed zgadywaniem haseł: max 5 nieudanych prób w oknie 10 minut —
+    potem blokada tylko do końca tego okna (a nie do wygaśnięcia sesji).
+    Po zalogowaniu wraca do ?next= (np. /cms/)."""
     if request.user.is_authenticated:
         nxt = _bezpieczny_next(request)
         return redirect(nxt) if nxt else redirect('pulpit')
     if request.method == 'POST':
+        teraz = timezone.now().timestamp()
+        okno = request.session.get('okno_logowania', 0)
+        if not okno or teraz - okno >= OKNO_PROB_SEK:
+            # nowe okno 10-minutowe — licznik prób od zera
+            okno = teraz
+            request.session['okno_logowania'] = okno
+            request.session['proby_logowania'] = 0
         if request.session.get('proby_logowania', 0) >= MAX_PROB_LOGOWANIA:
+            pozostalo = int((OKNO_PROB_SEK - (teraz - okno)) // 60) + 1
             messages.error(
                 request,
-                'Zbyt wiele nieudanych prób logowania — odczekaj ok. 10 minut i spróbuj ponownie.',
+                f'Zbyt wiele nieudanych prób logowania — spróbuj ponownie za ok. {pozostalo} min '
+                'albo kliknij „Nie pamiętasz hasła?”.',
             )
             return render(request, 'konta/logowanie.html', {'form': FormularzLogowania(request)})
         request.session['proby_logowania'] = request.session.get('proby_logowania', 0) + 1
@@ -388,6 +400,7 @@ def logowanie(request):
         user = form.get_user()
         login(request, user)
         request.session['proby_logowania'] = 0
+        request.session.pop('okno_logowania', None)
         messages.success(request, f'Witaj, {user.get_full_name() or user.username}!')
         nxt = _bezpieczny_next(request)
         return redirect(nxt) if nxt else redirect('pulpit')
@@ -1306,14 +1319,23 @@ def pobierz_raport_id(request, raport_id):
 
 
 def reset_hasla(request):
-    """Reset hasła z limitem prób: max 5 żądań na sesję (ochrona przed spamowaniem maili).
+    """Reset hasła z limitem prób: max 5 żądań w oknie 10 minut (ochrona przed
+    spamowaniem maili) — potem blokada tylko do końca okna. Link w mailu jest
+    robiony naszym generatorem (działa 3 dni nawet po zalogowaniu).
     Celowo bez @login_required — z tego widoku korzystają osoby niezalogowane."""
     from django.contrib.auth.views import PasswordResetView
     if request.method == 'POST':
+        teraz = timezone.now().timestamp()
+        okno = request.session.get('okno_resetu', 0)
+        if not okno or teraz - okno >= OKNO_PROB_SEK:
+            okno = teraz
+            request.session['okno_resetu'] = okno
+            request.session['proby_resetu'] = 0
         if request.session.get('proby_resetu', 0) >= 5:
+            pozostalo = int((OKNO_PROB_SEK - (teraz - okno)) // 60) + 1
             messages.error(
                 request,
-                'Zbyt wiele prób resetu hasła — odczekaj ok. 10 minut i spróbuj ponownie.',
+                f'Zbyt wiele prób resetu hasła — spróbuj ponownie za ok. {pozostalo} min.',
             )
             return redirect('logowanie')
         request.session['proby_resetu'] = request.session.get('proby_resetu', 0) + 1
@@ -1322,19 +1344,19 @@ def reset_hasla(request):
         subject_template_name='konta/mail_reset_temat.txt',
         email_template_name='konta/mail_reset_tresc.txt',
         success_url='/reset-hasla/wyslane/',
+        token_generator=token_generator_resetu,
     )(request)
 
 def _link_przeterminowany(uidb64, token):
     """True, gdy link był prawidłowy, ale minęły 3 dni (PASSWORD_RESET_TIMEOUT).
     Fałszywy link zwraca False — wtedy pokazuje się zwykła strona błędu."""
     from django.conf import settings as ustawienia
-    from django.contrib.auth.tokens import default_token_generator
     from django.utils.crypto import constant_time_compare
     from django.utils.http import base36_to_int, urlsafe_base64_decode
     try:
         uid = urlsafe_base64_decode(uidb64).decode()
         uzytkownik = Pracownik.objects.get(pk=uid)
-        gen = default_token_generator
+        gen = token_generator_resetu
         if gen.check_token(uzytkownik, token):
             return False  # link wciąż ważny
         czesci = token.split('-')
@@ -1360,7 +1382,10 @@ def _link_przeterminowany(uidb64, token):
 
 class ResetHaslaPotwierdzWidok(PasswordResetConfirmView):
     """Jak wbudowany widok Django, ale gdy link minął (3 dni) —
-    przekierowuje na osobną stronę „czas minął” zamiast pustego formularza."""
+    przekierowuje na osobną stronę „czas minął” zamiast pustego formularza.
+    Nasz generator tokenów (bez last_login), więc link działa 3 dni mimo logowania."""
+
+    token_generator = token_generator_resetu
 
     def dispatch(self, request, *args, **kwargs):
         uidb64 = kwargs.get('uidb64')
@@ -2198,11 +2223,10 @@ def uzytkownicy(request):
         if nowy_uzytkownik.email:
             link_logowania = request.build_absolute_uri(reverse('logowanie'))
             # link do ustawienia hasla DOKLADNIE dla tego nowego konta
-            from django.contrib.auth.tokens import default_token_generator
             from django.utils.encoding import force_bytes
             from django.utils.http import urlsafe_base64_encode
             uid = urlsafe_base64_encode(force_bytes(nowy_uzytkownik.pk))
-            token = default_token_generator.make_token(nowy_uzytkownik)
+            token = token_generator_resetu.make_token(nowy_uzytkownik)
             link_hasla = request.build_absolute_uri(
                 reverse('reset_hasla_potwierdz', kwargs={'uidb64': uid, 'token': token})
             )

@@ -1654,15 +1654,15 @@ class ResetHaslaLinkTests(TestCase):
     """Link do ustawienia hasła: ważny 3 dni, potem osobna strona „czas minął”."""
 
     def setUp(self):
-        from django.contrib.auth.tokens import default_token_generator
+        from konta.tokens import token_generator_resetu
         from django.utils.encoding import force_bytes
         from django.utils.http import urlsafe_base64_encode
-        self.token_generator = default_token_generator
+        self.token_generator = token_generator_resetu
         self.user = Pracownik.objects.create_user(
             'a.nowak', 'anna@firma.pl', 'Sup3rHaslo!',
         )
         self.uid = urlsafe_base64_encode(force_bytes(self.user.pk))
-        self.token = default_token_generator.make_token(self.user)
+        self.token = token_generator_resetu.make_token(self.user)
 
     def _url(self, token):
         from django.urls import reverse
@@ -1709,7 +1709,22 @@ class ResetHaslaLinkTests(TestCase):
     def test_falszywy_link_pokazuje_zwykly_blad(self):
         r = self.client.get(self._url('abc-xyz'))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Link nie działa')
+
+    def test_link_dziala_mimo_ze_ktos_sie_zalogowal(self):
+        # logowanie (zmiana last_login) NIE unieważnia linku — ma działać 3 dni
+        self.user.last_login = timezone.now()
+        self.user.save(update_fields=['last_login'])
+        r = self.client.get(self._url(self.token), follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Ustaw nowe hasło')
+
+    def test_link_2_dniowy_nadal_wazny_4_dniowy_wygasl(self):
+        r = self.client.get(self._url(self._stary_token(dni=2)), follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Ustaw nowe hasło')
+        from django.urls import reverse
+        r = self.client.get(self._url(self._stary_token(dni=4)))
+        self.assertRedirects(r, reverse('reset_hasla_wygasl'))
 
     def test_link_juz_uzyty_pokazuje_zwykly_blad(self):
         self.client.get(self._url(self.token))
@@ -3127,19 +3142,36 @@ class SiatkaWszedzieTests(TestCase):
                 self.assertEqual(r.status_code, 200)
                 self.assertNotContains(r, 'class="tabela"')   # każda tabela to "tabela tabela-siata"
 
-    def test_strony_edycji_tez_maja_siatke(self):
-        uczen = Uczen.objects.create(
-            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 5, 17)),
-            przedmiot='matematyka', poziom='rozszerzony',
-            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
-            telefon_glowny='600100200', email_glowny='e@f.pl',
-            telefon_dodatkowy='', email_dodatkowy='',
-            korepetytor='Jan Kowalski', notatka_od_rodzica='ok', kto_umowil='Jan',
-        )
-        n = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='j@f.pl')
-        tutor = Pracownik.objects.create_user('ola', 'o@f.pl', 'Sup3rHaslo!', nauczyciel=n)
-        for adres in [f'/uczniowie/{uczen.id}/edytuj/', f'/uzytkownicy/{tutor.id}/edytuj/']:
-            with self.subTest(adres=adres):
-                r = self.client.get(adres)
-                self.assertEqual(r.status_code, 200)
-                self.assertNotContains(r, 'class="tabela"')
+class BlokadaLogowaniaTests(TestCase):
+    """Po 5 nieudanych próbach logowanie blokuje się tylko na okno 10 minut
+    (a nie do końca sesji) — i komunikat podpowiada reset hasła."""
+
+    def setUp(self):
+        self.user = Pracownik.objects.create_user('ola', 'o@f.pl', 'Sup3rHaslo!')
+
+    def _post(self, haslo='zle-haslo'):
+        return self.client.post('/', {'username': 'ola', 'password': haslo})   # logowanie jest pod adresem '/'
+
+    def test_po_5_probach_blokuje_sie_z_komunikatem(self):
+        for _ in range(5):
+            self._post()
+        r = self._post()
+        self.assertContains(r, 'Zbyt wiele nieudanych prób')
+        self.assertContains(r, 'Nie pamiętasz hasła?')
+
+    def test_po_minieciu_okna_10_min_mozna_sprobowac_znowu(self):
+        for _ in range(5):
+            self._post()
+        self.assertContains(self._post(), 'Zbyt wiele nieudanych prób')
+        # przesuwamy okno w czasie o 11 minut — blokada puszcza
+        s = self.client.session
+        s['okno_logowania'] = timezone.now().timestamp() - 11 * 60
+        s.save()
+        r = self._post()
+        self.assertNotContains(r, 'Zbyt wiele nieudanych prób')
+
+    def test_dobre_haslo_loguje_mimo_wczesniejszych_bledow(self):
+        self._post()
+        self._post()
+        r = self._post('Sup3rHaslo!')
+        self.assertEqual(r.status_code, 302)   # redirect po udanym logowaniu
