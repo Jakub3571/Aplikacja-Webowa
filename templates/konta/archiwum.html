@@ -157,17 +157,20 @@
 					<tr>
 						<td>{{ u.username }}</td>
 						<td>{{ u.first_name }} {{ u.last_name }}</td>
-						<td>
-							{% if u.is_superuser %}
-							<span class="umowa-tak">✔ admin</span>
-							{% elif u.username|lower|slice:":12" == "koordynator" %}
-							<span class="umowa-tak">✔ koordynator</span>
-							{% else %}
-							<span class="podpowiedz">osoba umawiająca</span>
-							{% endif %}
-						</td>
-						
-					</tr>
+                        <td>
+                            {% if u.is_superuser %}
+                            <span class="umowa-tak">✔ admin</span>
+                            {% elif u.username|lower|slice:":12" == "koordynator" %}
+                            <span class="umowa-tak">✔ koordynator</span>
+                            {% else %}
+                            <span class="podpowiedz">osoba umawiająca</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                                {% if not u.is_active %}<a class="ikona-kalendarza" href="{% url 'przywroc_konto' u.id %}" title="Przywróć konto do zakładki Użytkownicy (możliwość logowania wraca)">✔</a>{% endif %}
+                                {% if czy_szef %}<a class="ikona-usun" href="{% url 'usun_konto' u.id %}" title="Usuń konto na zawsze — tylko z Archiwum, z potwierdzeniem">🗑</a>{% endif %}
+                        </td>
+                    </tr>
 					{% endfor %}
 				</tbody>
 			</table>

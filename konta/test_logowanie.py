@@ -2721,7 +2721,7 @@ class KontaArchiwumTests(TestCase):
         self.assertFalse(n.aktywny)
         r = self.client.get('/archiwum/')
         self.assertContains(r, 'Ola Zet')   # korepetytor NIE znika bez śladu
-        self.assertContains(r, 'przywróć konto')
+        self.assertContains(r, '/przywroc/') # ikonka ✔ przywróć konto
         # przywrócenie konta przywraca też kartę
         self.client.get(f'/uzytkownicy/{tutor.id}/przywroc/')
         n.refresh_from_db()
