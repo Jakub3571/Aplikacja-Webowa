@@ -538,6 +538,53 @@ class PlatnosciTests(TestCase):
         self.assertEqual(mail.outbox[0].to, ['szef@f.pl'])
         self.assertEqual(RaportPlatnosci.objects.count(), 1)
 
+    def test_cofnij_zaplacone_nie_usuwa_ucznia(self):
+        # "Cofnij" tylko odznacza zapłatę — uczeń zostaje w aplikacji i wraca do nieopłaconych
+        self.client.force_login(self.user)
+        uczen = self.dodaj_ucznia('Kasia', zaplacone=True)
+        r = self.client.post('/platnosci/', {'odznacz_zaplacone': '1', 'uczen_id': uczen.id}, follow=True)
+        self.assertContains(r, 'cofnięto status opłacone')
+        uczen.refresh_from_db()
+        self.assertEqual(Uczen.objects.count(), 1)      # uczeń NIE został usunięty
+        self.assertFalse(uczen.zaplacone)
+        self.assertIsNone(uczen.rozliczono_kiedy)       # NIE trafił do historii raportów
+        r = self.client.get('/platnosci/')
+        self.assertContains(r, 'Kasia Nowak')           # wraca na listę nieopłaconych
+
+    def test_pobierz_raport_jako_html_z_siatka(self):
+        # plik raportu to HTML z tabelą (kolumny + siatka jak na stronie), nie sam tekst
+        self.client.force_login(self.user)
+        uczen = self.dodaj_ucznia('Kasia', zaplacone=True)
+        r = self.client.get('/raport-platnosci/')
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r['Content-Type'].startswith('text/html'))
+        self.assertIn('.html', r['Content-Disposition'])
+        self.assertContains(r, '<table')
+        self.assertContains(r, 'Kasia Nowak')
+        self.assertContains(r, 'Razem zapłaconych płatności: 1')
+        uczen.refresh_from_db()
+        self.assertFalse(uczen.zaplacone)
+        self.assertIsNotNone(uczen.rozliczono_kiedy)    # pobranie raportu = archiwizacja do historii
+        self.assertEqual(RaportPlatnosci.objects.count(), 1)
+
+    def test_historia_raportow_html_dla_nowych_txt_dla_starych(self):
+        # nowe raporty z historii pobierają się jako .html, stare (przed zmianą) jako .txt
+        self.client.force_login(self.user)
+        nowy = RaportPlatnosci.objects.create(
+            zawartosc='<html><table><tr><td>x</td></tr></table></html>',
+            email_odbiorcy='a@f.pl', wyslal='test')
+        stary = RaportPlatnosci.objects.create(
+            zawartosc='stary raport tekstowy',
+            email_odbiorcy='b@f.pl', wyslal='test')
+        r = self.client.get(f'/raport-platnosci/{nowy.id}/')
+        self.assertTrue(r['Content-Type'].startswith('text/html'))
+        self.assertIn('.html', r['Content-Disposition'])
+        self.assertContains(r, '<table')
+        r = self.client.get(f'/raport-platnosci/{stary.id}/')
+        self.assertTrue(r['Content-Type'].startswith('text/plain'))
+        self.assertIn('.txt', r['Content-Disposition'])
+        self.assertContains(r, 'stary raport tekstowy')
+
 class UzytkownicyTests(TestCase):
     """Zakładka użytkownicy: dodawanie kont i uprawnienia (tylko szef)."""
 
@@ -2656,7 +2703,9 @@ class PlatnosciHistoriaTests(TestCase):
     def test_pobranie_raportu_pliku_tez_idzie_do_historii(self):
         r = self.client.get('/raport-platnosci/')
         self.assertEqual(r.status_code, 200)
-        self.assertIn('raport_platnosci.txt', r['Content-Disposition'])
+        self.assertTrue(r['Content-Type'].startswith('text/html'))   # raport jako plik HTML z tabelą
+        self.assertIn('.html', r['Content-Disposition'])
+        self.assertIn('<table', r.content.decode())
         self.uczen.refresh_from_db()
         self.assertFalse(self.uczen.zaplacone)
         self.assertIsNotNone(self.uczen.rozliczono_kiedy)

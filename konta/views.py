@@ -15,6 +15,7 @@ from django.core.cache import cache
 from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse, request
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
@@ -1260,24 +1261,19 @@ def usun_konto(request, user_id):
 
 @login_required
 def pobierz_raport(request):
-    """Raport zapłaconych płatności jako plik tekstowy do pobrania.
-    Szef i koordynator. Pobranie raportu też archiwizuje pozycje do historii
-    (nie wracają do nieopłaconych)."""
+    """Raport zapłaconych płatności jako plik HTML do pobrania — tabela z kolumnami
+    i siatką, jak na stronie Płatności. Szef i koordynator. Pobranie raportu też
+    archiwizuje pozycje do historii (nie wracają do nieopłaconych)."""
     if not (czy_szef(request.user) or czy_koordynator(request.user)):
         raise PermissionDenied
-    zaplaconi = Uczen.objects.filter(zaplacone=True, zakonczona=False)
-    linie = ['Raport zapłaconych płatności', '=' * 40, '']
-    for u in zaplaconi:
-        linie.append(
-            f'{u.imie_ucznia} {u.nazwisko_rodzica} — korepetytor: {u.korepetytor} '
-            f'— przedmiot: {u.przedmiot} — wpisał: {u.kto_umowil} '
-            f'— 1. lekcja: {u.pierwsza_lekcja:%d.%m.%Y %H:%M}'
-        )
-    linie.append('')
-    linie.append(f'Razem zapłaconych płatności: {len(zaplaconi)}.')
-    tresc = '\n'.join(linie)
-    # archiwizacja jak przy wysyłce mailem: pozycje do historii, nie do nieopłaconych
+    zaplaconi = list(Uczen.objects.filter(zaplacone=True, zakonczona=False))
     teraz = timezone.now()
+    tresc = render_to_string('konta/raport_plik.html', {
+        'pozycje': zaplaconi,
+        'data_raportu': teraz.strftime('%d.%m.%Y %H:%M'),
+        'odbiorca': '(pobranie pliku)',
+    })
+    # archiwizacja jak przy wysyłce mailem: pozycje do historii, nie do nieopłaconych
     for u in zaplaconi:
         u.zaplacone = False
         u.rozliczono_kiedy = teraz
@@ -1287,19 +1283,25 @@ def pobierz_raport(request):
         email_odbiorcy='(pobranie pliku)',
         wyslal=request.user.get_full_name() or request.user.username,
     )
-    odpowiedz = HttpResponse(tresc, content_type='text/plain; charset=utf-8')
-    odpowiedz['Content-Disposition'] = 'attachment; filename="raport_platnosci.txt"'
+    odpowiedz = HttpResponse(tresc, content_type='text/html; charset=utf-8')
+    odpowiedz['Content-Disposition'] = f'attachment; filename="raport_platnosci_{teraz:%Y-%m-%d_%H-%M}.html"'
     return odpowiedz
 
 
 @login_required
 def pobierz_raport_id(request, raport_id):
-    """Pobiera zapisaną treść raportu płatności z historii (plik .txt). Szef i koordynator."""
+    """Pobiera zapisaną treść raportu płatności z historii. Nowe raporty to pliki HTML
+    (tabela z siatką), stare (sprzed zmiany formatu) zostają jako zwykły .txt.
+    Szef i koordynator."""
     if not (czy_szef(request.user) or czy_koordynator(request.user)):
         raise PermissionDenied
     raport = get_object_or_404(RaportPlatnosci, pk=raport_id)
-    odpowiedz = HttpResponse(raport.zawartosc, content_type='text/plain; charset=utf-8')
-    odpowiedz['Content-Disposition'] = f'attachment; filename="raport_platnosci_{raport.id}.txt"'
+    if raport.zawartosc.lstrip().startswith('<'):
+        odpowiedz = HttpResponse(raport.zawartosc, content_type='text/html; charset=utf-8')
+        odpowiedz['Content-Disposition'] = f'attachment; filename="raport_platnosci_{raport.id}.html"'
+    else:
+        odpowiedz = HttpResponse(raport.zawartosc, content_type='text/plain; charset=utf-8')
+        odpowiedz['Content-Disposition'] = f'attachment; filename="raport_platnosci_{raport.id}.txt"'
     return odpowiedz
 
 

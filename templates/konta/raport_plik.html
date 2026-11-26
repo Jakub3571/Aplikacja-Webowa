@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Raport płatności — {{ data_raportu }}</title>
+<style>
+  /* raport jako osobny plik HTML: tabela z kolumnami i siatką jak w panelu */
+  body { font-family: Arial, Helvetica, sans-serif; color: #111827; margin: 2rem; }
+  h1 { font-size: 1.3rem; margin-bottom: 0.25rem; }
+  .data { color: #6b7280; margin: 0 0 1rem; font-size: 0.9rem; }
+  table.tabela { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  table.tabela th, table.tabela td { border: 1px solid #9ca3af; padding: 6px 10px; text-align: left; }
+  table.tabela th { background: #e5e7eb; }
+  .razem { margin-top: 0.75rem; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Raport zapłaconych płatności</h1>
+<p class="data">Wygenerowano: {{ data_raportu }} &mdash; odbiorca: {{ odbiorca }}</p>
+<table class="tabela">
+  <thead>
+    <tr>
+      <th>Uczeń</th>
+      <th>Korepetytor</th>
+      <th>Przedmiot</th>
+      <th>Wpisał</th>
+      <th>1. lekcja</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in pozycje %}
+    <tr>
+      <td>{{ u.imie_ucznia }} {{ u.nazwisko_rodzica }}</td>
+      <td>{{ u.korepetytor }}</td>
+      <td>{{ u.przedmiot }}</td>
+      <td>{{ u.kto_umowil }}</td>
+      <td>{{ u.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="razem">Razem zapłaconych płatności: {{ pozycje|length }}</p>
+</body>
+</html>
