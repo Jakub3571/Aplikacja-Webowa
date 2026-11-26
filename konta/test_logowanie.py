@@ -487,6 +487,17 @@ class PlatnosciTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'tabela tabela-siata')
 
+    def test_raport_i_historia_w_ukladzie_pelnoszerokim(self):
+        # "Wyślij raport" i "Historia płatności" siedzą WEWNĄTRZ .platnosci-uklad razem z "Zapłacone"
+        # (zamknięcie </div> ukladu jest dopiero PO sekcji Historii) -> pełna szerokość jak pozostałe karty
+        self.client.force_login(self.user)
+        self.dodaj_ucznia('Kasia', zaplacone=True)
+        r = self.client.get('/platnosci/')
+        html = r.content.decode()
+        frag_raport = html[html.find('<h2>Zapłacone</h2>'):html.find('<h2>Wyślij raport</h2>')]
+        self.assertNotIn('\n</div>\n', frag_raport)                     # raport NIE jest poza ukladem
+        self.assertIn('\n</div>\n', html[html.find('Historia płatności'):])  # uklad zamknięty dopiero po Historii
+
     def test_platnosci_blokowane_bez_zalogowania(self):
         r = self.client.get('/platnosci/')
         # niezalogowany dostaje przekierowanie na logowanie (nie wie, ze strona istnieje)
