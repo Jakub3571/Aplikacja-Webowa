@@ -1923,6 +1923,24 @@ def lekcje(request):
 
 
 
+def _lekcje_cykliczne_tekst(uczen, limit_miesiecy=2):
+    """Przyszłe lekcje ucznia (od teraz, bez odwołanych) pogrupowane po miesiącu,
+    np. 'lis 2026: 26.11 17:00, 30.11 17:00; gru 2026: 07.12 17:00'.
+    Pokazujemy max `limit_miesiecy` najbliższych miesięcy — zajęcia cykliczne są
+    odnawiane co miesiąc komendą odnow_cykliczne (CRON)."""
+    lekcje = Lekcja.objects.filter(uczen=uczen, odwolana=False, data__gte=timezone.now()).order_by('data')
+    grupy = {}
+    for l in lekcje:
+        lok = timezone.localtime(l.data)
+        grupy.setdefault((lok.year, lok.month), []).append(f'{lok.day:02d}.{lok.month:02d} {lok:%H:%M}')
+    if not grupy:
+        return '—'
+    return '; '.join(
+        f'{MIESIACE[m - 1][:3]} {r}: ' + ', '.join(terminy)
+        for (r, m), terminy in sorted(grupy.items())[:limit_miesiecy]
+    )
+
+
 @login_required
 def platnosci(request):
     """Zakładka płatności: lista uczniów, statusy zapłacone i wysyłka raportu.
@@ -2091,6 +2109,12 @@ def platnosci(request):
             'nauczyciele': sorted(nauczyciele_set),
         })
     rozliczenia_pracownikow.sort(key=lambda p: p['pracownik'].username)
+    for u in uczniowie_lista:
+        u.lekcje_cykliczne_tekst = _lekcje_cykliczne_tekst(u)
+    for u in zaplaconi:
+        u.lekcje_cykliczne_tekst = _lekcje_cykliczne_tekst(u)
+    for u in historia:
+        u.lekcje_cykliczne_tekst = _lekcje_cykliczne_tekst(u)
     return render(request, 'konta/platnosci.html', {
         'uczniowie': uczniowie_lista,
         'zaplaconi': zaplaconi,

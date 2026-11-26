@@ -585,6 +585,39 @@ class PlatnosciTests(TestCase):
         self.assertIn('.txt', r['Content-Disposition'])
         self.assertContains(r, 'stary raport tekstowy')
 
+    def test_platnosci_pokazuja_lekcje_cykliczne_pogrupowane_miesiacem(self):
+        # kolumna "Lekcje cykliczne": przyszłe lekcje ucznia pogrupowane po miesiącu
+        from konta.views import MIESIACE
+        self.client.force_login(self.user)
+        uczen = self.dodaj_ucznia()
+        dzis = timezone.localdate()
+        d1 = dzis + timedelta(days=3)
+        if d1.month == 12:
+            d2 = d1.replace(year=d1.year + 1, month=1, day=5)
+        else:
+            d2 = d1.replace(month=d1.month + 1, day=5)
+        Lekcja.objects.create(uczen=uczen, data=timezone.make_aware(datetime(d1.year, d1.month, d1.day, 17, 0)))
+        Lekcja.objects.create(uczen=uczen, data=timezone.make_aware(datetime(d2.year, d2.month, d2.day, 17, 0)))
+        r = self.client.get('/platnosci/')
+        self.assertContains(r, 'Lekcje cykliczne')
+        self.assertContains(r, f'{d1.day:02d}.{d1.month:02d} 17:00')
+        self.assertContains(r, f'{d2.day:02d}.{d2.month:02d} 17:00')
+        self.assertContains(r, f'{MIESIACE[d1.month - 1][:3]} {d1.year}')
+
+    def test_po_wyslaniu_raportu_lekcje_zostaja_a_historia_pokazuje_terminy(self):
+        # raport (mail lub plik) NIE czyści lekcji — uczeń zostaje z zajęciami,
+        # a w Historii nadal widać jego terminy pogrupowane miesiącem
+        self.client.force_login(self.user)
+        uczen = self.dodaj_ucznia('Kasia', zaplacone=True)
+        dzis = timezone.localdate()
+        d1 = dzis + timedelta(days=3)
+        Lekcja.objects.create(uczen=uczen, data=timezone.make_aware(datetime(d1.year, d1.month, d1.day, 17, 0)))
+        self.client.post('/platnosci/', {'wyslij_raport': '1', 'email_raportu': 'szef@f.pl'}, follow=True)
+        self.assertEqual(Lekcja.objects.filter(uczen=uczen).count(), 1)   # lekcja została
+        r = self.client.get('/platnosci/')
+        self.assertContains(r, 'Historia płatności')
+        self.assertContains(r, f'{d1.day:02d}.{d1.month:02d} 17:00')      # historia pokazuje terminy
+
 class UzytkownicyTests(TestCase):
     """Zakładka użytkownicy: dodawanie kont i uprawnienia (tylko szef)."""
 

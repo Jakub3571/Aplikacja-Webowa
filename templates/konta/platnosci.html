@@ -20,6 +20,7 @@
                         <th>Nauczyciel</th>
                         <th>Wpisał</th>
                         <th>1. lekcja</th>
+                        <th>Lekcje cykliczne</th>
                         <th>Status</th>
                         <th></th>
                     </tr>
@@ -39,6 +40,7 @@
                         <td>{{ uczen.korepetytor }}</td>
                         <td>{{ uczen.kto_umowil }}</td>
                         <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+                        <td>{{ uczen.lekcje_cykliczne_tekst }}</td>
                         <td><span class="status-niezaplacone">❌ niezapłacone</span></td>
                         <td>
                             {% if czy_szef %}
@@ -173,6 +175,7 @@
                         <th>Uczeń</th>
                         <th>Nauczyciel</th>
                         <th>1. lekcja</th>
+                        <th>Lekcje cykliczne</th>
                         <th>Status</th>
                         <th></th>
                     </tr>
@@ -189,8 +192,9 @@
                             </form>
                         </td>
                         <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
-                        <td>{{ uczen.korepetytor }}</td>
+                                                <td>{{ uczen.korepetytor }}</td>
                         <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+                        <td>{{ uczen.lekcje_cykliczne_tekst }}</td>
                         <td><span class="status-zaplacone">✅ zapłacone</span></td>
                         <td>
                             {% if czy_szef %}
@@ -247,8 +251,9 @@
                 <tr>
                     <th>Uczeń</th>
                     <th>Przedmiot</th>
-                    <th>Nauczyciel</th>
+                                        <th>Nauczyciel</th>
                     <th>1. lekcja</th>
+                    <th>Lekcje cykliczne</th>
                     <th>Rozliczono w raporcie</th>
                 </tr>
             </thead>
@@ -257,8 +262,9 @@
                 <tr>
                     <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
                     <td>{{ uczen.przedmiot }}</td>
-                    <td>{{ uczen.korepetytor }}</td>
+                                        <td>{{ uczen.korepetytor }}</td>
                     <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+                    <td>{{ uczen.lekcje_cykliczne_tekst }}</td>
                     <td>{{ uczen.rozliczono_kiedy|date:"d.m.Y H:i" }}</td>
                 </tr>
                 {% endfor %}
