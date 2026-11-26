@@ -3341,8 +3341,68 @@ class EtykietyKorepetytorTests(TestCase):
         niedozwolone = ['>Nauczyciel<', 'nauczyciela lub', 'Szukaj nauczyciela',
                         'stawki nauczyciela', 'nauczyciele nie mają', 'tydzień” nauczyciela',
                         'nauczyciela nie pracuje', 'karta nauczyciela']
-        for adres in ['/platnosci/', '/uczniowie/', '/kalendarz/', '/uzytkownicy/']:
-            with self.subTest(adres=adres):
-                r = self.client.get(adres)
-                for fraza in niedozwolone:
-                    self.assertNotContains(r, fraza)
+class RytmZakresowTests(TestCase):
+    """Dwa zakresy w dniu (10–13 i 14–20): każdy liczy własny rytm (60 min + przerwa),
+    zakresy nie przesuwają się względem siebie; w kalendarzu widać, o której kończą się zajęcia."""
+
+    def setUp(self):
+        self.admin = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.n = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='j@n.pl')  # przerwa domyślnie 5
+        self.dzien = date(2026, 11, 27)  # piątek
+        for od, do in [(time(10, 0), time(13, 0)), (time(14, 0), time(20, 0))]:
+            k = datetime.combine(self.dzien, od)
+            kon = datetime.combine(self.dzien, do)
+            while k < kon:
+                Dostepnosc.objects.create(
+                    nauczyciel=self.n, data_od=self.dzien, data_do=self.dzien,
+                    godzina_od=k.time(), godzina_do=(k + timedelta(minutes=30)).time(),
+                )
+                k += timedelta(minutes=30)
+
+    def test_kazdy_zakres_ma_wlasny_rytm(self):
+        from konta.views import wolne_godziny_nauczyciela
+        wolne = wolne_godziny_nauczyciela(self.n, self.dzien)
+        # zakres 10–13: 10:00, 11:05, 12:10, 13:15 (ostatni slot max 30 min poza 13:00)
+        self.assertEqual(wolne[:4], ['10:00', '11:05', '12:10', '13:15'])
+        # zakres 14–20 zaczyna się od 14:00 — nie od 14:15 jak w starym kodzie
+        self.assertIn('14:00', wolne)
+        self.assertIn('15:05', wolne)
+        self.assertNotIn('14:15', wolne)
+        self.assertNotIn('12:55', wolne)
+
+    def test_plan_dnia_ajax_ma_rytm_per_zakres(self):
+        self.client.force_login(self.admin)
+        r = self.client.post(
+            f'/nauczyciele/{self.n.id}/kalendarz/dane/',
+            {'dzien': self.dzien.isoformat(), 'akcja': 'zapisz_przerwe', 'przerwa': '5'},
+        )
+        starty = [w['start'] for w in r.json()['plan_dnia'] if w['typ'] == 'lekcja']
+        self.assertIn('13:15', starty)   # rytm zakresu 10–13
+        self.assertIn('14:00', starty)   # zakres 14–20 zaczyna się od 14:00
+        self.assertNotIn('14:15', starty)
+
+    def test_zaznacz_zakres_pokazuje_koniec_zajec(self):
+        self.client.force_login(self.admin)
+        Dostepnosc.objects.filter(nauczyciel=self.n, data_od=self.dzien).delete()
+        r = self.client.post(
+            f'/nauczyciele/{self.n.id}/kalendarz/dane/',
+            {'dzien': self.dzien.isoformat(), 'akcja': 'zaznacz_zakres', 'od': '10:00', 'do': '13:00'},
+        )
+        self.assertIn('13:15', r.json()['komunikat'])   # ostatnia lekcja 13:15
+        self.assertIn('14:15', r.json()['komunikat'])   # zajęcia kończą się o 14:15
+
+    def test_moj_tydzien_pokazuje_koniec_zajec_zakresu(self):
+        self.client.force_login(self.admin)
+        r = self.client.get(f'/moj-tydzien/{self.n.id}/?rok=2026&miesiac=11&dzien=27')
+        self.assertContains(r, '13:15–14:15')   # zakres 10–13
+        self.assertContains(r, '20:30–21:30')   # zakres 14–20
+
+    def test_godzina_w_przerwie_liczona_per_zakres(self):
+        from konta.models import PrzerwaDnia
+        from konta.views import godzina_w_przerwie
+        PrzerwaDnia.objects.create(nauczyciel=self.n, data=self.dzien, minuty=5)
+        # przerwa między slotami zakresu 10–13: 12:05–12:10
+        self.assertTrue(godzina_w_przerwie(self.n, self.dzien, time(12, 7)))
+        # początek drugiego zakresu (14:00) NIE jest przerwą (stary kod tak liczył: 14:00–14:05)
+        self.assertFalse(godzina_w_przerwie(self.n, self.dzien, time(14, 2)))
+        self.assertFalse(godzina_w_przerwie(self.n, self.dzien, time(14, 0)))

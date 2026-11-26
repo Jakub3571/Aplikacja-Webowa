@@ -305,12 +305,8 @@ def wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=None):
     krok = timedelta(minutes=GODZINA_LEKCJI + przerwa)
     for s, e in _zakresy_dnia(nauczyciel, dzien):
         kandydaci = set()
-        t = s
-        # rytm może wyjść poza koniec zakresu, ale max 30 min (15:20 przy "do 15:00" OK,
-        # 19:00 przy "do 18:00" już nie — byłoby 60 min poza zakresem)
-        while t <= e + timedelta(minutes=30):
-            kandydaci.add(t)
-            t += krok
+        # rytm liczony osobno dla każdego zakresu (ostatni slot max 30 min poza koniec zakresu)
+        kandydaci.update(_rytm_zakresu(s, e, krok))
         for l_start in lekcje_starty:
             po = l_start + timedelta(minutes=GODZINA_LEKCJI + przerwa)
             przed = l_start - timedelta(minutes=GODZINA_LEKCJI + przerwa)
@@ -333,45 +329,17 @@ def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
     wpis = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien).first()
     if not wpis or not wpis.minuty:
         return False
-    minuty = wpis.minuty
-
-    zaznaczone = set()
-    for termin in Dostepnosc.objects.filter(nauczyciel=nauczyciel, data_od=dzien):
-        start = datetime.combine(dzien, termin.godzina_od)
-        koniec = datetime.combine(dzien, termin.godzina_do)
-        while start < koniec:
-            zaznaczone.add(start.strftime('%H:%M'))
-            start += timedelta(minutes=30)
-    if not zaznaczone:
-        return False
-
-    sloty = sorted(zaznaczone)
-    bloki = []
-    i = 0
-    while i < len(sloty):
-        start_bloku = datetime.strptime(sloty[i], '%H:%M')
-        dlugosc = 30
-        while (
-            i + 1 < len(sloty)
-            and (start_bloku + timedelta(minutes=dlugosc)).strftime('%H:%M') == sloty[i + 1]
-        ):
-            dlugosc += 30
-            i += 1
-        bloki.append((start_bloku, dlugosc))
-        i += 1
-
-    przesuniecie = 0
-    przerwy = []
-    for numer, (start_bloku, dlugosc) in enumerate(bloki, start=1):
-        start = start_bloku + timedelta(minutes=przesuniecie)
-        if numer > 1:
-            przerwy.append((start - timedelta(minutes=minuty), start))
-        przesuniecie += wpis.minuty
-
-    start_slotu = datetime.combine(date(1900, 1, 1), godzina_start)
-    for poczatek, koniec in przerwy:
-        if poczatek <= start_slotu < koniec:
-            return True
+    # przerwy liczone per zakres — tak samo jak rytm w wolne_godziny_nauczyciela:
+    # między kolejnymi slotami jednego zakresu; początek kolejnego zakresu NIE jest przerwą
+    krok = timedelta(minutes=GODZINA_LEKCJI + wpis.minuty)
+    for s, e in _zakresy_dnia(nauczyciel, dzien):
+        sloty = _rytm_zakresu(s, e, krok)
+        for i, t in enumerate(sloty):
+            if i + 1 < len(sloty):
+                poczatek_przerwy = (t + timedelta(minutes=GODZINA_LEKCJI)).time()
+                koniec_przerwy = sloty[i + 1].time()
+                if poczatek_przerwy <= godzina_start < koniec_przerwy:
+                    return True
     return False
 
 
@@ -1612,6 +1580,19 @@ def kalendarz_dane(request, nauczyciel_id):
             if odznaczyc else
             f'Godziny {start:%H:%M}–{koniec_zakresu:%H:%M} — oznaczono jako dostępne.'
         )
+        if not odznaczyc:
+            # pokaż, o której skończą się zajęcia w tym zakresie (rytm 60+przerwa od startu zakresu)
+            krok_z = timedelta(minutes=GODZINA_LEKCJI + _przerwa_dnia(nauczyciel, dzien_data))
+            sloty_r = _rytm_zakresu(
+                datetime.combine(date(2000, 1, 1), start),
+                datetime.combine(date(2000, 1, 1), koniec_zakresu),
+                krok_z,
+            )
+            if sloty_r:
+                ost = sloty_r[-1]
+                koniec_zajec = ost + timedelta(minutes=GODZINA_LEKCJI)
+                komunikat += (f' Ostatnia lekcja w tym zakresie: {ost:%H:%M}–{koniec_zajec:%H:%M}'
+                              f' (zajęcia kończą się o {koniec_zajec:%H:%M}).')
         if cykliczny and not odznaczyc:
             # cykliczność od razu co tydzień aż do końca wakacji (31.08)
             skopiowane = _rozszerz_cyklicznie(nauczyciel, dzien_data, start, koniec_zakresu, okres=1)
@@ -1810,45 +1791,31 @@ def kalendarz_dane(request, nauczyciel_id):
     wpis = PrzerwaDnia.objects.filter(nauczyciel=nauczyciel, data=dzien_data).first()
     przerwa_min = wpis.minuty if wpis else (nauczyciel.przerwa or 5)
 
+    # plan dnia = rytm KAŻDEGO zakresu osobno (taki sam jak w formularzu ucznia)
     plan_dnia, sloty_przerwy = [], set()
-    sloty = sorted(zaznaczone)
-    if sloty:
-        bloki = []
-        i = 0
-        while i < len(sloty):
-            start_bloku = datetime.strptime(sloty[i], '%H:%M')
-            dlugosc = 30
-            while (
-                i + 1 < len(sloty)
-                and (start_bloku + timedelta(minutes=dlugosc)).strftime('%H:%M') == sloty[i + 1]
-                and dlugosc < 60
-            ):
-                dlugosc += 30
-                i += 1
-            bloki.append((start_bloku, dlugosc))
-            i += 1
-        przesuniecie = 0
-        for numer, (start_bloku, dlugosc) in enumerate(bloki, start=1):
-            start = start_bloku + timedelta(minutes=przesuniecie)
-            koniec = start + timedelta(minutes=dlugosc)
-            if numer > 1 and przerwa_min:
-                poczatek_przerwy = start - timedelta(minutes=przerwa_min)
-                plan_dnia.append({
-                    'typ': 'przerwa',
-                    'start': poczatek_przerwy.strftime('%H:%M'),
-                    'koniec': start.strftime('%H:%M'),
-                })
-                kursor = poczatek_przerwy.replace(minute=(poczatek_przerwy.minute // 30) * 30)
-                while kursor < start:
-                    sloty_przerwy.add(kursor.strftime('%H:%M'))
-                    kursor += timedelta(minutes=30)
+    krok = timedelta(minutes=GODZINA_LEKCJI + przerwa_min)
+    for s, e in _zakresy_dnia(nauczyciel, dzien_data):
+        sloty_zakresu = _rytm_zakresu(s, e, krok)
+        for i, t in enumerate(sloty_zakresu):
             plan_dnia.append({
                 'typ': 'lekcja',
-                'numer': numer,
-                'start': start.strftime('%H:%M'),
-                'koniec': koniec.strftime('%H:%M'),
+                'numer': len(plan_dnia) + 1,
+                'start': t.strftime('%H:%M'),
+                'koniec': (t + timedelta(minutes=GODZINA_LEKCJI)).strftime('%H:%M'),
             })
-            przesuniecie += przerwa_min
+            if i + 1 < len(sloty_zakresu):
+                nastepny = sloty_zakresu[i + 1]
+                koniec_lekcji = t + timedelta(minutes=GODZINA_LEKCJI)
+                plan_dnia.append({
+                    'typ': 'przerwa',
+                    'start': koniec_lekcji.strftime('%H:%M'),
+                    'koniec': nastepny.strftime('%H:%M'),
+                })
+                kursor = koniec_lekcji.replace(minute=(koniec_lekcji.minute // 30) * 30)
+                while kursor < nastepny:
+                    sloty_przerwy.add(kursor.strftime('%H:%M'))
+                    kursor += timedelta(minutes=30)
+    plan_dnia.sort(key=lambda w: (w['start'], w['typ'] == 'przerwa'))
     zajete = set()
     nazwa_nauczyciela_dane = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
     for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__date=dzien_data, odwolana=False):
@@ -2429,13 +2396,18 @@ def moj_tydzien(request, nauczyciel_id=None):
     dni = []
     for dzien in dni_tygodnia:
         zakresy = []
+        przerwa_dnia = przerwy_dni.get(dzien, nauczyciel.przerwa or 5)
         for s, e in _zakresy_dnia(nauczyciel, dzien):
             cyk_sloty = list(Dostepnosc.objects.filter(
                 nauczyciel=nauczyciel, data_od=dzien, cykliczny=True,
                 godzina_od__gte=s.time(), godzina_do__lte=e.time(),
             ))
+            sloty_z = _rytm_zakresu(s, e, timedelta(minutes=GODZINA_LEKCJI + przerwa_dnia))
+            ostatnia = sloty_z[-1] if sloty_z else s
             zakresy.append({
                 'od': s.strftime('%H:%M'), 'do': e.strftime('%H:%M'),
+                'ostatnia': ostatnia.strftime('%H:%M'),
+                'koniec': (ostatnia + timedelta(minutes=GODZINA_LEKCJI)).strftime('%H:%M'),
                 'cykliczny': bool(cyk_sloty),
                 'okres': cyk_sloty[0].cykliczny_okres if cyk_sloty else 1,
             })
