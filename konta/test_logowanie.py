@@ -3161,6 +3161,23 @@ class SiatkaWszedzieTests(TestCase):
                 self.assertEqual(r.status_code, 200)
                 self.assertNotContains(r, 'class="tabela"')   # każda tabela to "tabela tabela-siata"
 
+    def test_strony_edycji_tez_maja_siatke(self):
+        uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 5, 17)),
+            przedmiot='matematyka', poziom='rozszerzony',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='e@f.pl',
+            telefon_dodatkowy='', email_dodatkowy='',
+            korepetytor='Jan Kowalski', notatka_od_rodzica='ok', kto_umowil='Jan',
+        )
+        n = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='j@f.pl')
+        tutor = Pracownik.objects.create_user('ola', 'o@f.pl', 'Sup3rHaslo!', nauczyciel=n)
+        for adres in [f'/uczniowie/{uczen.id}/edytuj/', f'/uzytkownicy/{tutor.id}/edytuj/']:
+            with self.subTest(adres=adres):
+                r = self.client.get(adres)
+                self.assertEqual(r.status_code, 200)
+                self.assertNotContains(r, 'class="tabela"')
+
 class BlokadaLogowaniaTests(TestCase):
     """Po 5 nieudanych próbach logowanie blokuje się tylko na okno 10 minut
     (a nie do końca sesji) — i komunikat podpowiada reset hasła."""
