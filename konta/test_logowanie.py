@@ -479,6 +479,14 @@ class PlatnosciTests(TestCase):
         self.assertContains(r, 'Jan Kowalski')
         self.assertContains(r, 'niezapłacone')
 
+    def test_platnosci_maja_siatke_jak_uzytkownicy(self):
+        # wszystkie tabele w Płatnościach mają klasę tabela-siata (pionowe linie między kolumnami)
+        self.client.force_login(self.user)
+        self.dodaj_ucznia()
+        r = self.client.get('/platnosci/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'tabela tabela-siata')
+
     def test_platnosci_blokowane_bez_zalogowania(self):
         r = self.client.get('/platnosci/')
         # niezalogowany dostaje przekierowanie na logowanie (nie wie, ze strona istnieje)
