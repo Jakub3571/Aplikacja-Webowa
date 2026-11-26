@@ -392,8 +392,7 @@ class NauczycieleTests(TestCase):
         r = self.client.get('/archiwum/')
         self.assertContains(r, 'Osoby umawiające — wyłączone')
         self.assertNotContains(r, 'Pracownicy — wyłączeni')
-        self.assertNotContains(r, '🗑')          # kosz zamieniony na X
-        self.assertContains(r, 'ikona-usun')    # czerwony X przy „usuń ucznia” (szef)
+        self.assertContains(r, 'ikona-usun')    # X przy „usuń ucznia” (szef); 🗑 tylko przy kontach w archiwum
 
     def test_pasek_nauczyciela_pod_zakladkami(self):
         # pasek z imieniem + przedmiotami widzi tylko zalogowany korepetytor, na całej szerokości pod zakładkami
@@ -2710,6 +2709,70 @@ class KontaArchiwumTests(TestCase):
         self.assertNotContains(r, '>prac</td>')
         self.client.logout()
         self.assertTrue(self.client.login(username='prac', password='Sup3rHaslo!'))
+
+    def test_dezaktywacja_korepetytora_wylacza_tez_karte_i_laduje_w_archiwum(self):
+        # konto korepetytora wyłączone -> karta aktywny=False -> korepetytor widać w Archiwum
+        n = Nauczyciel.objects.create(imie='Ola', nazwisko='Zet', email='o@z.pl')
+        tutor = Pracownik.objects.create_user('ola', 'o@z.pl', 'Sup3rHaslo!', nauczyciel=n)
+        self.client.post(f'/uzytkownicy/{tutor.id}/konto/')
+        tutor.refresh_from_db()
+        n.refresh_from_db()
+        self.assertFalse(tutor.is_active)
+        self.assertFalse(n.aktywny)
+        r = self.client.get('/archiwum/')
+        self.assertContains(r, 'Ola Zet')   # korepetytor NIE znika bez śladu
+        self.assertContains(r, 'przywróć konto')
+        # przywrócenie konta przywraca też kartę
+        self.client.get(f'/uzytkownicy/{tutor.id}/przywroc/')
+        n.refresh_from_db()
+        self.assertTrue(n.aktywny)
+
+    def test_usun_na_zawsze_tylko_z_archiwum_i_tylko_dla_szefa(self):
+        # w Użytkownicy NIE ma przycisku usun_konto, w Archiwum jest (szef)
+        r = self.client.get('/uzytkownicy/')
+        self.assertNotContains(r, 'usun_konto')
+        self.client.post(f'/uzytkownicy/{self.prac.id}/konto/')
+        r = self.client.get('/archiwum/')
+        self.assertContains(r, f'/uzytkownicy/{self.prac.id}/usun/')
+        self.assertContains(r, 'usuń na zawsze')
+        # GET = ekran potwierdzenia, POST = kasuje na stałe i wraca do archiwum
+        r = self.client.get(f'/uzytkownicy/{self.prac.id}/usun/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'na stałe')
+        r = self.client.post(f'/uzytkownicy/{self.prac.id}/usun/', follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(Pracownik.objects.filter(pk=self.prac.id).exists())
+        self.assertContains(r, 'Archiwum')
+        # koordynator nie może usuwać na zawsze (403)
+        koord = Pracownik.objects.create_user('koord', 'k@f.pl', 'Sup3rHaslo!', stanowisko='koordynator')
+        prac2 = Pracownik.objects.create_user('prac2', 'p2@f.pl', 'Sup3rHaslo!', is_active=False)
+        self.client.force_login(koord)
+        r = self.client.get('/uzytkownicy/')  # koordynator widzi zakładkę, ale bez usun
+        self.assertNotContains(r, 'usun_konto')
+        r = self.client.post(f'/uzytkownicy/{prac2.id}/usun/')
+        self.assertEqual(r.status_code, 403)
+
+    def test_usun_na_zawsze_korepetytora_kasuje_tez_karte(self):
+        n = Nauczyciel.objects.create(imie='Ola', nazwisko='Zet', email='o@z.pl')
+        tutor = Pracownik.objects.create_user('ola', 'o@z.pl', 'Sup3rHaslo!', nauczyciel=n)
+        self.client.post(f'/uzytkownicy/{tutor.id}/konto/')  # -> archiwum
+        self.client.post(f'/uzytkownicy/{tutor.id}/usun/')
+        self.assertFalse(Pracownik.objects.filter(pk=tutor.id).exists())
+        self.assertFalse(Nauczyciel.objects.filter(pk=n.id).exists())  # żadnych "duchów"
+
+    def test_uzytkownicy_bez_statusu_z_siatka_i_kolorowymi_przedmiotami_i_zakresami(self):
+        n = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='j@k.pl')
+        tutor = Pracownik.objects.create_user('jk', 'jk@k.pl', 'Sup3rHaslo!', nauczyciel=n)
+        PrzedmiotNauczyciela.objects.create(nauczyciel=n, przedmiot='matematyka', poziom='srednia podstawa', stawka=120)
+        dzis = date.today()
+        Dostepnosc.objects.create(nauczyciel=n, data_od=dzis, data_do=dzis, godzina_od=time(6, 0), godzina_do=time(15, 0))
+        r = self.client.get('/uzytkownicy/')
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, '<th>Status</th>')           # status usunięty z Użytkowników
+        self.assertContains(r, 'tabela-siata')                  # siatka kolumn
+        self.assertContains(r, 'przedmiot-poziom poziom-srednia-podstawa')  # przedmiot w kolorze
+        self.assertContains(r, 'matematyka')
+        self.assertContains(r, '6:00–15:00')                   # zakres korepetytora w jego wierszu
 
 class PelneGodzinyMojTydzienTests(TestCase):
     """Pelne godziny w Moj tydzien (bez :30) i panel przesuwania zajec tylko dla szefa."""

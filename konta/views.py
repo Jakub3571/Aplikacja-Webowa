@@ -1013,6 +1013,8 @@ def archiwum_uczniow(request):
     """Zakładka archiwum: uczniowie ze zakończoną współpracą, zakończeni korepetytorzy
     i wyłączone konta pracowników — wszystko z możliwością przywrócenia. Aktywni się nie pokazują."""
     korepetytorzy_lista = list(Nauczyciel.objects.filter(aktywny=False).order_by('nazwisko', 'imie'))
+    for n in korepetytorzy_lista:
+        n.konto_uzytkownika = Pracownik.objects.filter(nauczyciel=n).first()  # powiązane konto (jeśli jest)
     pracownicy_lista = [
         u for u in Pracownik.objects.filter(is_active=False).order_by('username')
         if not u.nauczyciel
@@ -1201,6 +1203,10 @@ def przelacz_konto(request, user_id):
     if request.method == 'POST':
         uzytkownik.is_active = False
         uzytkownik.save(update_fields=['is_active'])
+        # konto korepetytora wyłączone -> jego karta też nieaktywna (inaczej "znika" bez śladu)
+        if uzytkownik.nauczyciel_id:
+            uzytkownik.nauczyciel.aktywny = False
+            uzytkownik.nauczyciel.save(update_fields=['aktywny'])
         messages.info(
             request,
             f'Konto {uzytkownik.username} zostało dezaktywowane — trafiło do Archiwum '
@@ -1218,6 +1224,10 @@ def przywroc_konto(request, user_id):
     uzytkownik = get_object_or_404(Pracownik, pk=user_id)
     uzytkownik.is_active = True
     uzytkownik.save(update_fields=['is_active'])
+    # konto korepetytora przywrócone -> karta znowu aktywna
+    if uzytkownik.nauczyciel_id:
+        uzytkownik.nauczyciel.aktywny = True
+        uzytkownik.nauczyciel.save(update_fields=['aktywny'])
     messages.success(
         request,
         f'Konto {uzytkownik.username} zostało przywrócone — wróciło do zakładki Użytkownicy '
@@ -1233,7 +1243,7 @@ def usun_konto(request, user_id):
     uzytkownik = get_object_or_404(Pracownik, pk=user_id)
     if uzytkownik.id == request.user.id:
         messages.error(request, 'Nie możesz usunąć własnego konta.')
-        return redirect('uzytkownicy')
+        return redirect('archiwum')
     if not czy_szef(request.user):
         raise PermissionDenied
     if request.method == 'POST':
@@ -1245,7 +1255,7 @@ def usun_konto(request, user_id):
         if nauczyciel:
             nauczyciel.delete()
         messages.success(request, f'Konto {login} zostało usunięte na stałe.')
-        return redirect('uzytkownicy')
+        return redirect('archiwum')
     return render(request, 'konta/usun_konto.html', {'uzytkownik': uzytkownik})
 
 @login_required
@@ -2210,6 +2220,23 @@ def uzytkownicy(request):
     koordynatorzy = [u for u in lista if not u.is_superuser and not u.nauczyciel and (u.stanowisko or '').strip().lower() == 'koordynator']
     umawiajacy = [u for u in lista if not u.is_superuser and not u.nauczyciel and (u.stanowisko or '').strip().lower() != 'koordynator']
     nauczyciele_konta = [u for u in lista if u.nauczyciel]
+    DNI_SKROT = ['pon', 'wt', 'śr', 'czw', 'pt', 'sob', 'nied']
+    for u in nauczyciele_konta:
+        n = u.nauczyciel
+        # przedmioty z klasą koloru poziomu (jak legenda w Uczniowie)
+        u.przedmioty_kolor = [
+            {'przedmiot': p.przedmiot, 'poziom': p.poziom, 'stawka': p.stawka, 'klasa': _klasa_poziomu(p.poziom)}
+            for p in n.przedmioty.all()
+        ]
+        # zakresy pracy wg dnia tygodnia, np. "pon 6:00–15:00, śr 8:00–12:00"
+        per_dzien = {}
+        for d in Dostepnosc.objects.filter(nauczyciel=n):
+            klucz = d.data_od.weekday()
+            od, do = per_dzien.get(klucz, (d.godzina_od, d.godzina_do))
+            per_dzien[klucz] = (min(od, d.godzina_od), max(do, d.godzina_do))
+        u.zakresy_tekst = ', '.join(
+            f'{DNI_SKROT[k]} {od:%H:%M}–{do:%H:%M}' for k, (od, do) in sorted(per_dzien.items())
+        ) or '—'
     return render(request, 'konta/uzytkownicy.html', {
         'form': form,
         'uzytkownicy': lista,

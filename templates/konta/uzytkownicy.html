@@ -119,13 +119,13 @@ pracowniczy{% endblock %} {% block panel %}
             </p>
             {% if admini %}
             <div class="tabela-wrapper">
-                <table class="tabela" id="tabela-admini">
+                <table class="tabela tabela-siata" id="tabela-admini">
                     <thead>
                         <tr>
                             <th>Użytkownik</th>
                             <th>Imię i nazwisko</th>
                             <th>Email</th>
-                            <th>Status</th>
+                            
                             <th>Akcje</th>
                         </tr>
                     </thead>
@@ -135,7 +135,7 @@ pracowniczy{% endblock %} {% block panel %}
                             <td>{{ u.username }}</td>
                             <td>{{ u.first_name }} {{ u.last_name }}</td>
                             <td>{{ u.email }}</td>
-                            <td>{% if u.is_active %}<span class="umowa-tak">✔ aktywne</span>{% else %}<span class="umowa-nie">wyłączone</span>{% endif %}</td>
+                            
                             <td>
                                 <a
                                     class="ikona-kalendarza"
@@ -171,13 +171,13 @@ pracowniczy{% endblock %} {% block panel %}
             </p>
             {% if koordynatorzy %}
             <div class="tabela-wrapper">
-                <table class="tabela" id="tabela-koordynatorzy">
+                <table class="tabela tabela-siata" id="tabela-koordynatorzy">
                     <thead>
                         <tr>
                             <th>Użytkownik</th>
                             <th>Imię i nazwisko</th>
                             <th>Email</th>
-                            <th>Status</th>
+                            
                             <th>Akcje</th>
                         </tr>
                     </thead>
@@ -187,7 +187,7 @@ pracowniczy{% endblock %} {% block panel %}
                             <td>{{ u.username }}</td>
                             <td>{{ u.first_name }} {{ u.last_name }}</td>
                             <td>{{ u.email }}</td>
-                            <td>{% if u.is_active %}<span class="umowa-tak">✔ aktywne</span>{% else %}<span class="umowa-nie">wyłączone</span>{% endif %}</td>
+                            
                             <td>
                                 {% if czy_szef or czy_koordynator %}
                                 <a
@@ -227,13 +227,13 @@ pracowniczy{% endblock %} {% block panel %}
             </p>
             {% if umawiajacy %}
             <div class="tabela-wrapper">
-                <table class="tabela" id="tabela-umawiajacy">
+                <table class="tabela tabela-siata" id="tabela-umawiajacy">
                     <thead>
                         <tr>
                             <th>Użytkownik</th>
                             <th>Imię i nazwisko</th>
                             <th>Email</th>
-                            <th>Status</th>
+                            
                             <th>Akcje</th>
                         </tr>
                     </thead>
@@ -243,7 +243,7 @@ pracowniczy{% endblock %} {% block panel %}
                             <td>{{ u.username }}</td>
                             <td>{{ u.first_name }} {{ u.last_name }}</td>
                             <td>{{ u.email }}</td>
-                            <td>{% if u.is_active %}<span class="umowa-tak">✔ aktywne</span>{% else %}<span class="umowa-nie">wyłączone</span>{% endif %}</td>
+                            
                             <td>
                                 {% if czy_szef or czy_koordynator %}
                                 <a
@@ -278,13 +278,13 @@ pracowniczy{% endblock %} {% block panel %}
             </p>
             {% if nauczyciele %}
             <div class="tabela-wrapper">
-                <table class="tabela" id="tabela-nauczyciele-konta">
+                <table class="tabela tabela-siata" id="tabela-nauczyciele">
                     <thead>
                         <tr>
                             <th>Korepetytor</th>
                             <th>Email</th>
-                            <th>Przedmioty i stawki</th>
-                            <th>Status</th>
+                            <th>Przedmioty</th>
+                            <th>Zakresy</th>
                             <th>Kalendarz</th>
                             <th>Akcje</th>
                         </tr>
@@ -295,15 +295,9 @@ pracowniczy{% endblock %} {% block panel %}
                             <td>{{ u.first_name }} {{ u.last_name }}</td>
                             <td>{{ u.email }}</td>
                             <td>
-                                {% for p in u.nauczyciel.przedmioty.all %}{{ p.przedmiot }} {{ p.poziom }} — {{ p.stawka }} zł{% if not forloop.last %}, {% endif %} {% endfor %}
+                                {% for p in u.przedmioty_kolor %}<span class="przedmiot-poziom {{ p.klasa }}">{{ p.przedmiot }}</span> {{ p.poziom }} — {{ p.stawka }} zł{% if not forloop.last %}, {% endif %}{% endfor %}
                             </td>
-                            <td>
-                                {% if u.is_active %}
-                                <span class="umowa-tak">✔ aktywne</span>
-                                {% else %}
-                                <span class="umowa-nie">wyłączone</span>
-                                {% endif %}
-                            </td>
+                            <td>{{ u.zakresy_tekst }}</td>
                             <td>
                                 {% if czy_szef %}
                                 <a

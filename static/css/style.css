@@ -686,3 +686,7 @@ input[type="radio"], input[type="checkbox"] {
 .poziom-studia { background: #fee2e2; color: #b91c1c; }
 .poziom-inne { background: #e5e7eb; color: #374151; }
 .legenda-poziomow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ramka); font-size: .8rem; }
+
+/* siatka: pionowe linie między kolumnami w tabelach Użytkownicy / Archiwum */
+.tabela-siata th, .tabela-siata td { border-right: 1px solid var(--ramka); }
+.tabela-siata th:last-child, .tabela-siata td:last-child { border-right: none; }

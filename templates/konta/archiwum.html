@@ -82,7 +82,7 @@
 		</div>
 		{% if korepetytorzy %}
 		<div class="tabela-wrapper">
-			<table class="tabela" id="tabela-archiwum-korepetytorzy">
+			<table class="tabela tabela-siata" id="tabela-archiwum-korepetytorzy">
 				<thead>
 					<tr>
 						<th>Korepetytor</th>
@@ -100,7 +100,7 @@
 							{% if n.aktywny %}
 							<span class="umowa-tak">✔ współpraca</span>
 							{% else %}
-							<span class="umowa-nie">zakończona (archiwum)</span>
+							<span class="podpowiedz">zakończona (archiwum)</span>
 							{% endif %}
 						</td>
 						<td>
@@ -147,7 +147,7 @@
 		</div>
 		{% if pracownicy %}
 		<div class="tabela-wrapper">
-			<table class="tabela" id="tabela-archiwum-pracownicy">
+			<table class="tabela tabela-siata" id="tabela-archiwum-pracownicy">
 				<thead>
 					<tr>
 						<th>Użytkownik</th>
@@ -168,14 +168,14 @@
 							{% elif u.username|lower|slice:":12" == "koordynator" %}
 							<span class="umowa-tak">✔ koordynator</span>
 							{% else %}
-							<span class="umowa-nie">osoba umawiająca</span>
+							<span class="podpowiedz">osoba umawiająca</span>
 							{% endif %}
 						</td>
 						<td>
 							{% if u.is_active %}
 							<span class="umowa-tak">✔ aktywne</span>
 							{% else %}
-							<span class="umowa-nie">wyłączone</span>
+							<span class="podpowiedz">wyłączone</span>
 							{% endif %}
 						</td>
 						<td>
@@ -191,6 +191,7 @@
                                     title="Przywróć konto do zakładki Użytkownicy (możliwość logowania wraca)"
                                     >przywróć konto</a
                                 >{% endif %}
+                                {% if czy_szef %}<a class="ikona-usun" href="{% url 'usun_konto' u.id %}" title="Usuń konto na zawsze — tylko z Archiwum, z potwierdzeniem">🗑 usuń na zawsze</a>{% endif %}
 						</td>
 					</tr>
 					{% endfor %}
@@ -215,7 +216,7 @@
     </div>
     {% if koordynatorzy %}
     <div class="tabela-wrapper">
-      <table class="tabela" id="tabela-archiwum-koordynatorzy">
+      <table class="tabela tabela-siata" id="tabela-archiwum-koordynatorzy">
         <thead>
           <tr>
             <th>Użytkownik</th>
@@ -234,6 +235,7 @@
             <td>
               <a class="przycisk-umowa umowa-tak" href="{% url 'przywroc_konto' u.id %}"
                  title="Przywróć konto do zakładki Użytkownicy">przywróć konto</a>
+              {% if czy_szef %}<a class="ikona-usun" href="{% url 'usun_konto' u.id %}" title="Usuń konto na zawsze — tylko z Archiwum, z potwierdzeniem">🗑 usuń na zawsze</a>{% endif %}
             </td>
             <td>
               {% if u.is_active %}
