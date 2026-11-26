@@ -39,12 +39,12 @@ body {
 
 /* było 60rem (960px) — rozszerzone do 90rem (1440px), żeby panel wykorzystywał
    więcej szerokiego ekranu (ok. połowa pustego miejsca po bokach) */
-.opakowanie { max-width: 90rem; margin: 0 auto; padding: 1rem; }
+.opakowanie { width: 85%; max-width: 90rem; margin: 0 auto; padding: 1rem; }
 
 .opakowanie .karta { margin-top: 1rem; }
 
 @media (max-width: 640px) {
-  .opakowanie { padding: 0.5rem; }
+  .opakowanie { width: 100%; padding: 0.5rem; }
   .karta { padding: 1.25rem; }
   .karta h2 { font-size: 1.15rem; }
   .pasek { flex-direction: column; align-items: center; text-align: center; }

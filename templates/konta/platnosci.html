@@ -1,18 +1,18 @@
 {% extends 'konta/panel.html' %} {% block tytul %}Płatności — Panel pracowniczy{% endblock %} {% block panel %}
 <div class="platnosci-uklad">
     <section class="karta">
-        <h2>Płatności</h2>
+        <h2>Płatności — zajęcia cykliczne</h2>
         <div class="pole-szukania" style="margin-bottom: 1rem">
             <input
                 type="text"
                 class="szukaj-tabela"
-                data-tabela="tabela-platnosci-niezaplacone"
+                data-tabela="tabela-platnosci-cykliczni"
                 placeholder="Szukaj ucznia lub nauczyciela..."
             />
         </div>
-        {% if uczniowie %}
+        {% if uczniowie_cykliczni %}
         <div class="tabela-wrapper">
-            <table class="tabela tabela-siata" id="tabela-platnosci-niezaplacone">
+            <table class="tabela tabela-siata" id="tabela-platnosci-cykliczni">
                 <thead>
                     <tr>
                         <th></th>
@@ -26,7 +26,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for uczen in uczniowie %}
+                    {% for uczen in uczniowie_cykliczni %}
                     <tr>
                         <td>
                             <form method="post">
@@ -69,7 +69,80 @@
             </table>
         </div>
         {% else %}
-        <p>Brak uczniów na liście płatności.</p>
+        <p>Brak nieopłaconych uczniów z zajęciami cyklicznymi.</p>
+        {% endif %}
+        </section>
+
+    <section class="karta">
+        <h2>Płatności — pojedyncza 1. lekcja</h2>
+        <div class="pole-szukania" style="margin-bottom: 1rem">
+            <input
+                type="text"
+                class="szukaj-tabela"
+                data-tabela="tabela-platnosci-pojedynczy"
+                placeholder="Szukaj ucznia lub nauczyciela..."
+            />
+        </div>
+        {% if uczniowie_pojedynczy %}
+        <div class="tabela-wrapper">
+            <table class="tabela tabela-siata" id="tabela-platnosci-pojedynczy">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Uczeń</th>
+                        <th>Nauczyciel</th>
+                        <th>Wpisał</th>
+                        <th>1. lekcja</th>
+                        <th>Lekcje cykliczne</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for uczen in uczniowie_pojedynczy %}
+                    <tr>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="uczen_id" value="{{ uczen.id }}" />
+                                <input type="hidden" name="oznacz_zaplacone" value="1" />
+                                <button type="submit" class="przycisk-zaplac">Zapłacone</button>
+                            </form>
+                        </td>
+                        <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
+                        <td>{{ uczen.korepetytor }}</td>
+                        <td>{{ uczen.kto_umowil }}</td>
+                        <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+                        <td>
+                            {% if uczen.lekcje_dane %}
+                            <div class="mini-kal" data-lekcje='{{ uczen.lekcje_json }}'>
+                                <button type="button" class="mini-strz" data-krok="-1" title="Poprzedni miesiąc">‹</button>
+                                <strong class="mini-miesiac"></strong>
+                                <button type="button" class="mini-strz" data-krok="1" title="Następny miesiąc">›</button>
+                                <div class="mini-terminy podpowiedz">{{ uczen.lekcje_cykliczne_tekst }}</div>
+                            </div>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td><span class="status-niezaplacone">❌ niezapłacone</span></td>
+                        <td>
+                            {% if czy_szef %}
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="uczen_id" value="{{ uczen.id }}" />
+                                <input type="hidden" name="usun_ucznia" value="1" />
+                                <button type="submit" class="przycisk-usun">Usuń</button>
+                            </form>
+                            {% else %}
+                            <span class="podpowiedz">tylko szef</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="podtytul">Brak nieopłaconych uczniów z pojedynczą lekcją.</p>
         {% endif %}
     </section>
 </div>
@@ -166,18 +239,18 @@
 
 <div class="platnosci-uklad">
     <section class="karta">
-        <h2>Zapłacone</h2>
+        <h2>Zapłacone — zajęcia cykliczne</h2>
         <div class="pole-szukania" style="margin-bottom: 1rem">
             <input
                 type="text"
                 class="szukaj-tabela"
-                data-tabela="tabela-platnosci-zaplacone"
+                data-tabela="tabela-platnosci-zaplacone-cykliczni"
                 placeholder="Szukaj ucznia lub nauczyciela..."
             />
         </div>
-        {% if zaplaconi %}
+        {% if zaplaconi_cykliczni %}
         <div class="tabela-wrapper">
-            <table class="tabela tabela-siata" id="tabela-platnosci-zaplacone">
+            <table class="tabela tabela-siata" id="tabela-platnosci-zaplacone-cykliczni">
                 <thead>
                     <tr>
                         <th></th>
@@ -190,7 +263,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for uczen in zaplaconi %}
+                    {% for uczen in zaplaconi_cykliczni %}
                     <tr>
                         <td>
                             <form method="post">
@@ -233,8 +306,79 @@
         </div>
         {% else %}
         <p class="podtytul">
-            Brak zapłaconych płatności — oznacz „Zapłacone" w tabeli powyżej.
+            Brak opłaconych uczniów z zajęciami cyklicznymi.
         </p>
+        {% endif %}
+        </section>
+
+    <section class="karta">
+        <h2>Zapłacone — pojedyncza 1. lekcja</h2>
+        <div class="pole-szukania" style="margin-bottom: 1rem">
+            <input
+                type="text"
+                class="szukaj-tabela"
+                data-tabela="tabela-platnosci-zaplacone-pojedynczy"
+                placeholder="Szukaj ucznia lub nauczyciela..."
+            />
+        </div>
+        {% if zaplaconi_pojedynczy %}
+        <div class="tabela-wrapper">
+            <table class="tabela tabela-siata" id="tabela-platnosci-zaplacone-pojedynczy">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Uczeń</th>
+                        <th>Nauczyciel</th>
+                        <th>1. lekcja</th>
+                        <th>Lekcje cykliczne</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for uczen in zaplaconi_pojedynczy %}
+                    <tr>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="uczen_id" value="{{ uczen.id }}" />
+                                <input type="hidden" name="odznacz_zaplacone" value="1" />
+                                <button type="submit" class="przycisk-usun">Cofnij</button>
+                            </form>
+                        </td>
+                        <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
+                        <td>{{ uczen.korepetytor }}</td>
+                        <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+                        <td>
+                            {% if uczen.lekcje_dane %}
+                            <div class="mini-kal" data-lekcje='{{ uczen.lekcje_json }}'>
+                                <button type="button" class="mini-strz" data-krok="-1" title="Poprzedni miesiąc">‹</button>
+                                <strong class="mini-miesiac"></strong>
+                                <button type="button" class="mini-strz" data-krok="1" title="Następny miesiąc">›</button>
+                                <div class="mini-terminy podpowiedz">{{ uczen.lekcje_cykliczne_tekst }}</div>
+                            </div>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td><span class="status-zaplacone">✅ zapłacone</span></td>
+                        <td>
+                            {% if czy_szef %}
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="uczen_id" value="{{ uczen.id }}" />
+                                <input type="hidden" name="usun_ucznia" value="1" />
+                                <button type="submit" class="przycisk-usun">Usuń</button>
+                            </form>
+                            {% else %}
+                            <span class="podpowiedz">tylko szef</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="podtytul">Brak opłaconych uczniów z pojedynczą lekcją.</p>
         {% endif %}
     </section>
 

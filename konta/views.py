@@ -1972,7 +1972,11 @@ def platnosci(request):
     if not (czy_szef(request.user) or czy_koordynator(request.user)):
         raise PermissionDenied
     uczniowie_lista = Uczen.objects.filter(zaplacone=False, zakonczona=False, rozliczono_kiedy__isnull=True)
+    uczniowie_cykliczni = uczniowie_lista.filter(zajecia_cykliczne=True)
+    uczniowie_pojedynczy = uczniowie_lista.filter(zajecia_cykliczne=False)
     zaplaconi = Uczen.objects.filter(zaplacone=True, zakonczona=False)
+    zaplaconi_cykliczni = zaplaconi.filter(zajecia_cykliczne=True)
+    zaplaconi_pojedynczy = zaplaconi.filter(zajecia_cykliczne=False)
     historia = Uczen.objects.filter(zakonczona=False, rozliczono_kiedy__isnull=False).order_by('-rozliczono_kiedy')
     raporty = list(RaportPlatnosci.objects.all()[:20])
     wszyscy_uczniowie = list(Uczen.objects.filter(zakonczona=False).prefetch_related('przedmioty_ucznia'))
@@ -2133,12 +2137,16 @@ def platnosci(request):
             'nauczyciele': sorted(nauczyciele_set),
         })
     rozliczenia_pracownikow.sort(key=lambda p: p['pracownik'].username)
-    for u in list(uczniowie_lista) + list(zaplaconi) + list(historia):
+    for u in (list(uczniowie_cykliczni) + list(uczniowie_pojedynczy)
+              + list(zaplaconi_cykliczni) + list(zaplaconi_pojedynczy) + list(historia)):
         u.lekcje_dane = _lekcje_cykliczne_dane(u)
         u.lekcje_json = json.dumps(u.lekcje_dane, ensure_ascii=False)
         u.lekcje_cykliczne_tekst = _lekcje_cykliczne_tekst(u)   # pierwszy miesiąc jako tekst (fallback bez JS)
     return render(request, 'konta/platnosci.html', {
-        'uczniowie': uczniowie_lista,
+        'uczniowie_cykliczni': uczniowie_cykliczni,
+        'uczniowie_pojedynczy': uczniowie_pojedynczy,
+        'zaplaconi_cykliczni': zaplaconi_cykliczni,
+        'zaplaconi_pojedynczy': zaplaconi_pojedynczy,
         'zaplaconi': zaplaconi,
         'historia': historia,
         'raporty': raporty,

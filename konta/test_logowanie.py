@@ -494,7 +494,7 @@ class PlatnosciTests(TestCase):
         self.dodaj_ucznia('Kasia', zaplacone=True)
         r = self.client.get('/platnosci/')
         html = r.content.decode()
-        frag_raport = html[html.find('<h2>Zapłacone</h2>'):html.find('<h2>Wyślij raport</h2>')]
+        frag_raport = html[html.find('<h2>Zapłacone'):html.find('<h2>Wyślij raport</h2>')]
         self.assertNotIn('\n</div>\n', frag_raport)                     # raport NIE jest poza ukladem
         self.assertIn('\n</div>\n', html[html.find('Historia płatności'):])  # uklad zamknięty dopiero po Historii
 
@@ -631,6 +631,33 @@ class PlatnosciTests(TestCase):
         self.assertContains(r, 'data-lekcje=')
         self.assertContains(r, 'mini-strz')
         self.assertContains(r, f'{d1.day:02d}.{d1.month:02d} 17:00')   # pierwszy miesiąc jako tekst
+
+    def test_platnosci_podzielone_na_cyklicznych_i_pojedynczych(self):
+        # dwa osobne kafelki Płatności: "zajęcia cykliczne" (zajecia_cykliczne=True)
+        # i "pojedyncza 1. lekcja" — tak samo w Zapłaconych
+        self.client.force_login(self.user)
+        cykliczny = self.dodaj_ucznia('Kasia')
+        cykliczny.zajecia_cykliczne = True
+        cykliczny.save()
+        self.dodaj_ucznia('Ola')   # bez flagi = pojedyncza 1. lekcja
+        z = self.dodaj_ucznia('Zosia', zaplacone=True)
+        z.zajecia_cykliczne = True
+        z.save()
+        r = self.client.get('/platnosci/')
+        html = r.content.decode()
+        self.assertContains(r, 'Płatności — zajęcia cykliczne')
+        self.assertContains(r, 'Płatności — pojedyncza 1. lekcja')
+        self.assertContains(r, 'Zapłacone — zajęcia cykliczne')
+        self.assertContains(r, 'Zapłacone — pojedyncza 1. lekcja')
+        self.assertContains(r, 'tabela-platnosci-cykliczni')
+        self.assertContains(r, 'tabela-platnosci-pojedynczy')
+        self.assertContains(r, 'tabela-platnosci-zaplacone-cykliczni')
+        # Kasia (cykliczna) jest w kafelku cyklicznym, Ola (pojedyncza) w drugim kafelku
+        i_cyk = html.find('Płatności — zajęcia cykliczne')
+        i_pojed = html.find('Płatności — pojedyncza 1. lekcja')
+        self.assertLess(i_cyk, html.find('Kasia Nowak'))
+        self.assertLess(html.find('Kasia Nowak'), i_pojed)
+        self.assertLess(i_pojed, html.find('Ola Nowak'))
 
 class UzytkownicyTests(TestCase):
     """Zakładka użytkownicy: dodawanie kont i uprawnienia (tylko szef)."""
