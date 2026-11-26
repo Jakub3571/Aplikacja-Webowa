@@ -1,6 +1,6 @@
 """Formularze: logowanie, zmiana hasła, dodawanie ucznia i nauczyciela."""
 
-from datetime import datetime, time
+from datetime import date, datetime, time
 
 from django.utils import timezone
 
@@ -132,6 +132,8 @@ class FormularzUcznia(forms.ModelForm):
 
     def __init__(self, *args, przedmiot=None, poziom=None, **kwargs):
         super().__init__(*args, **kwargs)
+        # w kalendarzu tylko dzień dzisiejszy i przyszłe (przeszłe są wyszarzone i blokowane)
+        self.fields['data_pierwszej_lekcji'].widget.attrs['min'] = date.today().isoformat()
         # przy GET: godzina to sam placeholder (JS wypełni po wyborze daty/przedmiotu/poziomu);
         # przy POST: pełna siatka 5-min — dostępność i tak pilnuje widok (nauczyciel_wolny_o)
         if not self.is_bound:
@@ -177,6 +179,10 @@ class FormularzUcznia(forms.ModelForm):
         dane = super().clean()
         data = dane.get('data_pierwszej_lekcji')
         godzina = dane.get('godzina_pierwszej_lekcji')
+        if data and data < date.today():
+            raise forms.ValidationError(
+                'Data 1. lekcji nie może być z przeszłości — wybierz dzień dzisiejszy lub późniejszy.'
+            )
         if data and godzina:
             godziny, minuty = godzina.split(':')
             czas = time(int(godziny), int(minuty))

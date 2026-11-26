@@ -699,3 +699,8 @@ input[type="radio"], input[type="checkbox"] {
 .mini-strz:disabled { opacity: 0.35; cursor: default; }
 .mini-miesiac { min-width: 5.5rem; text-align: center; }
 .mini-terminy { flex-basis: 100%; }
+
+
+/* przeszłe dni w kalendarzu dostępności (Uczniowie): szare i nieaktywne — tylko dziś i dalej */
+.dzien-dostepnosci.przeszly { opacity: 0.45; filter: grayscale(0.7); }
+.dzien-dostepnosci.przeszly .dzien-naglowek { color: #9ca3af; }

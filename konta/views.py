@@ -10,7 +10,8 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.views import PasswordResetConfirmView
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse, request
@@ -562,6 +563,7 @@ def dostepnosci_tygodnia(dni):
             'data': dzien,
             'nazwa': dni_pelne[dzien.weekday()],
             'dzisiaj': dzien == date.today(),
+            'przeszly': dzien < date.today(),
             'wpisy': wpisy,
         })
     return wynik
@@ -814,7 +816,7 @@ def uczniowie(request):
         messages.info(
             request,
             'Do rodzica wysłano potwierdzenie zapisu: termin 1. lekcji'
-            + (' i link Meet.' if uczen.link_meet else ' (link Meet poleci osobno, gdy nauczyciel go zapisze).'),
+            + (' i link Meet.' if uczen.link_meet else ' (link Meet poleci osobno, gdy korepetytor go zapisze).'),
         )
         return redirect('uczniowie')
 
@@ -1176,6 +1178,15 @@ def edytuj_uzytkownika(request, user_id):
         stara_nazwa = ''
         if nauczyciel:
             stara_nazwa = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip()
+        # login (nazwa użytkownika) — można zmienić, ale musi być wolny; puste pole = bez zmiany
+        nowy_login = request.POST.get('username', '').strip() or uzytkownik.username
+        if not nowy_login:
+            messages.error(request, 'Login (nazwa użytkownika) nie może być pusty.')
+            return redirect('edytuj_uzytkownika', user_id=uzytkownik.id)
+        if Pracownik.objects.filter(username__iexact=nowy_login).exclude(pk=uzytkownik.pk).exists():
+            messages.error(request, f'Login „{nowy_login}” jest już zajęty — wybierz inny.')
+            return redirect('edytuj_uzytkownika', user_id=uzytkownik.id)
+        uzytkownik.username = nowy_login
         uzytkownik.first_name = request.POST.get('first_name', '').strip()
         uzytkownik.last_name = request.POST.get('last_name', '').strip()
         email = request.POST.get('email', '').strip()
@@ -1183,6 +1194,19 @@ def edytuj_uzytkownika(request, user_id):
         if email:
             uzytkownik.email = email
         uzytkownik.telefon = request.POST.get('telefon', '').strip()
+        # hasło opcjonalne: puste pola = hasło zostaje bez zmian (przydatne gdy ktoś zapomniał)
+        haslo1 = request.POST.get('haslo1', '')
+        haslo2 = request.POST.get('haslo2', '')
+        if haslo1 or haslo2:
+            if haslo1 != haslo2:
+                messages.error(request, 'Hasła nie są takie same — wpisz dwa razy identyczne.')
+                return redirect('edytuj_uzytkownika', user_id=uzytkownik.id)
+            try:
+                validate_password(haslo1, uzytkownik)
+            except ValidationError as e:
+                messages.error(request, ' '.join(e.messages))
+                return redirect('edytuj_uzytkownika', user_id=uzytkownik.id)
+            uzytkownik.set_password(haslo1)
         uzytkownik.save()
         # korepetytor: synchronizujemy imię, nazwisko i e-mail na karcie nauczyciela;
         # przy zmianie imienia/nazwiska przepisujemy też nazwisko na kartach uczniów

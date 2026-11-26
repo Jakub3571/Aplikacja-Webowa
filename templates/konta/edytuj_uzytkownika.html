@@ -8,12 +8,22 @@
   <h2>✏️ Edytuj konto: {{ uzytkownik.username }}</h2>
   <p class="podtytul">
     Rola: {% if uzytkownik.nauczyciel %}korepetytor{% elif uzytkownik.is_superuser %}admin{% else %}osoba umawiająca{% endif %}
-    — hasła i roli nie zmienia się tutaj.
+    — roli nie zmienia się tutaj. Login i hasło ustawisz poniżej (puste hasło = bez zmiany).
   </p>
   <form method="post" class="formularz">
     {% csrf_token %}
+    <label for="id_username">Nazwa użytkownika (login)</label>
+    <input type="text" name="username" id="id_username" value="{{ uzytkownik.username }}" required>
     <label for="id_first_name">Imię</label>
     <input type="text" name="first_name" id="id_first_name" value="{{ uzytkownik.first_name }}">
+    ... (nazwisko, e-mail, telefon jak było) ...
+    <label for="id_haslo1">Nowe hasło (opcjonalnie)</label>
+    <input type="password" name="haslo1" id="id_haslo1" autocomplete="new-password" placeholder="zostaw puste, aby nie zmieniać">
+    <p class="podpowiedz">Przydatne, gdy ktoś zapomniał hasła — minimum 8 znaków, nie same cyfry.</p>
+    <label for="id_haslo2">Powtórz nowe hasło</label>
+    <input type="password" name="haslo2" id="id_haslo2" autocomplete="new-password" placeholder="powtórz nowe hasło">
+    <button type="submit">Zapisz zmiany</button>
+  </form>
 
     <label for="id_last_name">Nazwisko</label>
     <input type="text" name="last_name" id="id_last_name" value="{{ uzytkownik.last_name }}">

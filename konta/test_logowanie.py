@@ -26,6 +26,25 @@ from unittest import mock
 
 from konta.views import kolizja_lekcji_nauczyciela
 
+class _ZamrozonaData(date):
+    """Do testów: „dziś” = 2026-10-01, żeby fixture'y 2026-10-xx były w przyszłości
+    (formularz ucznia blokuje daty z przeszłości)."""
+
+    @classmethod
+    def today(cls):
+        return date(2026, 10, 1)
+
+
+class TestCaseZamrozonaData(TestCase):
+    """Baza dla testów formularza ucznia: zamraża date.today() w konta.forms na 2026-10-01."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        patcher = mock.patch('konta.forms.date', _ZamrozonaData)
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
 class PrzeplywLogowaniaTests(TestCase):
     def setUp(self):
         self.user = Pracownik.objects.create_user(
@@ -120,7 +139,7 @@ class ZakladkiTests(TestCase):
         r = self.client.get('/pulpit/')
         self.assertRedirects(r, '/uczniowie/')
 
-class DodawanieUczniaTests(TestCase):
+class DodawanieUczniaTests(TestCaseZamrozonaData):
     def setUp(self):
         self.user = Pracownik.objects.create_superuser('test', 't@f.pl', 'Sup3rHaslo!')
         self.nauczyciel = Nauczyciel.objects.create(
@@ -808,7 +827,7 @@ class UzytkownicyTests(TestCase):
         self.assertFalse(Pracownik.objects.filter(username='nowy.jan').exists())
         self.assertContains(r, 'karta korepetytora z tym adresem e-mail')
 
-class EdycjaKorepetytoraTests(TestCase):
+class EdycjaKorepetytoraTests(TestCaseZamrozonaData):
     """Pełna edycja konta korepetytora: dane, e-mail (synchronizacja z kartą), przedmioty."""
 
     def setUp(self):
@@ -1746,7 +1765,7 @@ class ResetHaslaLinkTests(TestCase):
 
 
 
-class KalendarzKorepetytoraTests(TestCase):
+class KalendarzKorepetytoraTests(TestCaseZamrozonaData):
     """Poprawki szefa: przerwa min. 5 min, ✖ zamiast kosza, spójna lista godzin."""
 
     def setUp(self):
@@ -1886,7 +1905,7 @@ class KalendarzKorepetytoraTests(TestCase):
 
 
 
-class PoprawkiSzefaTests(TestCase):
+class PoprawkiSzefaTests(TestCaseZamrozonaData):
     """Komunikaty znikają po 3 s; cykliczne co 5 min i tylko wolne godziny; okresy bez 'zawsze'."""
 
     def setUp(self):
@@ -2090,7 +2109,7 @@ class PoprawkiSzefaTests(TestCase):
         self.assertTrue(pozno, 'okres powinien domyślnie iść do końca roku szkolnego, a nie 90 dni')
 
 
-class komunikatBleduKalendarzaTests(TestCase):
+class komunikatBleduKalendarzaTests(TestCaseZamrozonaData):
     """Gdy godzina nie przechodzi walidacji — komunikat mówi DOKŁADNIE, co przeszkadza."""
 
     def setUp(self):
@@ -3027,7 +3046,7 @@ class PelneGodzinyMojTydzienTests(TestCase):
         self.assertNotContains(r, 'rozpatrz')
 
 
-class DiscordPierwszaLekcjaTests(TestCase):
+class DiscordPierwszaLekcjaTests(TestCaseZamrozonaData):
     """Discord: korepetytor sam wpisuje swoje ID (Mój tydzień); przy 1. lekcji leci webhook ze wzmianką."""
 
     def setUp(self):
@@ -3175,3 +3194,12 @@ class BlokadaLogowaniaTests(TestCase):
         self._post()
         r = self._post('Sup3rHaslo!')
         self.assertEqual(r.status_code, 302)   # redirect po udanym logowaniu
+
+    def test_stara_sesja_z_blokada_sama_sie_odblokowuje(self):
+        # sesja zablokowana STARYM kodem (licznik 5 w sesji, bez okna czasowego)
+        # po wdrożeniu nowego kodu sama się odblokowuje — nie trzeba czyścić ciasteczek
+        s = self.client.session
+        s['proby_logowania'] = 5
+        s.save()
+        r = self._post('Sup3rHaslo!')
+        self.assertEqual(r.status_code, 302)   # od razu wchodzi, mimo że licznik był na 5

@@ -60,9 +60,9 @@
     <button type="button" id="dodaj-slot">+ Dodaj kolejny termin</button>
     <label>Zakres zajęć (od – do) <span class="gwiazdka">*</span></label>
     <div class="zakres-daty" style="display:flex; gap:0.5rem; align-items:center;">
-      <input type="date" name="data_od" id="id_data_od" required value="{{ dzisiaj }}">
+      <input type="date" min="{{ dzisiaj }}" name="data_od" id="id_data_od" required value="{{ dzisiaj }}">
       <span>–</span>
-      <input type="date" name="data_do" id="id_data_do" required value="{{ domyslny_koniec }}">
+      <input type="date" min="{{ dzisiaj }}" name="data_do" id="id_data_do" required value="{{ domyslny_koniec }}">
     </div>
     <p class="podpowiedz" id="zakres-podpowiedz"></p>
     <p class="podpowiedz">Wpisz własny zakres — np. do matury (maj) albo „na 3 miesiące”. Format: (dzień).(data) – (dzień).(data), np. Wt. 11.11.2026 – Pt. 29.05.2027. Po tym terminie lekcje przestają się dopisywać.</p>
@@ -133,7 +133,7 @@
           if (!(dane.godziny || []).length) {
             var niePracuje = (dane.dni_pracy || []).indexOf(parseInt(wyborDnia.value, 10)) === -1;
             opcje = '<option value="">— ' + (niePracuje
-              ? 'nauczyciel nie pracuje w ten dzień tygodnia'
+              ? 'korepetytor nie pracuje w ten dzień tygodnia'
               : 'brak wolnych godzin ' + dataPl) + ' —</option>';
           }
           wyborGodziny.innerHTML = opcje;

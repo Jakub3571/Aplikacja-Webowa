@@ -9,7 +9,7 @@
     {% if uzytkownik.first_name or uzytkownik.last_name %}({{ uzytkownik.first_name }} {{ uzytkownik.last_name }}){% endif %}?</p>
   <p class="podpowiedz">
     {% if uzytkownik.nauczyciel %}
-    Konto należy do korepetytora — usunięta zostanie także jego karta nauczyciela (przedmioty, stawki i zaznaczone godziny w kalendarzu).
+    Konto należy do korepetytora — usunięta zostanie także jego karta korepetytora (przedmioty, stawki i zaznaczone godziny w kalendarzu).
     {% else %}
     Konto zostanie usunięte na stałe, razem z uprawnieniami.
     {% endif %}
