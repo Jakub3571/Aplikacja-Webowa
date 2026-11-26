@@ -2691,7 +2691,7 @@ class KontaArchiwumTests(TestCase):
         self.assertNotContains(r, 'p@f.pl')
         r = self.client.get('/archiwum/')
         self.assertContains(r, 'prac')
-        self.assertContains(r, 'przywróć konto')
+        self.assertContains(r, '/przywroc/')   # ikonka ✔ przywróć konto
         self.client.logout()
         self.assertFalse(self.client.login(username='prac', password='Sup3rHaslo!'))
 
@@ -2734,7 +2734,9 @@ class KontaArchiwumTests(TestCase):
         self.client.post(f'/uzytkownicy/{self.prac.id}/konto/')
         r = self.client.get('/archiwum/')
         self.assertContains(r, f'/uzytkownicy/{self.prac.id}/usun/')
-        self.assertContains(r, 'usuń na zawsze')
+        self.assertContains(r, '🗑')            # sama ikonka śmietnika, bez napisu
+        self.assertNotContains(r, '<th>Status</th>')   # w archiwum nie ma kolumny Status
+        self.assertNotContains(r, 'edytuj_uzytkownika')  # edycja kont tylko w Użytkownikach
         # GET = ekran potwierdzenia, POST = kasuje na stałe i wraca do archiwum
         r = self.client.get(f'/uzytkownicy/{self.prac.id}/usun/')
         self.assertEqual(r.status_code, 200)
@@ -2760,19 +2762,30 @@ class KontaArchiwumTests(TestCase):
         self.assertFalse(Pracownik.objects.filter(pk=tutor.id).exists())
         self.assertFalse(Nauczyciel.objects.filter(pk=n.id).exists())  # żadnych "duchów"
 
-    def test_uzytkownicy_bez_statusu_z_siatka_i_kolorowymi_przedmiotami_i_zakresami(self):
+    def test_uzytkownicy_siatka_bez_statusu_zakresow_kalendarza_i_kolorow(self):
         n = Nauczyciel.objects.create(imie='Jan', nazwisko='Kowalski', email='j@k.pl')
         tutor = Pracownik.objects.create_user('jk', 'jk@k.pl', 'Sup3rHaslo!', nauczyciel=n)
         PrzedmiotNauczyciela.objects.create(nauczyciel=n, przedmiot='matematyka', poziom='srednia podstawa', stawka=120)
-        dzis = date.today()
-        Dostepnosc.objects.create(nauczyciel=n, data_od=dzis, data_do=dzis, godzina_od=time(6, 0), godzina_do=time(15, 0))
         r = self.client.get('/uzytkownicy/')
         self.assertEqual(r.status_code, 200)
-        self.assertNotContains(r, '<th>Status</th>')           # status usunięty z Użytkowników
-        self.assertContains(r, 'tabela-siata')                  # siatka kolumn
-        self.assertContains(r, 'przedmiot-poziom poziom-srednia-podstawa')  # przedmiot w kolorze
-        self.assertContains(r, 'matematyka')
-        self.assertContains(r, '6:00–15:00')                   # zakres korepetytora w jego wierszu
+        self.assertNotContains(r, '<th>Status</th>')     # status usunięty z Użytkowników
+        self.assertContains(r, 'tabela-siata')            # siatka kolumn jak w Archiwum/Lekcjach
+        self.assertContains(r, 'matematyka')             # przedmioty korepetytora
+        self.assertNotContains(r, 'przedmiot-poziom')     # kolory tylko w Uczniowie
+        self.assertNotContains(r, '<th>Zakresy</th>')     # zakresy widać w Kalendarzu zbiorczym
+        self.assertNotContains(r, '<th>Kalendarz</th>')
+
+    def test_lekcje_maja_siatke_jak_uzytkownicy(self):
+        Uczen.objects.create(
+            pierwsza_lekcja=timezone.make_aware(datetime(2026, 10, 6, 17)),
+            przedmiot='matematyka', poziom='podstawowka',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='e@f.pl',
+            korepetytor='Jan Kowalski', kto_umowil='admin',
+        )
+        r = self.client.get('/lekcje/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'tabela-siata')
 
 class PelneGodzinyMojTydzienTests(TestCase):
     """Pelne godziny w Moj tydzien (bez :30) i panel przesuwania zajec tylko dla szefa."""

@@ -87,7 +87,6 @@
 					<tr>
 						<th>Korepetytor</th>
 						<th>Przedmioty</th>
-						<th>Status</th>
 						<th>Akcje</th>
 					</tr>
 				</thead>
@@ -96,13 +95,6 @@
 					<tr>
 						<td>{{ n.imie }} {{ n.nazwisko }}</td>
 						<td>{{ n.przedmioty_tekst }}</td>
-						<td>
-							{% if n.aktywny %}
-							<span class="umowa-tak">✔ współpraca</span>
-							{% else %}
-							<span class="podpowiedz">zakończona (archiwum)</span>
-							{% endif %}
-						</td>
 						<td>
 							{% if n.aktywny %}
 							<a
@@ -119,7 +111,7 @@
                                 >↩ przywróć</a
                             >
                             {% if n.konto_uzytkownika and not n.konto_uzytkownika.is_active %}
-                            <a class="przycisk-umowa umowa-tak" href="{% url 'przywroc_konto' n.konto_uzytkownika.id %}" title="Przywróć konto korepetytora do Użytkowników">przywróć konto</a>
+                            <a class="ikona-kalendarza" href="{% url 'przywroc_konto' n.konto_uzytkownika.id %}" title="Przywróć konto korepetytora do Użytkowników">✔</a>
                             {% if czy_szef %}<a class="ikona-usun" href="{% url 'usun_konto' n.konto_uzytkownika.id %}" title="Usuń konto na zawsze — tylko z Archiwum, z potwierdzeniem">🗑</a>{% endif %}
                             {% endif %}
                             {% endif %}
@@ -157,7 +149,6 @@
 						<th>Użytkownik</th>
 						<th>Imię i nazwisko</th>
 						<th>Rola</th>
-						<th>Status</th>
 						<th>Akcje</th>
 					</tr>
 				</thead>
@@ -175,28 +166,7 @@
 							<span class="podpowiedz">osoba umawiająca</span>
 							{% endif %}
 						</td>
-						<td>
-							{% if u.is_active %}
-							<span class="umowa-tak">✔ aktywne</span>
-							{% else %}
-							<span class="podpowiedz">wyłączone</span>
-							{% endif %}
-						</td>
-						<td>
-							<a
-								class="ikona-kalendarza"
-								href="{% url 'edytuj_uzytkownika' u.id %}"
-								title="Edytuj dane konta"
-								>✏️</a
-							>
-                                {% if not u.is_active %}<a
-                                    class="przycisk-umowa umowa-tak"
-                                    href="{% url 'przywroc_konto' u.id %}"
-                                    title="Przywróć konto do zakładki Użytkownicy (możliwość logowania wraca)"
-                                    >przywróć konto</a
-                                >{% endif %}
-                                {% if czy_szef %}<a class="ikona-usun" href="{% url 'usun_konto' u.id %}" title="Usuń konto na zawsze — tylko z Archiwum, z potwierdzeniem">🗑 usuń na zawsze</a>{% endif %}
-						</td>
+						
 					</tr>
 					{% endfor %}
 				</tbody>
@@ -227,7 +197,6 @@
             <th>Imię i nazwisko</th>
             <th>Email</th>
             <th>Akcje</th>
-            <th>Status</th>
           </tr>
         </thead>
         <tbody>
@@ -237,16 +206,9 @@
             <td>{{ u.first_name }} {{ u.last_name }}</td>
             <td>{{ u.email }}</td>
             <td>
-              <a class="przycisk-umowa umowa-tak" href="{% url 'przywroc_konto' u.id %}"
-                 title="Przywróć konto do zakładki Użytkownicy">przywróć konto</a>
-              {% if czy_szef %}<a class="ikona-usun" href="{% url 'usun_konto' u.id %}" title="Usuń konto na zawsze — tylko z Archiwum, z potwierdzeniem">🗑 usuń na zawsze</a>{% endif %}
-            </td>
-            <td>
-              {% if u.is_active %}
-                <span class="umowa-tak">✔ aktywne</span>
-              {% else %}
-                <span class="podpowiedz">wyłączone</span>
-              {% endif %}
+              <a class="ikona-kalendarza" href="{% url 'przywroc_konto' u.id %}"
+                 title="Przywróć konto do zakładki Użytkownicy">✔</a>
+              {% if czy_szef %}<a class="ikona-usun" href="{% url 'usun_konto' u.id %}" title="Usuń konto na zawsze — tylko z Archiwum, z potwierdzeniem">🗑</a>{% endif %}
             </td>
           </tr>
           {% endfor %}

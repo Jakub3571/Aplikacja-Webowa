@@ -284,8 +284,6 @@ pracowniczy{% endblock %} {% block panel %}
                             <th>Korepetytor</th>
                             <th>Email</th>
                             <th>Przedmioty</th>
-                            <th>Zakresy</th>
-                            <th>Kalendarz</th>
                             <th>Akcje</th>
                         </tr>
                     </thead>
@@ -295,18 +293,7 @@ pracowniczy{% endblock %} {% block panel %}
                             <td>{{ u.first_name }} {{ u.last_name }}</td>
                             <td>{{ u.email }}</td>
                             <td>
-                                {% for p in u.przedmioty_kolor %}<span class="przedmiot-poziom {{ p.klasa }}">{{ p.przedmiot }}</span> {{ p.poziom }} — {{ p.stawka }} zł{% if not forloop.last %}, {% endif %}{% endfor %}
-                            </td>
-                            <td>{{ u.zakresy_tekst }}</td>
-                            <td>
-                                {% if czy_szef %}
-                                <a
-                                    class="ikona-kalendarza"
-                                    href="{% url 'moj_tydzien_nauczyciela' u.nauczyciel_id %}"
-                                    title="Zobacz kalendarz korepetytora"
-                                    >📅</a
-                                >
-                                {% endif %}
+                                {% for p in u.nauczyciel.przedmioty.all %}{{ p.przedmiot }} {{ p.poziom }} — {{ p.stawka }} zł{% if not forloop.last %}, {% endif %} {% endfor %}
                             </td>
                             <td>
                                 {% if czy_szef or czy_koordynator %}
