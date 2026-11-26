@@ -3203,3 +3203,100 @@ class BlokadaLogowaniaTests(TestCase):
         s.save()
         r = self._post('Sup3rHaslo!')
         self.assertEqual(r.status_code, 302)   # od razu wchodzi, mimo że licznik był na 5
+
+class EdycjaUzytkownikaTests(TestCase):
+    """Edytuj użytkownika = formularz jak przy dodawaniu, ale wypełniony danymi;
+    można też zmienić login i ustawić nowe hasło (puste = bez zmiany)."""
+
+    def setUp(self):
+        self.szef = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.prac = Pracownik.objects.create_user('prac', 'p@f.pl', 'StareHaslo123!')
+        self.client.force_login(self.szef)
+
+    def test_edycja_wypelniona_danymi_i_zmiana_loginu_i_hasla(self):
+        r = self.client.get(f'/uzytkownicy/{self.prac.id}/edytuj/')
+        self.assertContains(r, 'value="prac"')       # login podstawiony
+        self.assertContains(r, 'value="p@f.pl"')     # e-mail podstawiony
+        self.assertContains(r, 'id_haslo1')          # pola nowego hasła są na formularzu
+        r = self.client.post(f'/uzytkownicy/{self.prac.id}/edytuj/', {
+            'username': 'pracownik1', 'first_name': 'Piotr', 'last_name': 'Nowak',
+            'email': 'p@f.pl', 'telefon': '600',
+            'haslo1': 'NoweHaslo123!', 'haslo2': 'NoweHaslo123!',
+        }, follow=True)
+        self.prac.refresh_from_db()
+        self.assertEqual(self.prac.username, 'pracownik1')
+        self.assertTrue(self.prac.check_password('NoweHaslo123!'))
+        # stary login odrzucony, nowy działa
+        self.client.logout()
+        r = self.client.post('/', {'username': 'prac', 'password': 'NoweHaslo123!'})
+        self.assertNotEqual(r.status_code, 302)
+        r = self.client.post('/', {'username': 'pracownik1', 'password': 'NoweHaslo123!'})
+        self.assertEqual(r.status_code, 302)
+
+    def test_zajety_login_jest_odrzucony(self):
+        Pracownik.objects.create_user('inny', 'i@f.pl', 'Sup3rHaslo!')
+        r = self.client.post(f'/uzytkownicy/{self.prac.id}/edytuj/', {
+            'username': 'inny', 'first_name': '', 'last_name': '', 'email': '', 'telefon': '',
+            'haslo1': '', 'haslo2': '',
+        }, follow=True)
+        self.assertContains(r, 'już zajęty')
+        self.prac.refresh_from_db()
+        self.assertEqual(self.prac.username, 'prac')
+
+    def test_puste_haslo_zostawia_stare(self):
+        self.client.post(f'/uzytkownicy/{self.prac.id}/edytuj/', {
+            'username': 'prac', 'first_name': 'P', 'last_name': 'N', 'email': 'p@f.pl', 'telefon': '',
+            'haslo1': '', 'haslo2': '',
+        })
+        self.prac.refresh_from_db()
+        self.assertTrue(self.prac.check_password('StareHaslo123!'))
+
+
+class KalendarzPrzeszleDniTests(TestCaseZamrozonaData):
+    """W dodawaniu ucznia data 1. lekcji: tylko dziś i przyszłość (przeszłe dni szare)."""
+
+    def setUp(self):
+        self.user = Pracownik.objects.create_superuser('test', 't@f.pl', 'Sup3rHaslo!')
+
+    def test_data_z_przeszlosci_odrzucona_serwerowo(self):
+        self.client.force_login(self.user)
+        wczoraj = date(2026, 9, 30).isoformat()   # „wczoraj” wg zamrożonej daty (2026-10-01)
+        dane = {
+            'data_pierwszej_lekcji': wczoraj,
+            'godzina_pierwszej_lekcji': '17:00',
+            'przedmiot': 'matematyka', 'poziom': 'podstawowka',
+            'imie_ucznia': 'Kasia', 'nazwisko_rodzica': 'Nowak', 'rodzic': 'Ewa Nowak',
+            'telefon_glowny': '600100200', 'email_glowny': 'ewa@f.pl',
+            'telefon_dodatkowy': '', 'email_dodatkowy': '',
+            'korepetytor': 'Anna Kowalska', 'kto_umowil': 'test',
+            'notatka_od_rodzica': '', 'auto_wyslij_meet': 'on',
+        }
+        r = self.client.post('/uczniowie/', dane, follow=True)
+        self.assertContains(r, 'nie może być z przeszłości')
+        self.assertFalse(Uczen.objects.filter(imie_ucznia='Kasia').exists())
+
+    def test_kalendarz_w_uczniowie_blokuje_przeszle_dni(self):
+        self.client.force_login(self.user)
+        r = self.client.get('/uczniowie/')
+        self.assertContains(r, 'min="')   # pole daty ma min = dziś
+        # tydzień z przeszłości: wszystkie dni mają klasę przeszly (szare)
+        r = self.client.get('/uczniowie/?rok=2020&miesiac=1&dzien=6')
+        self.assertContains(r, 'przeszly')
+
+
+class EtykietyKorepetytorTests(TestCase):
+    """W widocznym UI tylko „korepetytor” — słowo „nauczyciel” zostaje wyłącznie w kodzie."""
+
+    def setUp(self):
+        self.szef = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.client.force_login(self.szef)
+
+    def test_etykiety_mowia_korepetytor_zamiast_nauczyciel(self):
+        niedozwolone = ['>Nauczyciel<', 'nauczyciela lub', 'Szukaj nauczyciela',
+                        'stawki nauczyciela', 'nauczyciele nie mają', 'tydzień” nauczyciela',
+                        'nauczyciela nie pracuje', 'karta nauczyciela']
+        for adres in ['/platnosci/', '/uczniowie/', '/kalendarz/', '/uzytkownicy/']:
+            with self.subTest(adres=adres):
+                r = self.client.get(adres)
+                for fraza in niedozwolone:
+                    self.assertNotContains(r, fraza)
