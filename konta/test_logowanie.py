@@ -1400,16 +1400,19 @@ class LekcjeCykliczneTests(TestCase):
         # JS pobiera dni_pracy i chowa dni tygodnia, w ktorych korepetytor nie pracuje
         self.assertContains(r, 'dni_pracy')
 
-    def test_lekcje_pokazuja_terminy_cyklicznych(self):
-        # w zakładce Lekcje przy zajęciach cyklicznych widać najbliższe terminy (kiedy lekcja)
+    def test_lekcje_pokazuja_nowego_ucznia_w_sekcji_nowi(self):
+        # zakładka „Umówieni uczniowie”: nowy uczeń (przyszła 1. lekcja) w sekcji „Nowi uczniowie”;
+        # zajęcia cykliczne są całkowicie usunięte z tego widoku
+        self.uczen.pierwsza_lekcja = timezone.make_aware(datetime.combine(date.today() + timedelta(days=3), time(17, 0)))
         self.uczen.zajecia_cykliczne = True
-        self.uczen.save(update_fields=['zajecia_cykliczne'])
-        d = date.today() + timedelta(days=3)
-        Lekcja.objects.create(uczen=self.uczen, data=timezone.make_aware(datetime.combine(d, time(17, 0))))
+        self.uczen.save()
+        Lekcja.objects.create(uczen=self.uczen, data=self.uczen.pierwsza_lekcja)
         self.client.force_login(self.pracownik)
         r = self.client.get('/lekcje/')
-        self.assertContains(r, 'Zajęcia cykliczne')
-        self.assertContains(r, f'{d.day:02d}.{d.month:02d} 17:00')
+        self.assertContains(r, 'Umówieni uczniowie')
+        self.assertContains(r, 'Nowi uczniowie')
+        self.assertContains(r, 'Kasia')
+        self.assertNotContains(r, 'Zajęcia cykliczne')
 
 class NauczycielTylkoKalendarzTests(TestCase):
     """Konto nauczyciela widzi wyłącznie swój kalendarz — bez zakładki Uczniowie."""

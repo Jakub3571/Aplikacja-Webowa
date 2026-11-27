@@ -738,3 +738,24 @@ details.wolne-godziny .wolne-lista {
 /* przeszłe dni w kalendarzu dostępności (Uczniowie): szare i nieaktywne — tylko dziś i dalej */
 .dzien-dostepnosci.przeszly { opacity: 0.45; filter: grayscale(0.7); }
 .dzien-dostepnosci.przeszly .dzien-naglowek { color: #9ca3af; }
+
+/* Panel settera „Umówieni uczniowie” */
+.licznik { background: var(--tlo); border-radius: 999px; padding: .05rem .5rem; font-size: .8rem; }
+.wiersz-czerwony td { background: #f8d7da; }
+.cb-form { display: inline; }
+.cb {
+  background: none; border: 1px solid var(--ramka); border-radius: .35rem; cursor: pointer;
+  font-size: 1rem; line-height: 1; padding: .1rem .35rem;
+}
+.cb.cb-on { background: #d4edda; border-color: #2e9e5b; }
+.przycisk-maly {
+  border: 1px solid var(--akcent); background: var(--karta); color: var(--akcent-ciemny);
+  border-radius: .35rem; padding: .2rem .55rem; font-size: .82rem; cursor: pointer;
+}
+.przycisk-maly:hover { background: var(--akcent); color: #fff; }
+.umow-form { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-top: .4rem; }
+.umow-form input[type="date"], .umow-form select { font-size: .82rem; padding: .15rem .3rem; }
+details.feedback { display: inline-block; margin-left: .4rem; font-size: .82rem; }
+details.feedback summary { cursor: pointer; color: var(--akcent-ciemny); font-weight: 600; }
+details.feedback p { margin: .15rem 0; }
+td.pusto, .pusto { opacity: .6; font-style: italic; }

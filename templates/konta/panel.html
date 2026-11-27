@@ -18,7 +18,7 @@
   {% if user.nauczyciel_id %}
   <nav class="zakladki">
     <a href="{% url 'moj_tydzien' %}" class="{% if request.resolver_match.url_name == 'moj_tydzien' %}aktywna{% endif %}">🗓 Mój tydzień</a>
-    <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">📚 Lekcje</a>
+    <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">📚 Umówieni uczniowie</a>
   </nav>
   <div class="pasek-nauczyciela">{{ user.nauczyciel.imie }} {{ user.nauczyciel.nazwisko }} — {{ user.nauczyciel.przedmioty_tekst }}</div>
   {% endif %}
@@ -29,7 +29,7 @@
     <a href="{% url 'uczniowie' %}" class="{% if request.resolver_match.url_name == 'uczniowie' %}aktywna{% endif %}">Uczniowie</a>
     <a href="{% url 'pulpit' %}" class="{% if request.resolver_match.url_name == 'pulpit' %}aktywna{% endif %}">Start</a>
     <a href="{% url 'archiwum' %}" class="{% if request.resolver_match.url_name == 'archiwum' %}aktywna{% endif %}">Archiwum</a>
-    <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">Lekcje</a>
+    <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">Umówieni uczniowie</a>
     <a href="{% url 'kalendarz_zbiorczy' %}" class="{% if request.resolver_match.url_name == 'kalendarz_zbiorczy' %}aktywna{% endif %}">Kalendarz</a>
     <a href="{% url 'platnosci' %}" class="{% if request.resolver_match.url_name == 'platnosci' %}aktywna{% endif %}">Płatności</a>
     <a href="{% url 'uzytkownicy' %}" class="{% if request.resolver_match.url_name == 'uzytkownicy' %}aktywna{% endif %}">Użytkownicy</a>
@@ -37,7 +37,7 @@
    
     {% else %}
     <a href="{% url 'uczniowie' %}" class="{% if request.resolver_match.url_name == 'uczniowie' %}aktywna{% endif %}">Uczniowie</a>
-    <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">Lekcje</a>
+    <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">Umówieni uczniowie</a>
     <a href="{% url 'archiwum' %}" class="{% if request.resolver_match.url_name == 'archiwum' %}aktywna{% endif %}">Archiwum</a>
 {% if czy_koordynator_ctx %}
     <a href="{% url 'kalendarz_zbiorczy' %}" class="{% if request.resolver_match.url_name == 'kalendarz_zbiorczy' %}aktywna{% endif %}">Kalendarz</a>

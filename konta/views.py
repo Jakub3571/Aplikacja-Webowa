@@ -406,6 +406,11 @@ def _etap_ucznia(uczen):
         return 'do_potwierdzenia'
     return 'odbyla' if ocena.odbyla_sie else 'nie_odbyla'
 
+def _moze_zarzadzac_uczniem(user, uczen):
+    """Czy user może wykonywać akcje settera dla tego ucznia:
+    szef/koordynator — wszyscy, osoba umawiająca — tylko swoi (umowil)."""
+    return czy_szef(user) or czy_koordynator(user) or uczen.umowil_id == user.id
+
 def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
     """Sprawdza, czy slot (60 min) wypada w luce przerwy dnia nauczyciela.
     Przerwa to luka między blokami zajęć wyliczana wg planu dnia."""
@@ -873,31 +878,182 @@ def uczniowie(request):
         # 1. lekcja dostaje rekord i blokade u korepetytora — inaczej kolejny uczeń
         # moglby zostac umowiony na ta sama godzine (karta ucznia sama w sobie nie blokuje terminu)
         Lekcja.objects.get_or_create(uczen=uczen, data=uczen.pierwsza_lekcja)
-        if nauczyciel:
-            start_czas = timezone.localtime(uczen.pierwsza_lekcja).time()
-            Dostepnosc.objects.get_or_create(
-                nauczyciel=nauczyciel,
-                data_od=start_dt.date(),
-                data_do=start_dt.date(),
-                godzina_od=start_czas,
-                godzina_do=(datetime.combine(date(2000, 1, 1), start_czas) + timedelta(minutes=GODZINA_LEKCJI)).time(),
+    jest_nauczycielem = bool(nauczyciel_id)
+    # --- POST: akcje settera (panel „Umówieni uczniowie”) ---
+    if request.method == 'POST' and request.POST.get('akcja') and not jest_nauczycielem:
+        akcja = request.POST.get('akcja')
+        if akcja == 'setter_odbyla':
+            lekcja = get_object_or_404(Lekcja, pk=request.POST.get('lekcja_id'))
+            if not _moze_zarzadzac_uczniem(request.user, lekcja.uczen):
+                raise PermissionDenied
+            ocena, _ = OcenaLekcji.objects.get_or_create(
+                lekcja=lekcja, defaults={'odbyla_sie': True, 'wypelnil': request.user},
             )
-        messages.success(request, 'Uczeń został dodany do systemie.')
-        wyslij_powiadomienie_o_uczniu(request, uczen)
-        wyslij_powiadomienie_nauczycielowi(request, uczen)
-        wyslij_discord_pierwsza_lekcja(request, uczen)
-        wyslij_potwierdzenie_rodzicowi(request, uczen)
-        messages.info(
-            request,
-            'Do rodzica wysłano potwierdzenie zapisu: termin 1. lekcji'
-            + (' i link Meet.' if uczen.link_meet else ' (link Meet poleci osobno, gdy korepetytor go zapisze).'),
-        )
-        return redirect('uczniowie')
-
-    return render(request, 'konta/uczniowie.html', {
-        'form': form,
+            if ocena.odbyla_sie is not True:
+                ocena.odbyla_sie = True
+                ocena.wypelnil = request.user
+                ocena.save(update_fields=['odbyla_sie', 'wypelnil'])
+            messages.success(request, f'Lekcja {timezone.localtime(lekcja.data):%d.%m.%Y %H:%M} oznaczona jako odbyta.')
+            return redirect('lekcje')
+        if akcja == 'checkbox':
+            ocena = get_object_or_404(OcenaLekcji, pk=request.POST.get('ocena_id'))
+            pole = request.POST.get('pole', '')
+            if pole not in ('wrazenia_zebrane', 'oplacona', 'kolejna_umowiona', 'na_fanpage'):
+                return redirect('lekcje')
+            if not _moze_zarzadzac_uczniem(request.user, ocena.lekcja.uczen):
+                raise PermissionDenied
+            setattr(ocena, pole, request.POST.get('wartosc') == '1')
+            ocena.save(update_fields=[pole])
+            return redirect('lekcje')
+        if akcja in ('umow_kolejna', 'umow_ponownie'):
+            if akcja == 'umow_kolejna':
+                uczen = get_object_or_404(Uczen, pk=request.POST.get('uczen_id'), zakonczona=False)
+                lekcja_stara = None
+            else:
+                lekcja_stara = get_object_or_404(Lekcja, pk=request.POST.get('lekcja_id'))
+                uczen = lekcja_stara.uczen
+            if not _moze_zarzadzac_uczniem(request.user, uczen):
+                raise PermissionDenied
+            try:
+                dzien = date.fromisoformat(request.POST.get('data', ''))
+                godzina = datetime.strptime(request.POST.get('godzina', ''), '%H:%M').time()
+            except (ValueError, TypeError):
+                messages.error(request, 'Wybierz datę i godzinę.')
+                return redirect('lekcje')
+            korepetytor_txt = (request.POST.get('korepetytor') or uczen.korepetytor or '').strip()
+            wybrany_nauczyciel = nauczyciel_z_korepetytora(korepetytor_txt)
+            if not wybrany_nauczyciel:
+                messages.error(request, 'Wybierz korepetytora z listy.')
+                return redirect('lekcje')
+            start_dt = datetime.combine(dzien, godzina)
+            etykieta = f'{godzina.hour:02d}:{godzina.minute:02d}'
+            if etykieta not in wolne_godziny_nauczyciela(wybrany_nauczyciel, dzien, pomijaj_uczen_id=uczen.id):
+                messages.error(request, f'{korepetytor_txt} nie ma wolnej godziny {dzien:%d.%m.%Y} o {etykieta} — wybierz inną.')
+                return redirect('lekcje')
+            nazwa_wybranego = f'{wybrany_nauczyciel.imie} {wybrany_nauczyciel.nazwisko}'.strip()
+            if nazwa_wybranego.lower() != (uczen.korepetytor or '').strip().lower():
+                uczen.korepetytor = nazwa_wybranego
+                uczen.save(update_fields=['korepetytor'])
+            if akcja == 'umow_ponownie' and lekcja_stara and not lekcja_stara.odwolana:
+                lekcja_stara.odwolana = True
+                lekcja_stara.save(update_fields=['odwolana'])
+            data_lekcji = timezone.make_aware(start_dt)
+            Lekcja.objects.get_or_create(uczen=uczen, data=data_lekcji, przedmiot_karta__isnull=True)
+            Dostepnosc.objects.get_or_create(
+                nauczyciel=wybrany_nauczyciel, data_od=dzien, data_do=dzien,
+                godzina_od=godzina,
+                godzina_do=(datetime.combine(date(2000, 1, 1), godzina) + timedelta(minutes=GODZINA_LEKCJI)).time(),
+            )
+            if akcja == 'umow_kolejna':
+                # checkbox „umówiona kolejna lekcja” zaznacza się sam
+                ostatnia = Lekcja.objects.filter(uczen=uczen, odwolana=False, data__lt=timezone.now()).order_by('-data').first()
+                if ostatnia:
+                    ocena = OcenaLekcji.objects.filter(lekcja=ostatnia).first()
+                    if ocena and not ocena.kolejna_umowiona:
+                        ocena.kolejna_umowiona = True
+                        ocena.save(update_fields=['kolejna_umowiona'])
+                messages.success(request, f'Umówiono kolejną lekcję: {uczen.imie_ucznia} {uczen.nazwisko_rodzica} — {dzien:%d.%m.%Y} o {etykieta} u {nazwa_wybranego}.')
+            else:
+                messages.success(request, f'Przełożono na {dzien:%d.%m.%Y} o {etykieta} — ten sam uczeń ({uczen.imie_ucznia} {uczen.nazwisko_rodzica}), bez nowego rekordu.')
+            return redirect('lekcje')
+    # --- GET: sekcje etapów + wybór miesiąca (poprzedni / bieżący / następny) ---
+        if nauczyciel:
+        uczniowie_lista = [
+            u for u in Uczen.objects.filter(zakonczona=False).prefetch_related('przedmioty_ucznia')
+            if (u.korepetytor or '').strip().lower() == nazwa_nauczyciela
+            or any(
+                (k.korepetytor or '').strip().lower() == nazwa_nauczyciela
+                for k in u.przedmioty_ucznia.all()
+            )
+        ]
+        elif czy_szef(request.user) or czy_koordynator(request.user):
+        uczniowie_lista = list(Uczen.objects.filter(zakonczona=False))
+        else:
+        uczniowie_lista = list(Uczen.objects.filter(umowil=request.user, zakonczona=False))
+        fraza = (request.GET.get('szukaj') or '').strip().lower()
+        if fraza:
+        uczniowie_lista = [
+            u for u in uczniowie_lista
+            if fraza in u.imie_ucznia.lower()
+            or fraza in u.nazwisko_rodzica.lower()
+            or fraza in (u.korepetytor or '').lower()
+            or fraza in u.przedmiot.lower()
+        ]
+    dzis = date.today()
+    try:
+        rok = int(request.GET.get('rok') or dzis.year)
+        miesiac = int(request.GET.get('miesiac') or dzis.month)
+        if not 1 <= miesiac <= 12:
+            miesiac = dzis.month
+    except ValueError:
+        rok, miesiac = dzis.year, dzis.month
+    if miesiac == 12:
+        nastepny_rok, nastepny_miesiac = rok + 1, 1
+    else:
+        nastepny_rok, nastepny_miesiac = rok, miesiac + 1
+    if miesiac == 1:
+        poprzedni_rok, poprzedni_miesiac = rok - 1, 12
+    else:
+        poprzedni_rok, poprzedni_miesiac = rok, miesiac - 1
+    teraz = timezone.now()
+    prog_24h = teraz - timedelta(hours=24)
+    sekcje = {'nowi': [], 'do_potwierdzenia': [], 'odbyla': [], 'nie_odbyla': []}
+    for u in uczniowie_lista:
+        etap = _etap_ucznia(u)
+        if etap == 'nowy':
+            ref = timezone.localtime(u.pierwsza_lekcja) if u.pierwsza_lekcja else None
+            wiersz = {'uczen': u, 'lekcja': None, 'lekcja_data': ref, 'ocena': None, 'czerwony': False}
+        else:
+            lekcja = Lekcja.objects.filter(uczen=u, odwolana=False, data__lt=teraz).order_by('-data').first()
+            ocena = OcenaLekcji.objects.filter(lekcja=lekcja).first() if lekcja else None
+            ref = timezone.localtime(lekcja.data) if lekcja else None
+            # czerwony wiersz: >24 h po lekcji i któryś checkbox pusty
+            czerwony = bool(
+                etap == 'odbyla' and ocena and ref and ref < prog_24h
+                and not (ocena.wrazenia_zebrane and ocena.oplacona and ocena.kolejna_umowiona and ocena.na_fanpage)
+            )
+            wiersz = {'uczen': u, 'lekcja': lekcja, 'lekcja_data': ref, 'ocena': ocena, 'czerwony': czerwony}
+            wiersz['checkboxy'] = [
+                ('wrazenia_zebrane', 'zebrane wrażenia od rodzica', ocena.wrazenia_zebrane if ocena else False),
+                ('oplacona', 'opłacona', ocena.oplacona if ocena else False),
+                ('kolejna_umowiona', 'umówiona kolejna lekcja / stały termin', ocena.kolejna_umowiona if ocena else False),
+                ('na_fanpage', 'przerzucony na fanpage', ocena.na_fanpage if ocena else False),
+            ] if ocena else []
+        if ref and (ref.year, ref.month) == (rok, miesiac):
+            sekcje[{'nowy': 'nowi'}.get(etap, etap)].append(wiersz)
+    for klucz in sekcje:
+        sekcje[klucz].sort(key=lambda w: (w['lekcja_data'] or teraz))
+    liczba_lekcji = {}
+    for lekcja in Lekcja.objects.filter(uczen__in=uczniowie_lista, data__year=rok, data__month=miesiac):
+        liczba_lekcji[lekcja.uczen_id] = liczba_lekcji.get(lekcja.uczen_id, 0) + 1
+    for u in uczniowie_lista:
+        u.liczba_lekcji = liczba_lekcji.get(u.id, 0)
+    korepetytorzy_aktywni = [
+        f'{n.imie} {n.nazwisko}'.strip()
+        for n in Nauczyciel.objects.filter(aktywny=True).order_by('nazwisko', 'imie')
+    ]
+    nauczyciele_json = json.dumps({
+        f'{n.imie} {n.nazwisko}'.strip(): n.id
+        for n in Nauczyciel.objects.filter(aktywny=True)
+    })
+    return render(request, 'konta/lekcje.html', {
         'uczniowie': uczniowie_lista,
-        'dost': dost,
+        'fraza': (request.GET.get('szukaj') or '').strip(),
+        'nauczyciel_id': nauczyciel_id,
+        'dzisiaj': date.today().isoformat(),
+        'czy_szef': czy_szef(request.user),
+        'jest_nauczycielem': jest_nauczycielem,
+        'sekcje': sekcje,
+        'rok': rok,
+        'miesiac': miesiac,
+        'nazwa_miesiaca': MIESIACE[miesiac - 1],
+        'poprzedni_rok': poprzedni_rok,
+        'poprzedni_miesiac': poprzedni_miesiac,
+        'nastepny_rok': nastepny_rok,
+        'nastepny_miesiac': nastepny_miesiac,
+        'korepetytorzy_aktywni': korepetytorzy_aktywni,
+        'nauczyciele_json': nauczyciele_json,
+        'moze_akcje': not jest_nauczycielem,
     })
 
 @login_required

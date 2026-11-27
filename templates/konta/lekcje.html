@@ -1,152 +1,264 @@
 {% extends 'konta/panel.html' %}
-{% block tytul %}Lekcje — Panel pracowniczy{% endblock %}
+{% block tytul %}Umówieni uczniowie — Panel pracowniczy{% endblock %}
 {% block panel %}
 <div class="platnosci-uklad">
   <section class="karta">
-    <h2>Lekcje</h2>
+    <h2>Umówieni uczniowie</h2>
+    <div class="tydzien-nawigacja" style="margin-bottom: 1rem;">
+      <a class="strzalka" href="?rok={{ poprzedni_rok }}&miesiac={{ poprzedni_miesiac }}" title="Poprzedni miesiąc">&larr;</a>
+      <strong>{{ nazwa_miesiaca }} {{ rok }}</strong>
+      <a class="strzalka" href="?rok={{ nastepny_rok }}&miesiac={{ nastepny_miesiac }}" title="Następny miesiąc">&rarr;</a>
+    </div>
+
     {% if jest_nauczycielem %}
     <div style="margin-bottom: 1rem;">
-<button type="button" id="sl-toggle" class="przycisk-pigulka">＋ Dodaj lekcję</button>
+      <button type="button" id="sl-toggle" class="przycisk-pigulka">＋ Dodaj lekcję</button>
       <div id="sl-form" hidden>
-      <form method="post" style="margin-top: .75rem; display: flex; flex-wrap: wrap; gap: .75rem; align-items: end;">
-        {% csrf_token %}
-        <input type="hidden" name="szybka_lekcja" value="1" />
-        <label>Uczeń:
-          <select name="uczen_id" required>
-            <option value="">— wybierz ucznia —</option>
-            {% for u in uczniowie %}
-            <option value="{{ u.id }}">{{ u.imie_ucznia }} {{ u.nazwisko_rodzica }} ({{ u.przedmiot }})</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>Data: <input type="date" id="sl-data" name="data" value="{{ dzisiaj }}" required /></label>
-        <label>Godzina: <select id="sl-godzina" name="godzina" required></select></label>
-        <button type="submit">Zapisz lekcję</button>
-      </form>
+        <form method="post" style="margin-top: .75rem; display: flex; flex-wrap: wrap; gap: .75rem; align-items: end;">
+          {% csrf_token %}
+          <input type="hidden" name="szybka_lekcja" value="1" />
+          <label>Uczeń:
+            <select name="uczen_id" required>
+              <option value="">— wybierz ucznia —</option>
+              {% for u in uczniowie %}
+              <option value="{{ u.id }}">{{ u.imie_ucznia }} {{ u.nazwisko_rodzica }} ({{ u.przedmiot }})</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Data: <input type="date" id="sl-data" name="data" value="{{ dzisiaj }}" required /></label>
+          <label>Godzina: <select id="sl-godzina" name="godzina" required></select></label>
+          <button type="submit">Zapisz lekcję</button>
+        </form>
       </div>
     </div>
     {% endif %}
-    <h3>🔄 Zajęcia cykliczne</h3>
+
     <div class="pole-szukania" style="margin-bottom: 1rem;">
-      <input
-        type="text"
-        class="szukaj-tabela"
-        data-tabela="tabela-lekcje-cykliczne"
-        placeholder="Szukaj zajęć cyklicznych (uczeń, korepetytor, przedmiot)..."
-      />
+      <input type="text" class="szukaj-tabela" data-tabela="tabela-umowieni"
+        placeholder="Szukaj ucznia (imię, nazwisko, korepetytor, przedmiot)..." value="{{ fraza }}" />
     </div>
-    {% if uczniowie_cykliczni %}
-    <div class="tabela-wrapper">
-      <table class="tabela tabela-siata" id="tabela-lekcje-cykliczne">
+
+    <div class="tabela-wrapper" id="tabela-umowieni">
+
+      <h3>🆕 Nowi uczniowie <span class="licznik">{{ sekcje.nowi|length }}</span></h3>
+      <table class="tabela tabela-siata">
+        <thead>
+          <tr><th>Uczeń</th><th>Korepetytor</th><th>Przedmiot</th><th>1. lekcja</th>{% if not jest_nauczycielem %}<th>Akcje</th>{% endif %}</tr>
+        </thead>
+        <tbody>
+          {% for w in sekcje.nowi %}
+          <tr>
+            <td>{{ w.uczen.imie_ucznia }} {{ w.uczen.nazwisko_rodzica }}</td>
+            <td>{{ w.uczen.korepetytor }}</td>
+            <td>{{ w.uczen.przedmioty_tekst }}</td>
+            <td>{% if w.lekcja_data %}{{ w.lekcja_data|date:"d.m.Y H:i" }}{% else %}—{% endif %}</td>
+            {% if not jest_nauczycielem %}
+            <td>
+              <a class="ikona-kalendarza" href="{% url 'edytuj_ucznia' w.uczen.id %}" title="Edytuj dane ucznia">✏️</a>
+              {% if czy_szef %}
+              <a class="ikona-kalendarza" href="{% url 'zakoncz_ucznia' w.uczen.id %}" title="Zakończ współpracę (uczeń trafi do archiwum)">📦</a>
+              <a class="ikona-usun" href="{% url 'usun_ucznia' w.uczen.id %}" title="Usuń ucznia">✖</a>
+              {% endif %}
+            </td>
+            {% endif %}
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="pusto">Brak nowych uczniów w tym miesiącu.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 1.5rem;">⏳ Do potwierdzenia <span class="licznik">{{ sekcje.do_potwierdzenia|length }}</span></h3>
+      <table class="tabela tabela-siata">
+        <thead>
+          <tr><th>Uczeń</th><th>Korepetytor</th><th>Przedmiot</th><th>Lekcja</th>{% if moze_akcje %}<th>Akcja settera</th>{% endif %}</tr>
+        </thead>
+        <tbody>
+          {% for w in sekcje.do_potwierdzenia %}
+          <tr>
+            <td>{{ w.uczen.imie_ucznia }} {{ w.uczen.nazwisko_rodzica }}</td>
+            <td>{{ w.uczen.korepetytor }}</td>
+            <td>{{ w.uczen.przedmioty_tekst }}</td>
+            <td>{{ w.lekcja_data|date:"d.m.Y H:i" }}</td>
+            {% if moze_akcje %}
+            <td>
+              <form method="post" style="display:inline">
+                {% csrf_token %}
+                <input type="hidden" name="akcja" value="setter_odbyla">
+                <input type="hidden" name="lekcja_id" value="{{ w.lekcja.id }}">
+                <button type="submit" class="przycisk-maly">✅ Lekcja się odbyła</button>
+              </form>
+              <a class="ikona-kalendarza" href="{% url 'edytuj_ucznia' w.uczen.id %}" title="Edytuj dane ucznia">✏️</a>
+              {% if czy_szef %}
+              <a class="ikona-kalendarza" href="{% url 'zakoncz_ucznia' w.uczen.id %}" title="Zakończ współpracę (uczeń trafi do archiwum)">📦</a>
+              <a class="ikona-usun" href="{% url 'usun_ucznia' w.uczen.id %}" title="Usuń ucznia">✖</a>
+              {% endif %}
+            </td>
+            {% endif %}
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="pusto">Nic do potwierdzenia.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 1.5rem;">✅ Odbyła się <span class="licznik">{{ sekcje.odbyla|length }}</span></h3>
+      <p class="podpowiedz">Checkboxy odhacza setter. Wiersz robi się czerwony, gdy minęły 24 h od lekcji, a któryś checkbox jest pusty.</p>
+      <table class="tabela tabela-siata">
         <thead>
           <tr>
-            <th>Uczeń</th>
-            <th>Korepetytor</th>
-            <th>Przedmiot</th>
-                        <th>Lekcje w tym miesiącu</th>
-            <th>Najbliższe terminy</th>
-
-            {% if not jest_nauczycielem %}
-            <th>Dodaj kolejne</th>
+            <th>Uczeń</th><th>Korepetytor</th><th>Przedmiot</th><th>Lekcja</th>
+            {% if moze_akcje %}
+            <th title="zebrane wrażenia od rodzica">wrażenia</th>
+            <th title="opłacona">opłacona</th>
+            <th title="umówiona kolejna lekcja / stały termin">kolejna</th>
+            <th title="przerzucony na fanpage">fanpage</th>
             <th>Akcje</th>
             {% endif %}
           </tr>
         </thead>
         <tbody>
-          {% for uczen in uczniowie_cykliczni %}
-          <tr>
-            <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
-            <td>{{ uczen.korepetytor }}</td>
-                        <td>{{ uczen.przedmioty_tekst }}</td>
-            <td>{{ uczen.liczba_lekcji }}</td>
-            <td>{{ uczen.lekcje_terminy }}</td>
-
-            {% if not jest_nauczycielem %}
+          {% for w in sekcje.odbyla %}
+          <tr class="{% if w.czerwony %}wiersz-czerwony{% endif %}">
+            <td>{{ w.uczen.imie_ucznia }} {{ w.uczen.nazwisko_rodzica }}</td>
+            <td>{{ w.uczen.korepetytor }}</td>
+            <td>{{ w.uczen.przedmioty_tekst }}</td>
+            <td>{{ w.lekcja_data|date:"d.m.Y H:i" }}</td>
+            {% if moze_akcje %}
+            {% for pole, etykieta_cb, wartosc in w.checkboxy %}
             <td>
-              <a class="ikona-kalendarza" href="{% url 'lekcja_cykliczna' uczen.id %}" title="Dodaj kolejne zajęcia cykliczne">🔄</a>
+              <form method="post" class="cb-form">
+                {% csrf_token %}
+                <input type="hidden" name="akcja" value="checkbox">
+                <input type="hidden" name="ocena_id" value="{{ w.ocena.id }}">
+                <input type="hidden" name="pole" value="{{ pole }}">
+                <input type="hidden" name="wartosc" value="{% if wartosc %}0{% else %}1{% endif %}">
+                <button type="submit" class="cb {% if wartosc %}cb-on{% endif %}" title="{{ etykieta_cb }}">{% if wartosc %}☑{% else %}☐{% endif %}</button>
+              </form>
             </td>
+            {% endfor %}
             <td>
-              <a class="ikona-kalendarza" href="{% url 'edytuj_ucznia' uczen.id %}" title="Edytuj dane ucznia">✏️</a>
-              {% if czy_szef %}
-              <a class="ikona-kalendarza" href="{% url 'zakoncz_ucznia' uczen.id %}" title="Zakończ współpracę (uczeń trafi do archiwum)">📦</a>
+              <button type="button" class="przycisk-maly umow-toggle" data-target="umow-{{ w.uczen.id }}">📅 Umów kolejną lekcję</button>
+              {% if w.ocena %}
+              <details class="feedback"><summary>📝 feedback</summary>
+                <p><strong>Temat:</strong> {{ w.ocena.temat|default:"—" }}</p>
+                <p><strong>Skupienie:</strong> {{ w.ocena.skupienie|default:"—" }}/5{% if w.ocena.skupienie_wyjasnienie %} — {{ w.ocena.skupienie_wyjasnienie }}{% endif %}</p>
+                <p><strong>Dobrze:</strong> {{ w.ocena.dobrze_poszlo|default:"—" }}</p>
+                <p><strong>Nie poszło:</strong> {{ w.ocena.nie_poszlo|default:"—" }}</p>
+                <p><strong>Zadanie domowe:</strong> {{ w.ocena.zadanie_domowe|default:"—" }}</p>
+              </details>
               {% endif %}
+              <form method="post" class="umow-form" id="umow-{{ w.uczen.id }}" data-uczen="{{ w.uczen.id }}" style="display:none">
+                {% csrf_token %}
+                <input type="hidden" name="akcja" value="umow_kolejna">
+                <input type="hidden" name="uczen_id" value="{{ w.uczen.id }}">
+                <input type="date" name="data" min="{{ dzisiaj }}" required>
+                <select name="korepetytor">
+                  {% for k in korepetytorzy_aktywni %}
+                  <option value="{{ k }}" {% if k == w.uczen.korepetytor %}selected{% endif %}>{{ k }}</option>
+                  {% endfor %}
+                </select>
+                <select name="godzina" required><option value="">— najpierw data + korepetytor —</option></select>
+                <button type="submit" class="przycisk-maly">Umów</button>
+              </form>
+              <a class="ikona-kalendarza" href="{% url 'edytuj_ucznia' w.uczen.id %}" title="Edytuj dane ucznia">✏️</a>
               {% if czy_szef %}
-              <a class="ikona-usun" href="{% url 'usun_ucznia' uczen.id %}" title="Usuń ucznia">✖</a>
+              <a class="ikona-kalendarza" href="{% url 'zakoncz_ucznia' w.uczen.id %}" title="Zakończ współpracę (uczeń trafi do archiwum)">📦</a>
+              <a class="ikona-usun" href="{% url 'usun_ucznia' w.uczen.id %}" title="Usuń ucznia">✖</a>
               {% endif %}
             </td>
             {% endif %}
           </tr>
+          {% empty %}
+          <tr><td colspan="9" class="pusto">Brak odbytych lekcji w tym miesiącu.</td></tr>
           {% endfor %}
         </tbody>
       </table>
-    </div>
-    {% else %}
-    <p class="podtytul">Brak zajęć cyklicznych — umów je ikoną 🔄 przy uczniu poniżej.</p>
-    {% endif %}
 
-    <h3 style="margin-top: 2rem;">📌 Pierwsze lekcje</h3>
-    <div class="pole-szukania" style="margin-bottom: 1rem;">
-      <input
-        type="text"
-        class="szukaj-tabela"
-        data-tabela="tabela-lekcje-pierwsze"
-        placeholder="Szukaj pierwszych lekcji (uczeń, korepetytor, przedmiot)..."
-      />
-    </div>
-    {% if uczniowie_pierwsze %}
-    <div class="tabela-wrapper">
-      <table class="tabela tabela-siata" id="tabela-lekcje-pierwsze">
+      <h3 style="margin-top: 1.5rem;">❌ Nie odbyła się <span class="licznik">{{ sekcje.nie_odbyla|length }}</span></h3>
+      <table class="tabela tabela-siata">
         <thead>
-          <tr>
-            <th>Uczeń</th>
-            <th>Korepetytor</th>
-            <th>Przedmiot</th>
-            <th>1. lekcja</th>
-            <th>Lekcje w tym miesiącu</th>
-            <th>Dodano</th>
-
-            {% if not jest_nauczycielem %}
-            <th>Umów cykliczne</th>
-            <th>Akcje</th>
-            {% endif %}
-          </tr>
+          <tr><th>Uczeń</th><th>Korepetytor</th><th>Przedmiot</th><th>Lekcja</th><th>Powód</th>{% if moze_akcje %}<th>Akcja</th>{% endif %}</tr>
         </thead>
         <tbody>
-          {% for uczen in uczniowie_pierwsze %}
+          {% for w in sekcje.nie_odbyla %}
           <tr>
-            <td>{{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }}</td>
-            <td>{{ uczen.korepetytor }}</td>
-            <td>{{ uczen.przedmioty_tekst }}</td>
-            <td>{{ uczen.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
-            <td>{{ uczen.liczba_lekcji }}</td>
-            <td>{{ uczen.dodano|date:"d.m.Y H:i" }}</td>
-
-            {% if not jest_nauczycielem %}
+            <td>{{ w.uczen.imie_ucznia }} {{ w.uczen.nazwisko_rodzica }}</td>
+            <td>{{ w.uczen.korepetytor }}</td>
+            <td>{{ w.uczen.przedmioty_tekst }}</td>
+            <td>{{ w.lekcja_data|date:"d.m.Y H:i" }}</td>
+            <td>{{ w.ocena.get_powod_nieodbycia_display|default:"—" }}</td>
+            {% if moze_akcje %}
             <td>
-              <a class="ikona-kalendarza" href="{% url 'lekcja_cykliczna' uczen.id %}" title="Umów lekcję cykliczną">🔄</a>
-            </td>
-            <td>
-              <a class="ikona-kalendarza" href="{% url 'edytuj_ucznia' uczen.id %}" title="Edytuj dane ucznia">✏️</a>
+              <button type="button" class="przycisk-maly umow-toggle" data-target="ponownie-{{ w.lekcja.id }}">🔁 Umów ponownie</button>
+              <form method="post" class="umow-form" id="ponownie-{{ w.lekcja.id }}" data-uczen="{{ w.uczen.id }}" style="display:none">
+                {% csrf_token %}
+                <input type="hidden" name="akcja" value="umow_ponownie">
+                <input type="hidden" name="lekcja_id" value="{{ w.lekcja.id }}">
+                <input type="date" name="data" min="{{ dzisiaj }}" required>
+                <select name="korepetytor">
+                  {% for k in korepetytorzy_aktywni %}
+                  <option value="{{ k }}" {% if k == w.uczen.korepetytor %}selected{% endif %}>{{ k }}</option>
+                  {% endfor %}
+                </select>
+                <select name="godzina" required><option value="">— najpierw data + korepetytor —</option></select>
+                <button type="submit" class="przycisk-maly">Umów ponownie</button>
+              </form>
+              <a class="ikona-kalendarza" href="{% url 'edytuj_ucznia' w.uczen.id %}" title="Edytuj dane ucznia">✏️</a>
               {% if czy_szef %}
-              <a class="ikona-kalendarza" href="{% url 'zakoncz_ucznia' uczen.id %}" title="Zakończ współpracę (uczeń trafi do archiwum)">📦</a>
-              {% endif %}
-              {% if czy_szef %}
-              <a class="ikona-usun" href="{% url 'usun_ucznia' uczen.id %}" title="Usuń ucznia">✖</a>
+              <a class="ikona-kalendarza" href="{% url 'zakoncz_ucznia' w.uczen.id %}" title="Zakończ współpracę (uczeń trafi do archiwum)">📦</a>
+              <a class="ikona-usun" href="{% url 'usun_ucznia' w.uczen.id %}" title="Usuń ucznia">✖</a>
               {% endif %}
             </td>
             {% endif %}
           </tr>
+          {% empty %}
+          <tr><td colspan="6" class="pusto">Brak nieodbytych lekcji w tym miesiącu.</td></tr>
           {% endfor %}
         </tbody>
       </table>
+
     </div>
-    {% else %}
-    <p class="podtytul">Brak pierwszych lekcji — dodaj uczniów w zakładce Uczniowie.</p>
-    {% endif %}
   </section>
 </div>
 
 <script>
+  var NAUCZYCIEL_ID = {{ nauczyciele_json|safe }};
+  document.querySelectorAll('.umow-toggle').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var f = document.getElementById(btn.dataset.target);
+      if (f) f.style.display = f.style.display === 'none' ? '' : 'none';
+    });
+  });
+  document.querySelectorAll('.umow-form').forEach(function (form) {
+    function odswiez() {
+      var data = form.querySelector('input[name="data"]').value;
+      var nazwa = form.querySelector('select[name="korepetytor"]').value;
+      var godz = form.querySelector('select[name="godzina"]');
+      var nt = NAUCZYCIEL_ID[nazwa];
+      if (!data || !nt) return;
+      godz.innerHTML = '<option value="">— szukam wolnych godzin... —</option>';
+      fetch('{% url "korepetytorzy_dane" %}?nauczyciel=' + encodeURIComponent(nt) +
+            '&data=' + encodeURIComponent(data) +
+            '&uczen=' + encodeURIComponent(form.dataset.uczen || ''), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (dane) {
+          var opcje = '<option value="">— godzina (wolne terminy) —</option>';
+          (dane.godziny || []).forEach(function (g) {
+            opcje += '<option value="' + g.godzina + '">' + g.godzina + '</option>';
+          });
+          if (!(dane.godziny || []).length) {
+            opcje = '<option value="">— brak wolnych godzin tego dnia —</option>';
+          }
+          godz.innerHTML = opcje;
+        })
+        .catch(function () { godz.innerHTML = '<option value="">— błąd pobierania godzin —</option>'; });
+    }
+    form.querySelector('input[name="data"]').addEventListener('change', odswiez);
+    form.querySelector('select[name="korepetytor"]').addEventListener('change', odswiez);
+  });
   var slToggle = document.getElementById('sl-toggle');
   var slForm = document.getElementById('sl-form');
   if (slToggle && slForm) {
@@ -185,4 +297,5 @@
     });
   });
 </script>
+
 {% endblock %}
