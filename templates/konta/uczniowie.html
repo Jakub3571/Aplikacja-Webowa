@@ -147,7 +147,7 @@ pracowniczy{% endblock %} {% block panel %}
                         {% for w in dzien.wpisy %}
                         <div class="wpis-dostepnosci">
 <span class="nauczyciel-grupa"><span class="nauczyciel-tekst">{{ w.nauczyciel.imie }} {{ w.nauczyciel.nazwisko }}</span>{% if w.przedmioty %} <span class="nauczyciel-przedmiot">({% for p in w.przedmioty %}<span class="przedmiot-poziom {{ p.klasa }}">{{ p.przedmiot }}</span>{% if not forloop.last %}, {% endif %}{% endfor %})</span>{% endif %}</span>
-                            <span class="zakresy">{% for z in w.zakresy %}<span class="zakres-godzin">{{ z }}</span>{% endfor %}</span>
+                            <span class="zakresy">{% if w.liczba_wolnych %}<details class="wolne-godziny"><summary>{{ w.liczba_wolnych_tekst }}</summary><span class="wolne-lista">{{ w.wolne_godziny|join:", " }}</span></details>{% endif %}{% for z in w.zakresy_wolne %}<span class="zakres-godzin{% if z == 'zajęte' %} zakres-zajety{% endif %}">{{ z }}</span>{% endfor %}</span>
                         </div>
                         {% endfor %}
                     {% else %}

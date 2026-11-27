@@ -455,7 +455,8 @@ class NauczycieleTests(TestCase):
         self.assertContains(r, 'Kalendarz dostępności')
         self.assertContains(r, 'Jan Kowalski')
         self.assertContains(r, '16:00')
-        self.assertContains(r, '20:00')
+        # zakres pokazuje ostatni wolny slot rytmu (16:00, 17:05, ..., 20:20)
+        self.assertContains(r, '20:20')
 
     def test_uczniowie_dostepnosc_pokazuje_przedmioty_nauczyciela(self):
         # obok nazwiska w nawiasie mają być przedmioty korepetytora (posortowane, bez poziomów)

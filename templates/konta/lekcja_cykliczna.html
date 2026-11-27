@@ -34,21 +34,15 @@
     Wybierz jeden lub więcej terminów tygodniowych — lekcje wpiszą się automatycznie do kalendarza,
     a korepetytor będzie miał zablokowane te godziny.
   </p>
-  <form method="post" class="formularz">
-    {% csrf_token %}
-
-    <label>Terminy tygodniowe <span class="gwiazdka">*</span></label>
+  <label>Terminy tygodniowe <span class="gwiazdka">*</span></label>
     <div id="sloty-tygodniowe" data-nauczyciel="{{ nauczyciel_id }}" data-uczen="{{ uczen.id }}" data-start="{{ dzisiaj }}">
-      <div class="wiersz-przedmiotu">
+      {% for slot in wiersze_slotow %}
+      <div class="wiersz-przedmiotu"{% if slot %} data-wybrana-godzina="{{ slot.godzina }}"{% endif %}>
         <select name="slot_dzien" required>
           <option value="">— dzień —</option>
-          <option value="0">poniedziałek</option>
-          <option value="1">wtorek</option>
-          <option value="2">środa</option>
-          <option value="3">czwartek</option>
-          <option value="4">piątek</option>
-          <option value="5">sobota</option>
-          <option value="6">niedziela</option>
+          {% for d in dni_tygodnia %}
+          <option value="{{ d.0 }}"{% if slot and slot.dzien == d.0 %} selected{% endif %}>{{ d.1 }}</option>
+          {% endfor %}
         </select>
         <span class="slot-data podpowiedz"></span><span class="slot-cykliczny-hint podpowiedz"></span>
         <select name="slot_godzina" required>
@@ -56,6 +50,7 @@
         </select>
         <button type="button" class="przycisk-usun-slot" title="Usuń ten termin">✘</button>
       </div>
+      {% endfor %}
     </div>
     <button type="button" id="dodaj-slot">+ Dodaj kolejny termin</button>
     <label>Zakres zajęć (od – do) <span class="gwiazdka">*</span></label>
@@ -116,7 +111,7 @@
       })
         .then(function (odp) { return odp.json(); })
         .then(function (dane) {
-          var biezaca = wyborGodziny.value;
+          var biezaca = wyborGodziny.value || wiersz.dataset.wybranaGodzina || '';
           var dataTxt = dane.data || data;
           var dataPl = dataTxt.split('-').reverse().join('.');
           var etykietaData = wiersz.querySelector('.slot-data');
@@ -178,6 +173,11 @@
       if (e.target && e.target.name === 'slot_dzien') {
         odswiezGodzinyWiersza(e.target.closest('.wiersz-przedmiotu'));
       }
+    });
+
+    kontenerSlotow.querySelectorAll('.wiersz-przedmiotu').forEach(function (w) {
+      var sel = w.querySelector('select[name="slot_dzien"]');
+      if (sel && sel.value) odswiezGodzinyWiersza(w);
     });
   }
   (function () {

@@ -320,6 +320,40 @@ def wolne_godziny_nauczyciela(nauczyciel, dzien, pomijaj_uczen_id=None):
             wynik.append(start.strftime('%H:%M'))
     return sorted(set(wynik))
 
+def _tekst_liczby_godzin(n):
+    """Polska odmiana liczby wolnych godzin: 'wolna 1 godzina', 'wolne 2 godziny',
+    'wolnych 5 godzin' (panel dostępności)."""
+    if n == 1:
+        return 'wolna 1 godzina'
+    if n % 10 in (2, 3, 4) and not 12 <= n % 100 <= 14:
+        return f'wolne {n} godziny'
+    return f'wolnych {n} godzin'
+
+
+def _zakresy_wolne_dnia(nauczyciel, dzien, wolne):
+    """Wolne podzakresy każdego zakresu dostępności dnia (panel 'Kalendarz dostępności'):
+    rytm zakresu (60 min + przerwa dnia) bez zajętych slotów, wolne sloty sklejane
+    w ciągłe grupy 'od–do' (pierwszy i ostatni wolny slot, np. 6:00–10:40 i 13:00–14:10,
+    gdy 11:50 jest zajęte). Gdy WSZYSTKIE sloty zakresu są zajęte — 'zajęte'."""
+    przerwa = _przerwa_dnia(nauczyciel, dzien)
+    krok = timedelta(minutes=GODZINA_LEKCJI + przerwa)
+    wolne_set = set(wolne)
+    wynik = []
+    for s, e in _zakresy_dnia(nauczyciel, dzien):
+        sloty = _rytm_zakresu(s, e, krok)
+        wolne_sloty = [t for t in sloty if t.strftime('%H:%M') in wolne_set]
+        if not wolne_sloty:
+            wynik.append('zajęte')
+            continue
+        grupy = []
+        for t in wolne_sloty:
+            if grupy and t - grupy[-1][-1] == krok:
+                grupy[-1].append(t)
+            else:
+                grupy.append([t])
+        wynik.extend(f'{g[0]:%H:%M}–{g[-1]:%H:%M}' for g in grupy)
+    return wynik
+
 
 def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
     """Sprawdza, czy slot (60 min) wypada w luce przerwy dnia nauczyciela.
@@ -534,10 +568,15 @@ def dostepnosci_tygodnia(dni):
                 else:
                     zakresy.append((s, e))
             if zakresy:
+                wolne = wolne_godziny_nauczyciela(n, dzien)
                 wpisy.append({
                     'nauczyciel': n,
                     'przedmioty': przedmioty_na_nauczyciela.get(n.id, ''),
                     'zakresy': [f'{s:%H:%M}–{e:%H:%M}' for s, e in zakresy],
+                    'wolne_godziny': wolne,
+                    'liczba_wolnych': len(wolne),
+                    'liczba_wolnych_tekst': _tekst_liczby_godzin(len(wolne)),
+                    'zakresy_wolne': _zakresy_wolne_dnia(n, dzien, wolne),
                 })
         wynik.append({
             'data': dzien,
@@ -2819,6 +2858,23 @@ def umow_lekcje_cykliczna(request, uczen_id):
         if not sloty:
             messages.error(request, 'Dodaj min. jeden termin (dzień tygodnia i godzina).')
             return redirect('lekcja_cykliczna', uczen_id=uczen.id)
+
+        # EDYCJA: formularz pokazuje wszystkie obecne sloty ucznia — każda przyszła
+        # lekcja tego przedmiotu, której slot (dzień tygodnia + godzina) NIE jest
+        # w nowej liście, zostaje ODWOŁANA (nie kasowana — zostaje w historii)
+        nowe_sloty = {(dzien_tygodnia, godzina_txt) for dzien_tygodnia, godzina_txt in sloty}
+        qs_stare = Lekcja.objects.filter(uczen=uczen, odwolana=False, data__gte=timezone.now())
+        if karta:
+            qs_stare = qs_stare.filter(przedmiot_karta=karta)
+        else:
+            qs_stare = qs_stare.filter(przedmiot_karta__isnull=True)
+        odwolane = 0
+        for stara in qs_stare:
+            lok = timezone.localtime(stara.data)
+            if (lok.weekday(), lok.strftime('%H:%M')) not in nowe_sloty:
+                stara.odwolana = True
+                stara.save(update_fields=['odwolana'])
+                odwolane += 1
         utworzone = 0
         pominiete_konflikt = 0
 
@@ -2866,19 +2922,22 @@ def umow_lekcje_cykliczna(request, uczen_id):
                 messages.error(
                     request,
                     'Nie wpisałem żadnego terminu — ' + ' oraz '.join(komunikaty)
-                    + '. Sprawdź dostępność korepetytora w „Mój tydzień” (dni, w których pracuje).',
+                    + '. Sprawdź dostępność korepetytora w „Mój tydzień" (dni, w których pracuje).'
+                    + (f' Odwołano {odwolane} starych terminów.' if odwolane else ''),
                 )
             else:
                 messages.warning(
                     request,
                     f'Pominięto: ' + ' oraz '.join(komunikaty) + '. '
-                    f'Wpisano {utworzone} terminów do {do_dnia:%d.%m.%Y}.',
+                                        f'Wpisano {utworzone} terminów do {do_dnia:%d.%m.%Y}.'
+                    + (f' Odwołano {odwolane} starych terminów.' if odwolane else ''),
                 )
         else:
             messages.success(
                 request,
                 f'Stałe lekcje umówione — wpisano {utworzone} terminów do {do_dnia:%d.%m.%Y}. '
-                'Korepetytor ma zablokowane godziny w kalendarzu.',
+                'Korepetytor ma zablokowane godziny w kalendarzu.'
+                + (f' Odwołano {odwolane} starych terminów.' if odwolane else ''),
             )
         # flaga "zajęcia cykliczne" dotyczy ucznia (niezależnie od przedmiotu)
         if utworzone and not uczen.zajecia_cykliczne:
@@ -2904,6 +2963,23 @@ def umow_lekcje_cykliczna(request, uczen_id):
                 '60 minut przed każdą lekcją.',
             )
         return redirect('lekcje')
+
+    # EDYCJA: formularz podstawia obecne przyszłe sloty ucznia na tym przedmiocie
+    # (dzień tygodnia + godzina), żeby można było zmienić godzinę zamiast dokładać
+    qs_sloty = Lekcja.objects.filter(uczen=uczen, odwolana=False, data__gte=timezone.now())
+    if karta:
+        qs_sloty = qs_sloty.filter(przedmiot_karta=karta)
+    else:
+        qs_sloty = qs_sloty.filter(przedmiot_karta__isnull=True)
+    seen_sloty = set()
+    istniejace_sloty = []
+    for l in qs_sloty.order_by('data'):
+        lok = timezone.localtime(l.data)
+        klucz = (lok.weekday(), lok.strftime('%H:%M'))
+        if klucz not in seen_sloty:
+            seen_sloty.add(klucz)
+            istniejace_sloty.append({'dzien': lok.weekday(), 'godzina': lok.strftime('%H:%M')})
+    istniejace_sloty.sort(key=lambda sl: (sl['dzien'], sl['godzina']))    
     return render(request, 'konta/lekcja_cykliczna.html', {
         'uczen': uczen,
         'karta': karta,
@@ -2912,7 +2988,12 @@ def umow_lekcje_cykliczna(request, uczen_id):
         'godziny': [f'{h:02d}:00' for h in range(6, 24)],
         'dzisiaj': date.today().isoformat(),
         'domyslny_koniec': (date.today() + timedelta(days=92)).isoformat(),
-        'nauczyciel_id': nauczyciel.id if nauczyciel else '',
+        'nauczyciel_id': nauczyciel.id if nauczyciel else '',      
+        'dni_tygodnia': [
+            (0, 'poniedziałek'), (1, 'wtorek'), (2, 'środa'), (3, 'czwartek'),
+            (4, 'piątek'), (5, 'sobota'), (6, 'niedziela'),
+        ],
+        'wiersze_slotow': istniejace_sloty or [None],
     })
 
 KATEGORIE_ZAZALEN = ['aplikacja', 'zajęcia', 'pracownik', 'pomysły']

@@ -657,6 +657,24 @@ input[type="radio"], input[type="checkbox"] {
   tabular-nums; white-space: nowrap;
 }
 
+/* klikalna liczba wolnych godzin (Kalendarz dostępności) — rozwija listę godzin */
+details.wolne-godziny { display: inline-block; }
+details.wolne-godziny summary {
+  cursor: pointer; color: var(--akcent-ciemny); font-weight: 600; list-style: none;
+}
+details.wolne-godziny summary::before { content: '▸ '; }
+details.wolne-godziny[open] summary::before { content: '▾ '; }
+details.wolne-godziny summary:hover { text-decoration: underline; }
+details.wolne-godziny .wolne-lista {
+  display: block; color: #555; font-size: .82rem; padding: .15rem 0 .1rem 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* cały zakres dnia zajęty — czerwone, przekreślone "zajęte" */
+.zakres-godzin.zakres-zajety {
+  background: #f8d7da; color: #a00; text-decoration: line-through; font-weight: 600;
+}
+
 /* Przycisk-pigułka „＋ Dodaj lekcję” (zakładka Lekcje u korepetytora) */
 .przycisk-pigulka {
   border: none; border-radius: 999px; background: var(--akcent); color: #fff; font-size: 1.05rem;
