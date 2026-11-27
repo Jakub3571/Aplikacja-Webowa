@@ -1882,6 +1882,17 @@ class KalendarzKorepetytoraTests(TestCaseZamrozonaData):
         self.assertNotIn('12:00', etykiety)
         self.assertNotIn('14:00', etykiety)
 
+    def test_ajax_korepetytorzy_tylko_pracujacy_w_dniu(self):
+        # sama data (bez godziny): tylko korepetytorzy z zaznaczonymi godzinami tego dnia
+        n2 = Nauczyciel.objects.create(imie='Ewa', nazwisko='Lis', email='e2@f.pl')
+        PrzedmiotNauczyciela.objects.create(nauczyciel=n2, przedmiot='matematyka', poziom='podstawowka')
+        self._sloty('11:00', '14:00')   # Anna Kowalska pracuje 2026-11-09
+        self.client.force_login(self.user)
+        r = self.client.get(f'/korepetytorzy/dane/?przedmiot=matematyka&poziom=podstawowka&data={self.dzien.isoformat()}')
+        nazwy = [k['nazwa'] for k in r.json()['korepetytorzy']]
+        self.assertIn('Anna Kowalska', nazwy)
+        self.assertNotIn('Ewa Lis', nazwy)   # uczy matmy, ale nie pracuje tego dnia
+
     def _dane_ucznia(self, godzina):
         return {
             'data_pierwszej_lekcji': self.dzien.isoformat(),
@@ -2271,6 +2282,20 @@ class KalendarzZbiorczyTests(TestCase):
         dzis = date.today()
         r = self.client.get(f'/kalendarz/?rok={dzis.year}&miesiac={dzis.month}&dzien={dzis.day}')
         self.assertContains(r, 'umówił: prac')
+
+    def test_dzien_siatka_kolumny_korepetytorow(self):
+        # widok dnia = siatka: kolumny to korepetytorzy (imię nazwisko + przedmioty), wiersze 6:00–21:00
+        self.client.force_login(self.admin)
+        dzis = date.today()
+        r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
+        self.assertContains(r, 'kalendarz-dzien-siata')
+        self.assertContains(r, 'dzien-kolumna-naglowek')
+        self.assertContains(r, 'Jan Kowalski')      # nagłówek kolumny korepetytora
+        self.assertContains(r, '06:00')              # pierwsza godzina
+        self.assertContains(r, '21:00')              # ostatnia godzina (okno 6–21)
+        self.assertContains(r, 'z Kasia Nowak')      # lekcja w komórce
+        self.assertContains(r, 'komorka-lekcja')     # zielona komórka lekcji 17:00
+        self.assertContains(r, 'komorka-wolny')      # szare wolne (zakres 16:00–20:00)
 
 
 class PrzypomnieniaJutroTests(TestCase):

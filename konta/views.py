@@ -682,6 +682,10 @@ def korepetytorzy_dane(request):
             start_lekcji = datetime.combine(dzien, godzina)
             if not nauczyciel_wolny_o(n, dzien, start_lekcji):
                 continue
+        elif dzien:
+            # sama data (bez godziny): tylko korepetytorzy, którzy tego dnia mają zaznaczone godziny
+            if not Dostepnosc.objects.filter(nauczyciel=n, data_od__lte=dzien, data_do__gte=dzien).exists():
+                continue
         korepetytorzy.append({'nazwa': f'{n.imie} {n.nazwisko}', 'id': n.id})
     return JsonResponse({'korepetytorzy': korepetytorzy})
 @login_required
@@ -2468,7 +2472,7 @@ def kalendarz_zbiorczy(request):
     nastepny_rok, nastepny_miesiac = (rok + 1, 1) if miesiac == 12 else (rok, miesiac + 1)
 
     nauczyciele = list(
-        Nauczyciel.objects.filter(aktywny=True).order_by('nazwisko', 'imie')
+        Nauczyciel.objects.filter(aktywny=True).prefetch_related('przedmioty').order_by('nazwisko', 'imie')
     )
     nazwy = {n.id: f'{n.imie} {n.nazwisko}'.strip().lower() for n in nauczyciele}
 
@@ -2571,41 +2575,42 @@ def kalendarz_zbiorczy(request):
             })
 
     # rozwinięty dzień z podziałem na godziny (jak w zwykłym kalendarzu)
-    godziny_dnia = []
+    # widok dnia jako SIATKA: kolumny = korepetytorzy (imię nazwisko + przedmioty),
+    # wiersze = godziny 6:00–21:00; komórka = szara (wolny), zielona (lekcja jednorazowa),
+    # niebieska (lekcja cykliczna); lekcja siedzi w wierszu swojej pełnej godziny
+    siatka_dnia = []
+    kolumny = []
     if wybrany_dzien:
-        # wiersze godzinowe: godziny 6:00–20:00 PLUS każda godzina, w której zaczyna się
-        # lekcja lub zakres (np. 17:05 z rytmu 60 min + przerwa) — lekcja ląduje w wierszu
-        # swojej pełnej godziny (17:05 → wiersz 17:00), a dokładny czas jest w tekście chipa
-        godziny_set = set(range(6, 21))
-        for blok in szczegoly:
-            for z in blok['zakresy']:
-                godziny_set.add(int(z.split('–')[0].split(':')[0]))
-            for l in blok['lekcje']:
-                godziny_set.add(int(l['godzina'].split(':')[0]))
-        for h in sorted(godziny_set):
-            etykieta = f'{h:02d}:00'
-            wpisy_g = []
-            for blok in szczegoly:
-                for z in blok['zakresy']:
-                    if z.split('–')[0] == etykieta:
-                        wpisy_g.append({
-                            'typ': 'wolny',
-                            'cykliczna': False,
-                            'tekst': f"{blok['nauczyciel'].imie} {blok['nauczyciel'].nazwisko} wolny: {z}",
-                        })
-                for l in blok['lekcje']:
-                    if int(l['godzina'].split(':')[0]) == h:
-                        wpisy_g.append({
-                            'typ': 'lekcja',
-                            'cykliczna': l['cykliczna'],
-                            'tekst': (
-                                f"{l['godzina']}–{l['koniec']} · {blok['nauczyciel'].imie} {blok['nauczyciel'].nazwisko} "
-                                f"z {l['uczen']} — {l['przedmiot']} ({l['poziom']})"
-                                f" · umówił: {l['umowil']}"
-                            ),
-                        })
-            wpisy_g.sort(key=lambda w: w['tekst'])
-            godziny_dnia.append({'etykieta': etykieta, 'wpisy': wpisy_g})
+        for n in nauczyciele:
+            przedmioty_txt = ', '.join(sorted({p.przedmiot for p in n.przedmioty.all()}))
+            kolumny.append({'id': n.id, 'nazwa': f'{n.imie} {n.nazwisko}'.strip(), 'przedmioty': przedmioty_txt})
+        for h in range(6, 22):
+            wiersz = {'etykieta': f'{h:02d}:00', 'kolumny': []}
+            for n in nauczyciele:
+                kom = {'typ': '', 'tekst': '', 'cykliczna': False}
+                lekcje_h = [
+                    l for l in lekcje_dni.get((n.id, wybrany_dzien), [])
+                    if timezone.localtime(l.data).hour == h
+                ]
+                if lekcje_h:
+                    l = lekcje_h[0]
+                    start = timezone.localtime(l.data)
+                    karta = l.przedmiot_karta
+                    kom = {
+                        'typ': 'lekcja',
+                        'cykliczna': l.uczen.zajecia_cykliczne,
+                        'tekst': (
+                            f'{start:%H:%M}–{(start + timedelta(minutes=GODZINA_LEKCJI)):%H:%M} · z {l.uczen.imie_ucznia} {l.uczen.nazwisko_rodzica}'
+                            f' — {karta.przedmiot if karta else l.uczen.przedmiot} ({karta.poziom if karta else l.uczen.poziom})'
+                            f' · umówił: {l.uczen.kto_umowil}'
+                        ),
+                    }
+                else:
+                    h_dt = datetime.combine(wybrany_dzien, time(h, 0))
+                    if any(st <= h_dt < e for st, e in zakresy_dni.get((n.id, wybrany_dzien), [])):
+                        kom = {'typ': 'wolny', 'tekst': 'wolny', 'cykliczna': False}
+                wiersz['kolumny'].append(kom)
+            siatka_dnia.append(wiersz)
     poprzedni_dzien = nastepny_dzien = None
     if wybrany_dzien:
         poprzedni_dzien = wybrany_dzien - timedelta(days=1)
@@ -2614,7 +2619,8 @@ def kalendarz_zbiorczy(request):
         'tygodnie': tygodnie,
         'wybrany_dzien': wybrany_dzien,
         'szczegoly': szczegoly,
-        'godziny_dnia': godziny_dnia,
+        'siatka_dnia': siatka_dnia,
+        'kolumny': kolumny,
         'poprzedni_dzien': poprzedni_dzien,
         'nastepny_dzien': nastepny_dzien,
         'dni_nazwy': ['poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota', 'niedziela'],

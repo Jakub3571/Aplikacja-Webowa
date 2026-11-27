@@ -16,17 +16,26 @@
     <span class="chip chip-lekcja">zielony: lekcja nowa (jednorazowa)</span>
     <span class="chip chip-lekcja-cykliczna">jasnoniebieski: lekcja cykliczna</span>
   </p>
-  <div class="dzien-godziny">
-    {% for g in godziny_dnia %}
-    <div class="dzien-wiersz-godzina">
-      <div class="dzien-godzina-etykieta">{{ g.etykieta }}</div>
-      <div class="dzien-godzina-tresc">
-        {% for wpis in g.wpisy %}
-        <span class="chip chip-dzien {% if wpis.typ == 'lekcja' %}{% if wpis.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}">{{ wpis.tekst }}</span>
-        {% empty %}
-        <span class="dzien-pusto">—</span>
-        {% endfor %}
+    <div class="kalendarz-dzien-siata" style="--kolumny: {{ kolumny|length }}">
+    <div class="dzien-wiersz dzien-wiersz-naglowek">
+      <div class="dzien-godzina-etykieta"></div>
+      {% for kol in kolumny %}
+      <div class="dzien-kolumna-naglowek">
+        <strong>{{ kol.nazwa }}</strong>
+        {% if kol.przedmioty %}<span class="podpowiedz">{{ kol.przedmioty }}</span>{% endif %}
       </div>
+      {% endfor %}
+    </div>
+    {% for wiersz in siatka_dnia %}
+    <div class="dzien-wiersz-godzina">
+      <div class="dzien-godzina-etykieta">{{ wiersz.etykieta }}</div>
+      {% for kom in wiersz.kolumny %}
+      <div class="dzien-komorka {% if kom.typ == 'lekcja' %}{% if kom.cykliczna %}komorka-lekcja-cykliczna{% else %}komorka-lekcja{% endif %}{% elif kom.typ == 'wolny' %}komorka-wolny{% endif %}">
+        {% if kom.tekst %}
+        <span class="chip chip-dzien {% if kom.typ == 'lekcja' %}{% if kom.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}">{{ kom.tekst }}</span>
+        {% endif %}
+      </div>
+      {% endfor %}
     </div>
     {% endfor %}
   </div>
