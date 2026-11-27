@@ -2292,7 +2292,7 @@ class KalendarzZbiorczyTests(TestCase):
         self.assertContains(r, 'kalendarz-dzien-siata')
         self.assertContains(r, 'dzien-kolumna-naglowek')
         self.assertContains(r, 'dzien-godzina-naglowek')   # kolumny godzin 6:00–21:00
-        self.assertContains(r, '17:00 Kasia')               # krótki tekst lekcji w komórce
+        self.assertContains(r, '17:00–18:00') # pełny tekst lekcji w komórce
         self.assertContains(r, 'Jan Kowalski')      # nagłówek kolumny korepetytora
         self.assertContains(r, '06:00')              # pierwsza godzina
         self.assertContains(r, '21:00')              # ostatnia godzina (okno 6–21)

@@ -28,8 +28,8 @@
         {% if kol.przedmioty %}<span class="podpowiedz">{% for p in kol.przedmioty %}<span class="przedmiot-poziom {{ p.klasa }}">{{ p.przedmiot }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}
       </div>
       {% for kom in kol.komorki %}
-      <div class="dzien-komorka {% if kom.typ == 'lekcja' %}{% if kom.cykliczna %}komorka-lekcja-cykliczna{% else %}komorka-lekcja{% endif %}{% elif kom.typ == 'wolny' %}komorka-wolny{% endif %}"{% if kom.tekst %} title="{{ kom.tekst }}"{% endif %}>
-        {% if kom.krotki %}<span class="chip chip-dzien {% if kom.typ == 'lekcja' %}{% if kom.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}">{{ kom.krotki }}</span>{% endif %}
+            <div class="dzien-komorka {% if kom.typ == 'lekcja' %}{% if kom.cykliczna %}komorka-lekcja-cykliczna{% else %}komorka-lekcja{% endif %}{% elif kom.typ == 'wolny' %}komorka-wolny{% endif %}"{% if kom.tekst %} title="{{ kom.tekst }}"{% endif %}>
+        {% if kom.tekst %}<span class="chip chip-dzien {% if kom.typ == 'lekcja' %}{% if kom.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}">{{ kom.tekst }}</span>{% endif %}
       </div>
       {% endfor %}
     </div>
