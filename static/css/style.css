@@ -557,7 +557,7 @@ a.kalendarz-komorka:hover { border-color: var(--akcent, #2563eb); background: #e
 .kalendarz-dzien-siata .dzien-wiersz,
 .kalendarz-dzien-siata .dzien-wiersz-godzina {
   display: grid;
-  grid-template-columns: 4rem repeat(var(--kolumny, 1), minmax(9rem, 1fr));
+  grid-template-columns: 4rem repeat(var(--kolumny, 1), 4cm);
 }
 .dzien-kolumna-naglowek { padding: .4rem .5rem; border-left: 1px solid #eef2f7; border-bottom: 1px solid #eef2f7; background: #f8fafc; }
 .dzien-kolumna-naglowek .podpowiedz { display: block; font-size: .75rem; }
