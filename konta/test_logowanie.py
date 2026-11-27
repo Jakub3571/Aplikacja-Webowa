@@ -1180,13 +1180,13 @@ class LekcjeCykliczneTests(TestCase):
             kto_umowil='Admin', umowil=self.admin,
         )
         self.client.force_login(self.pracownik)
-        r = self.client.get('/lekcje/')
+        r = self.client.get('/lekcje/?rok=2026&miesiac=10')
         self.assertContains(r, 'Kasia')
         self.assertNotContains(r, 'Ola')
 
     def test_admin_widzi_wszystkich(self):
         self.client.force_login(self.admin)
-        r = self.client.get('/lekcje/')
+        r = self.client.get('/lekcje/?rok=2026&miesiac=10')
         self.assertContains(r, 'Kasia')
 
     def test_pracownik_umawia_lekcje_cykliczna(self):
@@ -1368,7 +1368,7 @@ class LekcjeCykliczneTests(TestCase):
 
     def test_pracownik_widzi_zakladke_lekcje(self):
         self.client.force_login(self.pracownik)
-        r = self.client.get('/lekcje/')
+        r = self.client.get('/lekcje/?rok=2026&miesiac=10')
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Kasia')
         # stary kalendarz lekcji ucznia usunięty — adres daje teraz 404
@@ -2806,12 +2806,12 @@ class UsuwanieTylkoSzefTests(TestCase):
 
     def test_umawiajacy_widzi_tylko_edycje_bez_przycisku_zakoncz(self):
         self.client.force_login(self.umawiajacy)
-        r = self.client.get('/lekcje/')
+        r = self.client.get('/lekcje/?rok=2026&miesiac=10')
         self.assertEqual(r.status_code, 200)
         self.assertNotContains(r, 'Zakończ współpracę')
         self.assertContains(r, 'Edytuj dane ucznia')
         self.client.force_login(self.szef)
-        r = self.client.get('/lekcje/')
+        r = self.client.get('/lekcje/?rok=2026&miesiac=10')
         self.assertContains(r, 'Zakończ współpracę')
 
 
@@ -2893,7 +2893,7 @@ class PlatnosciHistoriaTests(TestCase):
         self.client.post('/platnosci/', {'wyslij_raport': '1', 'email_raportu': 'biuro@f.pl'})
         self.assertEqual(Lekcja.objects.filter(uczen=self.uczen).count(), przed)
         self.assertTrue(Uczen.objects.filter(pk=self.uczen.pk, zakonczona=False).exists())
-        r = self.client.get('/lekcje/')
+        r = self.client.get('/lekcje/?rok=2026&miesiac=10')
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Kasia Nowak')
 
