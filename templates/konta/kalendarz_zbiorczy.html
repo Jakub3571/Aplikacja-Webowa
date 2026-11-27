@@ -16,29 +16,25 @@
     <span class="chip chip-lekcja">zielony: lekcja nowa (jednorazowa)</span>
     <span class="chip chip-lekcja-cykliczna">jasnoniebieski: lekcja cykliczna</span>
   </p>
-    <div class="kalendarz-dzien-siata" style="--kolumny: {{ kolumny|length }}">
+  <div class="kalendarz-dzien-siata">
     <div class="dzien-wiersz dzien-wiersz-naglowek">
-      <div class="dzien-godzina-etykieta"></div>
-      {% for kol in kolumny %}
+      <div class="dzien-kolumna-naglowek">Korepetytor</div>
+      {% for g in godziny_siatki %}<div class="dzien-godzina-naglowek">{{ g }}</div>{% endfor %}
+    </div>
+    {% for kol in siatka_dnia %}
+    <div class="dzien-wiersz dzien-wiersz-korepetytor">
       <div class="dzien-kolumna-naglowek">
         <strong>{{ kol.nazwa }}</strong>
         {% if kol.przedmioty %}<span class="podpowiedz">{% for p in kol.przedmioty %}<span class="przedmiot-poziom {{ p.klasa }}">{{ p.przedmiot }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}
       </div>
-      {% endfor %}
-    </div>
-    {% for wiersz in siatka_dnia %}
-    <div class="dzien-wiersz-godzina">
-      <div class="dzien-godzina-etykieta">{{ wiersz.etykieta }}</div>
-      {% for kom in wiersz.kolumny %}
-      <div class="dzien-komorka {% if kom.typ == 'lekcja' %}{% if kom.cykliczna %}komorka-lekcja-cykliczna{% else %}komorka-lekcja{% endif %}{% elif kom.typ == 'wolny' %}komorka-wolny{% endif %}">
-        {% if kom.tekst %}
-        <span class="chip chip-dzien {% if kom.typ == 'lekcja' %}{% if kom.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}">{{ kom.tekst }}</span>
-        {% endif %}
+      {% for kom in kol.komorki %}
+      <div class="dzien-komorka {% if kom.typ == 'lekcja' %}{% if kom.cykliczna %}komorka-lekcja-cykliczna{% else %}komorka-lekcja{% endif %}{% elif kom.typ == 'wolny' %}komorka-wolny{% endif %}"{% if kom.tekst %} title="{{ kom.tekst }}"{% endif %}>
+        {% if kom.krotki %}<span class="chip chip-dzien {% if kom.typ == 'lekcja' %}{% if kom.cykliczna %}chip-lekcja-cykliczna{% else %}chip-lekcja{% endif %}{% else %}chip-wolny{% endif %}">{{ kom.krotki }}</span>{% endif %}
       </div>
       {% endfor %}
     </div>
     {% endfor %}
-    </div>
+  </div>
   <div class="legenda-poziomow">
     <strong>Legenda poziomów:</strong>
     <span class="przedmiot-poziom poziom-podstawowka">podstawówka</span>
