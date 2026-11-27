@@ -222,4 +222,4 @@ class WyszukiwanieSekcjiTests(TestCase):
         self.client.force_login(self.admin)
         r = self.client.get('/uczniowie/')
         self.assertContains(r, '>Umówieni</a>')
-        self.assertNotContains(r, 'Umówieni</a>')
+        self.assertNotContains(r, 'Umówieni uczniowie</a>')
