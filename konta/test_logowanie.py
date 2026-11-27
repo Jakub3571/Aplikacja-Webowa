@@ -2226,7 +2226,7 @@ class KalendarzZbiorczyTests(TestCase):
         r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'kalendarz-dzien-widok')
-        self.assertContains(r, 'dzien-wiersz-korepetytor')
+        self.assertContains(r, 'dzien-wiersz-godzina')
         self.assertContains(r, 'strzalka-wroc')
         self.assertContains(r, 'z Kasia Nowak')
         self.assertContains(r, 'Jan Kowalski')
@@ -2291,8 +2291,6 @@ class KalendarzZbiorczyTests(TestCase):
         r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
         self.assertContains(r, 'kalendarz-dzien-siata')
         self.assertContains(r, 'dzien-kolumna-naglowek')
-        self.assertContains(r, 'dzien-godzina-naglowek')   # kolumny godzin 6:00–21:00
-        self.assertContains(r, '17:00–18:00') # pełny tekst lekcji w komórce
         self.assertContains(r, 'Jan Kowalski')      # nagłówek kolumny korepetytora
         self.assertContains(r, '06:00')              # pierwsza godzina
         self.assertContains(r, '21:00')              # ostatnia godzina (okno 6–21)

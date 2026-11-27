@@ -2574,12 +2574,13 @@ def kalendarz_zbiorczy(request):
                 'zakresy': [f'{s.strftime("%H:%M")}–{e.strftime("%H:%M")}' for s, e in zakresy],
             })
 
-    # widok dnia jako SIATKA transponowana: WIERSZE = korepetytorzy pracujący tego dnia
-    # (imię nazwisko + przedmioty w kolorze poziomu), KOLUMNY = godziny 6:00–21:00;
-    # komórka = szara (jego zakres, bez napisu), zielona (lekcja jednorazowa), niebieska (cykliczna)
-    godziny_siatki = [f'{h:02d}:00' for h in range(6, 22)]
+    # widok dnia jako SIATKA: kolumny = korepetytorzy (imię nazwisko + przedmioty),
+    # wiersze = godziny 6:00–21:00; komórka = szara (wolny), zielona (lekcja jednorazowa),
+    # niebieska (lekcja cykliczna); lekcja siedzi w wierszu swojej pełnej godziny
     siatka_dnia = []
+    kolumny = []
     if wybrany_dzien:
+        # tylko korepetytorzy, którzy tego dnia pracują (mają zaznaczony zakres lub lekcję)
         for n in nauczyciele:
             if not zakresy_dni.get((n.id, wybrany_dzien)) and not lekcje_dni.get((n.id, wybrany_dzien)):
                 continue
@@ -2587,9 +2588,12 @@ def kalendarz_zbiorczy(request):
                 {'przedmiot': p.przedmiot, 'klasa': _klasa_poziomu(p.poziom)}
                 for p in sorted(n.przedmioty.all(), key=lambda p: p.przedmiot)
             ]
-            komorki = []
-            for h in range(6, 22):
-                kom = {'typ': '', 'tekst': '', 'krotki': '', 'cykliczna': False}
+            kolumny.append({'n': n, 'nazwa': f'{n.imie} {n.nazwisko}'.strip(), 'przedmioty': przedmioty})
+        for h in range(6, 22):
+            wiersz = {'etykieta': f'{h:02d}:00', 'kolumny': []}
+            for kol in kolumny:
+                n = kol['n']
+                kom = {'typ': '', 'tekst': '', 'cykliczna': False}
                 lekcje_h = [
                     l for l in lekcje_dni.get((n.id, wybrany_dzien), [])
                     if timezone.localtime(l.data).hour == h
@@ -2598,23 +2602,21 @@ def kalendarz_zbiorczy(request):
                     l = lekcje_h[0]
                     start = timezone.localtime(l.data)
                     karta = l.przedmiot_karta
-                    pelny = (
-                        f'{start:%H:%M}–{(start + timedelta(minutes=GODZINA_LEKCJI)):%H:%M} · z {l.uczen.imie_ucznia} {l.uczen.nazwisko_rodzica}'
-                        f' — {karta.przedmiot if karta else l.uczen.przedmiot} ({karta.poziom if karta else l.uczen.poziom})'
-                        f' · umówił: {l.uczen.kto_umowil}'
-                    )
                     kom = {
                         'typ': 'lekcja',
                         'cykliczna': l.uczen.zajecia_cykliczne,
-                        'tekst': pelny,
-                        'krotki': f'{start:%H:%M} {l.uczen.imie_ucznia}',
+                        'tekst': (
+                            f'{start:%H:%M}–{(start + timedelta(minutes=GODZINA_LEKCJI)):%H:%M} · z {l.uczen.imie_ucznia} {l.uczen.nazwisko_rodzica}'
+                            f' — {karta.przedmiot if karta else l.uczen.przedmiot} ({karta.poziom if karta else l.uczen.poziom})'
+                            f' · umówił: {l.uczen.kto_umowil}'
+                        ),
                     }
                 else:
                     h_dt = datetime.combine(wybrany_dzien, time(h, 0))
                     if any(st <= h_dt < e for st, e in zakresy_dni.get((n.id, wybrany_dzien), [])):
-                        kom = {'typ': 'wolny', 'tekst': '', 'krotki': '', 'cykliczna': False}
-                komorki.append(kom)
-            siatka_dnia.append({'nazwa': f'{n.imie} {n.nazwisko}'.strip(), 'przedmioty': przedmioty, 'komorki': komorki})
+                        kom = {'typ': 'wolny', 'tekst': '', 'cykliczna': False}  # szara komórka zakresu, bez napisu
+                wiersz['kolumny'].append(kom)
+            siatka_dnia.append(wiersz)
     poprzedni_dzien = nastepny_dzien = None
     if wybrany_dzien:
         poprzedni_dzien = wybrany_dzien - timedelta(days=1)
@@ -2624,7 +2626,7 @@ def kalendarz_zbiorczy(request):
         'wybrany_dzien': wybrany_dzien,
         'szczegoly': szczegoly,
         'siatka_dnia': siatka_dnia,
-        'godziny_siatki': godziny_siatki,
+        'kolumny': kolumny,
         'poprzedni_dzien': poprzedni_dzien,
         'nastepny_dzien': nastepny_dzien,
         'dni_nazwy': ['poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota', 'niedziela'],
