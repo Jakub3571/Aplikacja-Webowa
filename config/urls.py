@@ -35,6 +35,7 @@ urlpatterns = [
     ),
     path('pulpit/', views.pulpit, name='pulpit'),
     path('uczniowie/', views.uczniowie, name='uczniowie'),
+    path('baza-uczniow/', views.baza_uczniow, name='baza_uczniow'),
     path('nauczyciele/<int:nauczyciel_id>/kalendarz/dane/', views.kalendarz_dane, name='kalendarz_dane'),
 
     path('moj-tydzien/', views.moj_tydzien, name='moj_tydzien'),

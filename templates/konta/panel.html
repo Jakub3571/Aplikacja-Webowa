@@ -18,7 +18,7 @@
   {% if user.nauczyciel_id %}
   <nav class="zakladki">
     <a href="{% url 'moj_tydzien' %}" class="{% if request.resolver_match.url_name == 'moj_tydzien' %}aktywna{% endif %}">🗓 Mój tydzień</a>
-    <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">📚 Umówieni uczniowie</a>
+    <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">📚 Umówieni</a>
   </nav>
   <div class="pasek-nauczyciela">{{ user.nauczyciel.imie }} {{ user.nauczyciel.nazwisko }} — {{ user.nauczyciel.przedmioty_tekst }}</div>
   {% endif %}
@@ -27,6 +27,7 @@
   <nav class="zakladki">
     {% if request.user.is_superuser %}
     <a href="{% url 'uczniowie' %}" class="{% if request.resolver_match.url_name == 'uczniowie' %}aktywna{% endif %}">Uczniowie</a>
+    <a href="{% url 'baza_uczniow' %}" class="{% if request.resolver_match.url_name == 'baza_uczniow' %}aktywna{% endif %}">Baza uczniów</a>
     <a href="{% url 'pulpit' %}" class="{% if request.resolver_match.url_name == 'pulpit' %}aktywna{% endif %}">Start</a>
     <a href="{% url 'archiwum' %}" class="{% if request.resolver_match.url_name == 'archiwum' %}aktywna{% endif %}">Archiwum</a>
     <a href="{% url 'lekcje' %}" class="{% if request.resolver_match.url_name == 'lekcje' %}aktywna{% endif %}">Umówieni uczniowie</a>

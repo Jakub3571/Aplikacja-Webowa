@@ -33,15 +33,14 @@
     </div>
     {% endif %}
 
-    <div class="pole-szukania" style="margin-bottom: 1rem;">
-      <input type="text" class="szukaj-tabela" data-tabela="tabela-umowieni"
-        placeholder="Szukaj ucznia (imię, nazwisko, korepetytor, przedmiot)..." value="{{ fraza }}" />
-    </div>
-
-    <div class="tabela-wrapper" id="tabela-umowieni">
+    <div class="tabela-wrapper">
 
       <h3>🆕 Nowi uczniowie <span class="licznik">{{ sekcje.nowi|length }}</span></h3>
-      <table class="tabela tabela-siata">
+      <div class="pole-szukania" style="margin-bottom: .5rem;">
+        <input type="text" class="szukaj-tabela" data-tabela="tabela-nowi"
+          placeholder="Szukaj w nowych uczniach (imię, nazwisko, korepetytor, przedmiot)..." />
+      </div>
+      <table class="tabela tabela-siata" id="tabela-nowi" data-szukanie="wylaczone">
         <thead>
           <tr><th>Uczeń</th><th>Korepetytor</th><th>Przedmiot</th><th>1. lekcja</th>{% if not jest_nauczycielem %}<th>Akcje</th>{% endif %}</tr>
         </thead>
@@ -69,7 +68,11 @@
       </table>
 
       <h3 style="margin-top: 1.5rem;">⏳ Do potwierdzenia <span class="licznik">{{ sekcje.do_potwierdzenia|length }}</span></h3>
-      <table class="tabela tabela-siata">
+      <div class="pole-szukania" style="margin-bottom: .5rem;">
+        <input type="text" class="szukaj-tabela" data-tabela="tabela-do-potwierdzenia"
+          placeholder="Szukaj w „Do potwierdzenia” (imię, nazwisko, korepetytor, przedmiot)..." />
+      </div>
+      <table class="tabela tabela-siata" id="tabela-do-potwierdzenia" data-szukanie="wylaczone">
         <thead>
           <tr><th>Uczeń</th><th>Korepetytor</th><th>Przedmiot</th><th>Lekcja</th>{% if moze_akcje %}<th>Akcja settera</th>{% endif %}</tr>
         </thead>
@@ -103,8 +106,12 @@
       </table>
 
       <h3 style="margin-top: 1.5rem;">✅ Odbyła się <span class="licznik">{{ sekcje.odbyla|length }}</span></h3>
+      <div class="pole-szukania" style="margin-bottom: .5rem;">
+        <input type="text" class="szukaj-tabela" data-tabela="tabela-odbyla"
+          placeholder="Szukaj w odbytych lekcjach (imię, nazwisko, korepetytor, przedmiot)..." />
+      </div>
       <p class="podpowiedz">Checkboxy odhacza setter. Wiersz robi się czerwony, gdy minęły 24 h od lekcji, a któryś checkbox jest pusty.</p>
-      <table class="tabela tabela-siata">
+      <table class="tabela tabela-siata" id="tabela-odbyla" data-szukanie="wylaczone">
         <thead>
           <tr>
             <th>Uczeń</th><th>Korepetytor</th><th>Przedmiot</th><th>Lekcja</th>
@@ -176,7 +183,11 @@
       </table>
 
       <h3 style="margin-top: 1.5rem;">❌ Nie odbyła się <span class="licznik">{{ sekcje.nie_odbyla|length }}</span></h3>
-      <table class="tabela tabela-siata">
+      <div class="pole-szukania" style="margin-bottom: .5rem;">
+        <input type="text" class="szukaj-tabela" data-tabela="tabela-nie-odbyla"
+          placeholder="Szukaj w nieodbytych lekcjach (imię, nazwisko, korepetytor, przedmiot)..." />
+      </div>
+      <table class="tabela tabela-siata" id="tabela-nie-odbyla" data-szukanie="wylaczone">
         <thead>
           <tr><th>Uczeń</th><th>Korepetytor</th><th>Przedmiot</th><th>Lekcja</th><th>Powód</th>{% if moze_akcje %}<th>Akcja</th>{% endif %}</tr>
         </thead>

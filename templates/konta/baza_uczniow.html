@@ -1,0 +1,69 @@
+{% extends 'konta/panel.html' %}
+{% block tytul %}Baza uczniów — Panel pracowniczy{% endblock %}
+{% block panel %}
+<div class="platnosci-uklad">
+  <section class="karta">
+    <h2>Baza uczniów</h2>
+    <p class="podpowiedz">
+      Wszyscy aktywni uczniowie (archiwum jest w osobnej zakładce). Kliknięcie nagłówka
+      kolumny sortuje tabelę. Żółte komórki = brak lub podejrzany telefon / e-mail
+      („-”, „0”, „@”).
+    </p>
+
+    <h3 style="margin-top: 1.5rem;">Statystyki osób umawiających
+      <span class="tydzien-nawigacja" style="display: inline-flex; margin: 0; vertical-align: middle;">
+        <a class="strzalka" href="{{ link_poprzedni }}" title="Poprzedni miesiąc">&larr;</a>
+        <strong>{{ nazwa_miesiaca }} {{ rok }}</strong>
+        <a class="strzalka" href="{{ link_nastepny }}" title="Następny miesiąc">&rarr;</a>
+      </span>
+    </h3>
+    <div class="tabela-wrapper">
+      <table class="tabela tabela-siata" id="tabela-statystyki">
+        <thead>
+          <tr><th>Kto umówił</th><th>Umówieni uczniowie w miesiącu</th><th>Odbyte lekcje w miesiącu</th></tr>
+        </thead>
+        <tbody>
+          {% for s in statystyki %}
+          <tr>
+            <td>{{ s.nazwa }}</td>
+            <td>{{ s.umowieni }}</td>
+            <td>{{ s.odbyte }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="pusto">Brak osób umawiających.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <form method="get" action="{% url 'baza_uczniow' %}" class="baza-filtry">
+      <label>Szukaj
+        <input type="text" name="szukaj" value="{{ szukaj }}"
+          placeholder="imię, nazwisko, rodzic, telefon, e-mail, korepetytor, przedmiot, kto umówił..." />
+      </label>
+      <label class="wiersz">
+        <input type="checkbox" name="grupuj" value="umowil" {% if grupuj %}checked{% endif %} />
+        grupuj wg „kto umówił”
+      </label>
+      <input type="hidden" name="rok" value="{{ rok }}" />
+      <input type="hidden" name="miesiac" value="{{ miesiac }}" />
+      <input type="hidden" name="sort" value="{{ sort }}" />
+      <input type="hidden" name="kierunek" value="{{ kierunek }}" />
+      <button type="submit" class="przycisk-maly">Szukaj</button>
+      {% if szukaj or grupuj %}
+      <a href="{% url 'baza_uczniow' %}?rok={{ rok }}&miesiac={{ miesiac }}">Wyczyść filtry</a>
+      {% endif %}
+    </form>
+
+    <h3 style="margin-top: 1rem;">Uczniowie <span class="licznik">{{ liczba }}</span></h3>
+    {% if grupy %}
+      {% for nazwa, wiersze_g in grupy %}
+      <h4>{{ nazwa }} <span class="licznik">{{ wiersze_g|length }}</span></h4>
+      {% include 'konta/baza_uczniow_tabela.html' with wiersze=wiersze_g %}
+      {% endfor %}
+    {% else %}
+      {% include 'konta/baza_uczniow_tabela.html' with wiersze=wiersze %}
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

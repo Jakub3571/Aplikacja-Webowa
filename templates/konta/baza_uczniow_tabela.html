@@ -1,0 +1,37 @@
+<div class="tabela-wrapper">
+  <table class="tabela tabela-siata">
+    <thead>
+      <tr>
+        {% for kol in kolumny %}
+        <th>
+          <a href="{{ kol.link }}">{{ kol.etykieta }}{% if kol.aktywna %} {% if kol.kierunek == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</a>
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for w in wiersze %}
+      {% with u=w.uczen %}
+      <tr>
+        <td><a href="{% url 'edytuj_ucznia' u.id %}">{{ u.imie_ucznia }} {{ u.nazwisko_rodzica }}</a></td>
+        <td>{{ u.rodzic }}</td>
+        <td class="{% if w.telefon_podejrzany %}komorka-podejrzana{% endif %}">
+          {% if w.telefon_podejrzany %}{{ u.telefon_glowny }}{% else %}<a href="tel:{{ u.telefon_glowny }}">{{ u.telefon_glowny }}</a>{% endif %}
+        </td>
+        <td class="{% if w.email_podejrzany %}komorka-podejrzana{% endif %}">
+          {% if w.email_podejrzany %}{{ u.email_glowny }}{% else %}<a href="mailto:{{ u.email_glowny }}">{{ u.email_glowny }}</a>{% endif %}
+        </td>
+        <td>{{ u.korepetytor }}</td>
+        <td>{% firstof u.kto_umowil u.umowil.username '—' %}</td>
+        <td>{{ u.przedmiot }}</td>
+        <td>{{ u.poziom }}</td>
+        <td>{{ u.szkola }}</td>
+        <td>{{ u.pierwsza_lekcja|date:"d.m.Y H:i" }}</td>
+      </tr>
+      {% endwith %}
+      {% empty %}
+      <tr><td colspan="{{ kolumny|length }}" class="pusto">Brak uczniów dla wybranych filtrów.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

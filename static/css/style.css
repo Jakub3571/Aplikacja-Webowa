@@ -103,7 +103,7 @@ body {
 .zakladki { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 1rem; }
 
 .zakladki a {
-  flex: 1 1 0; text-align: center; padding: 0.5rem 1rem; border: 1px solid var(--ramka);
+  flex: 1 1 0; text-align: center; padding: 0.5rem 1rem; border: 1px solid var(--ramka); white-space: nowrap;
   border-radius: 8px 8px 0 0; background: var(--karta); color: var(--tekst); text-decoration: none;
   font-weight: 600; opacity: 0.7;
 }
@@ -759,3 +759,10 @@ details.feedback { display: inline-block; margin-left: .4rem; font-size: .82rem;
 details.feedback summary { cursor: pointer; color: var(--akcent-ciemny); font-weight: 600; }
 details.feedback p { margin: .15rem 0; }
 td.pusto, .pusto { opacity: .6; font-style: italic; }
+
+/* Etap 3: baza uczniów — żółte podświetlenie podejrzanych telefonów/e-maili */
+.komorka-podejrzana { background: #fff3b0; }
+.komorka-podejrzana a { color: inherit; }
+.baza-filtry { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; margin-bottom: 1rem; }
+.baza-filtry label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; }
+.baza-filtry label.wiersz { flex-direction: row; align-items: center; }

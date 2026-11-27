@@ -189,3 +189,37 @@ class PanelSetteraTests(TestCase):
         self.client.force_login(self.admin)
         r = self.client.get('/lekcje/')
         self.assertContains(r, 'Kasia')
+
+class WyszukiwanieSekcjiTests(TestCase):
+    """Jedno wyszukiwanie na sekcję (Nowi / Do potwierdzenia / Odbyła się / Nie odbyła się),
+    bez zbiorczego pola na górze; zakładka w pasku nazywa się krótko „Umówieni”."""
+
+    def setUp(self):
+        self.admin = Pracownik.objects.create_superuser('admin', 'a@f.pl', 'Sup3rHaslo!')
+        self.setter = Pracownik.objects.create_user('setter', 's@f.pl', 'Sup3rHaslo!')
+        self.uczen = Uczen.objects.create(
+            pierwsza_lekcja=timezone.now() + timedelta(days=2),
+            przedmiot='matematyka', poziom='podstawówka', szkola='SP 1',
+            imie_ucznia='Kasia', nazwisko_rodzica='Nowak', rodzic='Ewa Nowak',
+            telefon_glowny='600100200', email_glowny='ewa@f.pl',
+            korepetytor='Jan Kowalski', kto_umowil='setter', umowil=self.setter,
+        )
+
+    def test_cztery_wyszukiwania_jedno_na_sekcje(self):
+        self.client.force_login(self.admin)
+        r = self.client.get('/lekcje/')
+        self.assertEqual(r.status_code, 200)
+        # dokładnie 4 pola wyszukiwania — po jednym nad każdą tabelą sekcji
+        self.assertEqual(r.content.count(b'class="szukaj-tabela"'), 4)
+        for tabela_id in ('tabela-nowi', 'tabela-do-potwierdzenia', 'tabela-odbyla', 'tabela-nie-odbyla'):
+            self.assertContains(r, tabela_id)
+        # zbiorcze wyszukiwanie na górze znika
+        self.assertNotContains(r, 'data-tabela="tabela-umowieni"')
+        # tabele mają wyłączone auto-doklejanie wyszukiwarki z base.html
+        self.assertEqual(r.content.count(b'data-szukanie="wylaczone"'), 4)
+
+    def test_zakladka_nazywa_sie_krotko_umowieni(self):
+        self.client.force_login(self.admin)
+        r = self.client.get('/uczniowie/')
+        self.assertContains(r, '>Umówieni</a>')
+        self.assertNotContains(r, 'Umówieni</a>')

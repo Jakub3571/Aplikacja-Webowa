@@ -78,14 +78,14 @@ pracowniczy{% endblock %} {% block panel %}
 			{% endif %}
 
 			<label for="{{ form.telefon_glowny.id_for_label }}"
-				>Telefon główny <span class="gwiazdka">*</span></label
+                >Telefon główny (opcjonalnie)</label
 			>
 			{{ form.telefon_glowny }} {% if form.telefon_glowny.help_text %}
 			<p class="podpowiedz">{{ form.telefon_glowny.help_text }}</p>
 			{% endif %}
 
 			<label for="{{ form.email_glowny.id_for_label }}"
-				>Email główny <span class="gwiazdka">*</span></label
+                >Email główny (opcjonalnie)</label
 			>
 			{{ form.email_glowny }} {% if form.email_glowny.help_text %}
 			<p class="podpowiedz">{{ form.email_glowny.help_text }}</p>

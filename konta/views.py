@@ -3,6 +3,7 @@ import json
 import re
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from urllib.parse import urlencode
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
@@ -2874,10 +2875,10 @@ def odbiorcy_meet(uczen, adresat='oba'):
     """Zwraca adresy e-mail rodzica — ZAWSZE oba (główny i dodatkowy),
     pomija puste adresy i duplikaty. Adresat z formularza nie jest już wybierany."""
     adresy = []
-    if uczen.email_glowny:
-        adresy.append(uczen.email_glowny)
-    if uczen.email_dodatkowy and uczen.email_dodatkowy not in adresy:
-        adresy.append(uczen.email_dodatkowy)
+    for adres in (uczen.email_glowny, uczen.email_dodatkowy):
+        # "-" i inne placeholdery (bez "@") nie są adresami — pomijamy
+        if adres and '@' in adres and adres not in adresy:
+            adresy.append(adres)
     return adresy
 
 
@@ -3636,6 +3637,170 @@ def zmiana_hasla(request):
         return redirect('pulpit')
     return render(request, 'konta/zmiana_hasla.html', {'form': form})
 
+KOLUMNY_BAZY = [
+    ('uczen', 'Uczeń'),
+    ('rodzic', 'Rodzic'),
+    ('telefon', 'Telefon'),
+    ('email', 'E-mail'),
+    ('korepetytor', 'Korepetytor'),
+    ('umowil', 'Kto umówił'),
+    ('przedmiot', 'Przedmiot'),
+    ('poziom', 'Poziom'),
+    ('szkola', 'Szkoła'),
+    ('pierwsza', 'Data 1. lekcji'),
+]
+
+SORTOWANIE_BAZY = {
+    'uczen': ['nazwisko_rodzica', 'imie_ucznia'],
+    'rodzic': ['rodzic'],
+    'telefon': ['telefon_glowny'],
+    'email': ['email_glowny'],
+    'korepetytor': ['korepetytor'],
+    'umowil': ['kto_umowil'],
+    'przedmiot': ['przedmiot'],
+    'poziom': ['poziom'],
+    'szkola': ['szkola'],
+    'pierwsza': ['pierwsza_lekcja'],
+}
+
+
+def _podejrzane_kontakt(wartosc, czy_email=False):
+    """Puste lub podejrzane dane kontaktowe („-”, „0”, „@”, za mało cyfr w telefonie,
+    e-mail bez „@” lub bez kropki w domenie) — w bazie uczniów podświetlane na żółto."""
+    w = (wartosc or '').strip()
+    if w in ('', '-'):
+        return True
+    if czy_email:
+        if '@' not in w:
+            return True
+        lokalna, _, domena = w.partition('@')
+        return not lokalna or not domena or '.' not in domena
+    return sum(c.isdigit() for c in w) < 7
+
+
+@tylko_szef
+def baza_uczniow(request):
+    """Baza uczniów (tylko szef): tabelka wszystkich aktywnych uczniów —
+    sortowanie kolumnami, szukanie, grupowanie wg „kto umówił”
+    i statystyki miesięczne na osobę umawiającą."""
+    dzis = date.today()
+    try:
+        rok = int(request.GET.get('rok') or dzis.year)
+        miesiac = int(request.GET.get('miesiac') or dzis.month)
+        if not 1 <= miesiac <= 12:
+            miesiac = dzis.month
+    except (ValueError, TypeError):
+        rok, miesiac = dzis.year, dzis.month
+    if miesiac == 12:
+        nastepny_rok, nastepny_miesiac = rok + 1, 1
+    else:
+        nastepny_rok, nastepny_miesiac = rok, miesiac + 1
+    if miesiac == 1:
+        poprzedni_rok, poprzedni_miesiac = rok - 1, 12
+    else:
+        poprzedni_rok, poprzedni_miesiac = rok, miesiac - 1
+
+    szukaj = (request.GET.get('szukaj') or '').strip()
+    sort = request.GET.get('sort') or 'pierwsza'
+    if sort not in SORTOWANIE_BAZY:
+        sort = 'pierwsza'
+    kierunek = request.GET.get('kierunek') or 'desc'
+    if kierunek not in ('asc', 'desc'):
+        kierunek = 'desc'
+    grupuj = request.GET.get('grupuj') == 'umowil'
+
+    def _query(**zmiany):
+        p = {
+            'szukaj': szukaj,
+            'sort': sort,
+            'kierunek': kierunek,
+            'grupuj': 'umowil' if grupuj else '',
+            'rok': rok,
+            'miesiac': miesiac,
+        }
+        p.update(zmiany)
+        return '?' + urlencode({k: v for k, v in p.items() if v != ''})
+
+    uczniowie_lista = list(Uczen.objects.filter(zakonczona=False).select_related('umowil'))
+    if szukaj:
+        fraza = szukaj.lower()
+        uczniowie_lista = [
+            u for u in uczniowie_lista
+            if fraza in (u.imie_ucznia or '').lower()
+            or fraza in (u.nazwisko_rodzica or '').lower()
+            or fraza in (u.rodzic or '').lower()
+            or fraza in (u.telefon_glowny or '').lower()
+            or fraza in (u.email_glowny or '').lower()
+            or fraza in (u.korepetytor or '').lower()
+            or fraza in (u.kto_umowil or '').lower()
+            or fraza in (u.przedmiot or '').lower()
+            or fraza in (u.poziom or '').lower()
+            or fraza in (u.szkola or '').lower()
+        ]
+    atrybuty = SORTOWANIE_BAZY[sort]
+    uczniowie_lista.sort(
+        key=lambda u: tuple((getattr(u, a) or '') for a in atrybuty),
+        reverse=(kierunek == 'desc'),
+    )
+    wiersze = [
+        {
+            'uczen': u,
+            'telefon_podejrzany': _podejrzane_kontakt(u.telefon_glowny),
+            'email_podejrzany': _podejrzane_kontakt(u.email_glowny, czy_email=True),
+        }
+        for u in uczniowie_lista
+    ]
+    grupy = None
+    if grupuj:
+        grupy = {}
+        for w in wiersze:
+            u = w['uczen']
+            nazwa = (u.kto_umowil or '').strip() or (
+                (u.umowil.get_full_name() or u.umowil.username) if u.umowil else ''
+            ) or '— brak —'
+            grupy.setdefault(nazwa, []).append(w)
+        grupy = sorted(grupy.items(), key=lambda kv: kv[0].lower())
+
+    kolumny = []
+    for klucz, etykieta in KOLUMNY_BAZY:
+        nowy_kierunek = 'asc' if (sort == klucz and kierunek == 'desc') else 'desc'
+        kolumny.append({
+            'klucz': klucz,
+            'etykieta': etykieta,
+            'aktywna': sort == klucz,
+            'kierunek': kierunek,
+            'link': _query(sort=klucz, kierunek=nowy_kierunek),
+        })
+
+    setterzy = Pracownik.objects.filter(umowieni_uczniowie__isnull=False).distinct().order_by(
+        'last_name', 'first_name', 'username'
+    )
+    statystyki = []
+    for p in setterzy:
+        statystyki.append({
+            'nazwa': (p.get_full_name() or p.username).strip(),
+            'umowieni': Uczen.objects.filter(umowil=p, dodano__year=rok, dodano__month=miesiac).count(),
+            'odbyte': Lekcja.objects.filter(
+                uczen__umowil=p, odwolana=False, data__year=rok, data__month=miesiac
+            ).count(),
+        })
+
+    return render(request, 'konta/baza_uczniow.html', {
+        'wiersze': wiersze,
+        'grupy': grupy,
+        'kolumny': kolumny,
+        'liczba': len(wiersze),
+        'szukaj': szukaj,
+        'sort': sort,
+        'kierunek': kierunek,
+        'grupuj': grupuj,
+        'rok': rok,
+        'miesiac': miesiac,
+        'nazwa_miesiaca': MIESIACE[miesiac - 1],
+        'link_poprzedni': _query(rok=poprzedni_rok, miesiac=poprzedni_miesiac),
+        'link_nastepny': _query(rok=nastepny_rok, miesiac=nastepny_miesiac),
+        'statystyki': statystyki,
+    })
 
 def brak_dostepu(request, exception=None):
     """Strona 403 — brak uprawnień."""

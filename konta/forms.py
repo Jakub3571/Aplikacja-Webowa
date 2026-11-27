@@ -75,6 +75,20 @@ class FormularzZmianyHasla(PasswordChangeForm):
         nowe.help_text = 'Powtórz nowe hasło, żeby wykluczyć literówkę.'
 
 
+class EmailOpcjonalnyField(forms.EmailField):
+    """Pole e-mail, w którym oprócz adresu można wpisać "-" (brak adresu)."""
+
+    def validate(self, value):
+        if (value or '').strip() in ('', '-'):
+            return
+        super().validate(value)
+
+    def run_validators(self, value):
+        if (value or '').strip() in ('', '-'):
+            return
+        super().run_validators(value)
+
+
 class FormularzUcznia(forms.ModelForm):
     """Formularz dodawania ucznia — pola obowiązkowe z podpowiedziami."""
 
@@ -119,8 +133,8 @@ class FormularzUcznia(forms.ModelForm):
             'imie_ucznia': 'Samo imię ucznia',
             'nazwisko_rodzica': 'Nazwisko rodzica (uczeń nosi nazwisko rodzica)',
             'rodzic': 'Imię i nazwisko rodzica do kontaktu',
-            'telefon_glowny': 'Główny numer do kontaktu z rodzicem',
-            'email_glowny': 'Główny adres e-mail do kontaktu',
+            'telefon_glowny': 'Główny numer do kontaktu z rodzicem — opcjonalny; brak wpisz jako "-"',
+            'email_glowny': 'Główny adres e-mail do kontaktu — opcjonalny; brak wpisz jako "-"',
             'telefon_dodatkowy': 'Zapasowy numer telefonu',
             'email_dodatkowy': 'Zapasowy adres e-mail',
             'notatka_od_rodzica': 'Dodatkowe informacje od rodzica',
@@ -167,13 +181,29 @@ class FormularzUcznia(forms.ModelForm):
             pole.required = True
             pole.widget.attrs['required'] = True
         # pola "na zapas" i notatka są opcjonalne — bez nich też można dodać ucznia
-        for opcjonalne in ('telefon_dodatkowy', 'email_dodatkowy', 'notatka_od_rodzica'):
+        for opcjonalne in ('telefon_glowny', 'email_glowny', 'telefon_dodatkowy', 'email_dodatkowy', 'notatka_od_rodzica'):
             if opcjonalne in self.fields:
                 self.fields[opcjonalne].required = False
                 self.fields[opcjonalne].widget.attrs.pop('required', None)
+        # e-mail główny przyjmuje też "-" (brak adresu) — wtedy pomijamy walidację formatu
+        pole_email = self.fields['email_glowny']
+        self.fields['email_glowny'] = EmailOpcjonalnyField(
+            label=pole_email.label,
+            required=False,
+            help_text=pole_email.help_text,
+            error_messages={'invalid': 'Wpisz poprawny adres e-mail.'},
+        )
         # przełącznik automatycznej wysyłki ma zostać opcjonalny (odznaczony = nie wysyłaj)
         self.fields['auto_wyslij_meet'].required = False
         self.fields['auto_wyslij_meet'].widget.attrs.pop('required', None)
+
+    def clean_telefon_glowny(self):
+        wartosc = (self.cleaned_data.get('telefon_glowny') or '').strip()
+        return wartosc or '-'
+
+    def clean_email_glowny(self):
+        wartosc = (self.cleaned_data.get('email_glowny') or '').strip()
+        return wartosc or '-'
 
     def clean(self):
         dane = super().clean()
