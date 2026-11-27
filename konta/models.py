@@ -359,6 +359,51 @@ class Lekcja(models.Model):
     def __str__(self):
         return f'{self.uczen}: {self.data:%d.%m.%Y %H:%M}'
 
+class OcenaLekcji(models.Model):
+    """Formularz korepetytora wypełniany PO lekcji. Odpowiedzi zapisują się przy
+    lekcji — każda w osobnym polu (pod przyszłe podsumowania nauki co 2–3 miesiące).
+    Odpowiedź na pyt. 1 (odbyla_sie) steruje etapem ucznia u settera.
+    Checkboxy (wrazenia_zebrane / oplacona / kolejna_umowiona / na_fanpage)
+    odhacza ręcznie setter w etapie „Odbyła się”."""
+
+    POWODY_NIEODBYCIA = [
+        ('uczen_nie_przyszedl', 'uczeń nie przyszedł'),
+        ('odwolal_rodzic', 'odwołał rodzic'),
+        ('odwolal_korepetytor', 'odwołał korepetytor'),
+        ('przelozona', 'przełożona'),
+    ]
+
+    lekcja = models.OneToOneField(
+        Lekcja, on_delete=models.CASCADE, related_name='ocena', verbose_name='lekcja',
+    )
+    odbyla_sie = models.BooleanField('czy lekcja się odbyła?', null=True, blank=True)
+    powod_nieodbycia = models.CharField(
+        'powód (gdy nie odbyła się)', max_length=32, choices=POWODY_NIEODBYCIA, blank=True,
+    )
+    temat = models.TextField('temat: co dokładnie dzisiaj przerobiliście?', blank=True)
+    skupienie = models.PositiveSmallIntegerField('skupienie (1–5)', null=True, blank=True)
+    skupienie_wyjasnienie = models.TextField('co dokładnie się działo? (przy skupieniu poniżej 4)', blank=True)
+    dobrze_poszlo = models.TextField('co dzisiaj dobrze poszło?', blank=True)
+    nie_poszlo = models.TextField('co dzisiaj nie poszło?', blank=True)
+    zadanie_domowe = models.TextField('zadanie domowe („-” jeśli nie było)', blank=True)
+    wrazenia_zebrane = models.BooleanField('zebrane wrażenia od rodzica', default=False)
+    oplacona = models.BooleanField('opłacona', default=False)
+    kolejna_umowiona = models.BooleanField('umówiona kolejna lekcja / stały termin', default=False)
+    na_fanpage = models.BooleanField('przerzucony na fanpage', default=False)
+    wypelnil = models.ForeignKey(
+        'Pracownik', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='oceny_lekcji', verbose_name='kto wypełnił formularz',
+    )
+    wypelniono = models.DateTimeField('data wypełnienia', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'ocena lekcji'
+        verbose_name_plural = 'oceny lekcji'
+
+    def __str__(self):
+        stan = 'odbyła się' if self.odbyla_sie else ('nie odbyła się' if self.odbyla_sie is False else '—')
+        return f'{self.lekcja} — {stan}'
+
 
 class PrzypomnienieLekcji(models.Model):
     """Znacznik: dla tej lekcji wysłano już przypomnienie (jedno na lekcję)."""

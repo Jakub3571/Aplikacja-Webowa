@@ -37,6 +37,7 @@ from .models import (
     Dostepnosc,
     Lekcja,
     Nauczyciel,
+    OcenaLekcji,
     Pracownik,
     PrzedmiotNauczyciela,
     PrzedmiotUcznia,
@@ -387,6 +388,23 @@ def _zakresy_wolne_dnia(nauczyciel, dzien, wolne):
                 grupy.append([t])
         wynik.extend(f'{g[0]:%H:%M}–{g[-1]:%H:%M}' for g in grupy)
     return wynik
+
+def _etap_ucznia(uczen):
+    """Etap ucznia w panelu settera (wyliczany z lekcji — jeden rekord ucznia):
+    'nowy' — umówiona 1. lekcja, która jeszcze się nie odbyła;
+    'do_potwierdzenia' — najnowsza lekcja po swoim terminie, korepetytor jeszcze
+    nie wypełnił formularza po lekcji;
+    'odbyla' / 'nie_odbyla' — wg odpowiedzi korepetytora na pyt. 1."""
+    ostatnia = (
+        Lekcja.objects.filter(uczen=uczen, odwolana=False, data__lt=timezone.now())
+        .order_by('-data').first()
+    )
+    if ostatnia is None:
+        return 'nowy'
+    ocena = OcenaLekcji.objects.filter(lekcja=ostatnia).first()
+    if ocena is None or ocena.odbyla_sie is None:
+        return 'do_potwierdzenia'
+    return 'odbyla' if ocena.odbyla_sie else 'nie_odbyla'
 
 def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
     """Sprawdza, czy slot (60 min) wypada w luce przerwy dnia nauczyciela.
@@ -2464,7 +2482,7 @@ def moj_tydzien(request, nauczyciel_id=None):
         przerwy_dni[wpis.data] = wpis.minuty
     nazwa_nauczyciela = f'{nauczyciel.imie} {nauczyciel.nazwisko}'.strip().lower()
     lekcje_dni = {}
-    for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta').filter(data__gte=poniedzialek, data__lt=nastepny):
+    for lekcja in Lekcja.objects.select_related('uczen', 'przedmiot_karta', 'ocena').filter(data__gte=poniedzialek, data__lt=nastepny):
         if not lekcja_jest_u_nauczyciela(lekcja, nazwa_nauczyciela):
             continue
         dzien_lekcji = timezone.localtime(lekcja.data).date()
@@ -2496,6 +2514,7 @@ def moj_tydzien(request, nauczyciel_id=None):
                 'godzina': timezone.localtime(lekcja.data).strftime('%H:%M'),
                 'koniec': (timezone.localtime(lekcja.data) + timedelta(minutes=GODZINA_LEKCJI)).strftime('%H:%M'),
                 'odwolana': lekcja.odwolana,
+                'ma_ocene': hasattr(lekcja, 'ocena'),
             })
         dni.append({
             'data': dzien,
@@ -3034,6 +3053,93 @@ KATEGORIE_ZAZALEN = ['aplikacja', 'zajęcia', 'pracownik', 'pomysły']
 import json as _json
 from django.http import JsonResponse as _JsonResponse
 from django.views.decorators.csrf import csrf_exempt as _csrf_exempt
+
+
+@login_required
+def ocena_lekcji(request, lekcja_id):
+    """Formularz korepetytora PO lekcji (6 pytań). Dostęp: korepetytor prowadzący
+    tę lekcję albo szef. Odpowiedź na pyt. 1 (tak/nie) przenosi ucznia u settera
+    między etapami — status wylicza _etap_ucznia automatycznie po zapisie."""
+    lekcja = get_object_or_404(
+        Lekcja.objects.select_related('uczen', 'przedmiot_karta'), pk=lekcja_id,
+    )
+    nauczyciel = _nauczyciel_lekcji(lekcja, lekcja.uczen)
+    wlasny = nauczyciel and getattr(request.user, 'nauczyciel_id', None) == nauczyciel.id
+    if not czy_szef(request.user) and not wlasny:
+        raise PermissionDenied
+    ocena = OcenaLekcji.objects.filter(lekcja=lekcja).first()
+
+    if request.method == 'POST':
+        odbyla_txt = (request.POST.get('odbyla_sie') or '').strip()
+        powod = (request.POST.get('powod_nieodbycia') or '').strip()
+        temat = (request.POST.get('temat') or '').strip()
+        skupienie_txt = (request.POST.get('skupienie') or '').strip()
+        skupienie_wyjasnienie = (request.POST.get('skupienie_wyjasnienie') or '').strip()
+        dobrze = (request.POST.get('dobrze_poszlo') or '').strip()
+        zle = (request.POST.get('nie_poszlo') or '').strip()
+        zadanie = (request.POST.get('zadanie_domowe') or '').strip()
+        bledy = []
+        dane = None
+        if odbyla_txt == 'nie':
+            if powod not in dict(OcenaLekcji.POWODY_NIEODBYCIA):
+                bledy.append('Wybierz powód, dlaczego lekcja się nie odbyła.')
+            else:
+                # przy „nie” dalszych pytań nie ma — pola zostają puste
+                dane = {
+                    'odbyla_sie': False, 'powod_nieodbycia': powod,
+                    'temat': '', 'skupienie': None, 'skupienie_wyjasnienie': '',
+                    'dobrze_poszlo': '', 'nie_poszlo': '', 'zadanie_domowe': '',
+                }
+        elif odbyla_txt == 'tak':
+            if not temat:
+                bledy.append('Wpisz temat — co dokładnie dzisiaj przerobiliście.')
+            skupienie = None
+            if skupienie_txt:
+                try:
+                    skupienie = int(skupienie_txt)
+                except ValueError:
+                    skupienie = None
+            if skupienie is None or not 1 <= skupienie <= 5:
+                bledy.append('Wybierz skupienie od 1 do 5.')
+            elif skupienie < 4 and not skupienie_wyjasnienie:
+                bledy.append('Przy skupieniu poniżej 4 wpisz, co dokładnie się działo.')
+            if not zadanie:
+                bledy.append('Wpisz zadanie domowe (lub „-”, jeśli nie było).')
+            if not bledy:
+                dane = {
+                    'odbyla_sie': True, 'powod_nieodbycia': '',
+                    'temat': temat, 'skupienie': skupienie,
+                    'skupienie_wyjasnienie': skupienie_wyjasnienie if skupienie and skupienie < 4 else '',
+                    'dobrze_poszlo': dobrze, 'nie_poszlo': zle, 'zadanie_domowe': zadanie,
+                }
+        else:
+            bledy.append('Odpowiedz, czy lekcja się odbyła (tak / nie).')
+        if bledy:
+            for b in bledy:
+                messages.error(request, b)
+        else:
+            if ocena is None:
+                ocena = OcenaLekcji(lekcja=lekcja)
+            for klucz, wartosc in dane.items():
+                setattr(ocena, klucz, wartosc)
+            ocena.wypelnil = request.user
+            ocena.save()
+            messages.success(
+                request,
+                'Formularz po lekcji zapisany — uczeń przeszedł do kolejnego etapu u settera.',
+            )
+            if getattr(request.user, 'nauczyciel_id', None):
+                return redirect('moj_tydzien')
+            return redirect('kalendarz_zbiorczy')
+
+    return render(request, 'konta/ocena_lekcji.html', {
+        'lekcja': lekcja,
+        'uczen': lekcja.uczen,
+        'karta': lekcja.przedmiot_karta,
+        'ocena': ocena,
+        'powody': OcenaLekcji.POWODY_NIEODBYCIA,
+        'nauczyciel': nauczyciel,
+    })
 
 
 def _ip_z_zadania(request):

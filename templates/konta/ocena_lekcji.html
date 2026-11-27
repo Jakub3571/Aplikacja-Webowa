@@ -1,0 +1,86 @@
+{% extends 'konta/panel.html' %}
+{% block tytul %}Formularz po lekcji — Panel pracowniczy{% endblock %}
+{% block panel %}
+<section class="karta">
+  <h2>📝 Formularz po lekcji</h2>
+  <p class="podtytul">
+    {{ uczen.imie_ucznia }} {{ uczen.nazwisko_rodzica }} ·
+    {% if karta %}{{ karta.przedmiot }} ({{ karta.poziom }}){% else %}{{ uczen.przedmiot }} ({{ uczen.poziom }}){% endif %}
+    · {{ lekcja.data|date:"d.m.Y H:i" }}
+    {% if nauczyciel %}· korepetytor: {{ nauczyciel.imie }} {{ nauczyciel.nazwisko }}{% endif %}
+  </p>
+
+  <form method="post" class="formularz">
+    {% csrf_token %}
+
+    <fieldset>
+      <legend>1. Czy lekcja się odbyła? <span class="gwiazdka">*</span></legend>
+      <label><input type="radio" name="odbyla_sie" value="tak" {% if ocena and ocena.odbyla_sie %}checked{% endif %} required> Tak</label>
+      <label><input type="radio" name="odbyla_sie" value="nie" {% if ocena and ocena.odbyla_sie == False %}checked{% endif %}> Nie</label>
+      <div id="blok-nie" {% if not ocena or ocena.odbyla_sie != False %}style="display:none"{% endif %}>
+        <label for="id_powod">Powód <span class="gwiazdka">*</span></label>
+        <select name="powod_nieodbycia" id="id_powod">
+          <option value="">— wybierz powód —</option>
+          {% for wartosc, etykieta in powody %}
+          <option value="{{ wartosc }}" {% if ocena and ocena.powod_nieodbycia == wartosc %}selected{% endif %}>{{ etykieta }}</option>
+          {% endfor %}
+        </select>
+        <p class="podpowiedz">Przy „Nie” dalszych pytań nie ma.</p>
+      </div>
+    </fieldset>
+
+    <div id="blok-tak" {% if ocena and ocena.odbyla_sie == False %}style="display:none"{% endif %}>
+      <label for="id_temat">2. Temat — co dokładnie dzisiaj przerobiliście? <span class="gwiazdka">*</span></label>
+      <textarea name="temat" id="id_temat" rows="3" required>{% if ocena %}{{ ocena.temat }}{% endif %}</textarea>
+
+      <label for="id_skupienie">3. Skupienie ucznia (1 = bardzo słabe, 5 = bardzo dobre) <span class="gwiazdka">*</span></label>
+      <select name="skupienie" id="id_skupienie" required>
+        <option value="">— wybierz 1–5 —</option>
+        {% for n in "12345" %}
+        <option value="{{ n }}" {% if ocena and ocena.skupienie == n|add:0 %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+      <div id="blok-skupienie" {% if not ocena or not ocena.skupienie or ocena.skupienie >= 4 %}style="display:none"{% endif %}>
+        <label for="id_skupienie_wyjasnienie">Co dokładnie się działo? (przy skupieniu poniżej 4 — obowiązkowe) <span class="gwiazdka">*</span></label>
+        <textarea name="skupienie_wyjasnienie" id="id_skupienie_wyjasnienie" rows="3">{% if ocena %}{{ ocena.skupienie_wyjasnienie }}{% endif %}</textarea>
+      </div>
+
+      <label for="id_dobrze">4. Co dzisiaj dobrze poszło?</label>
+      <textarea name="dobrze_poszlo" id="id_dobrze" rows="2">{% if ocena %}{{ ocena.dobrze_poszlo }}{% endif %}</textarea>
+
+      <label for="id_zle">5. Co dzisiaj nie poszło?</label>
+      <textarea name="nie_poszlo" id="id_zle" rows="2">{% if ocena %}{{ ocena.nie_poszlo }}{% endif %}</textarea>
+
+      <label for="id_zadanie">6. Zadanie domowe <span class="gwiazdka">*</span> <span class="podpowiedz">(wpisz „-”, jeśli nie było)</span></label>
+      <textarea name="zadanie_domowe" id="id_zadanie" rows="2" required>{% if ocena %}{{ ocena.zadanie_domowe }}{% endif %}</textarea>
+    </div>
+
+    <button type="submit">Zapisz formularz</button>
+    <a class="przycisk-kalendarz" href="{% url 'moj_tydzien' %}">Anuluj</a>
+  </form>
+</section>
+
+<script>
+  (function () {
+    var radia = document.querySelectorAll('input[name="odbyla_sie"]');
+    var blokTak = document.getElementById('blok-tak');
+    var blokNie = document.getElementById('blok-nie');
+    var skupienie = document.getElementById('id_skupienie');
+    var blokSkupienie = document.getElementById('blok-skupienie');
+    function odswiez() {
+      var wybrane = document.querySelector('input[name="odbyla_sie"]:checked');
+      var nie = wybrane && wybrane.value === 'nie';
+      blokTak.style.display = nie ? 'none' : '';
+      blokNie.style.display = nie ? '' : 'none';
+    }
+    function odswiezSkupienie() {
+      var v = parseInt(skupienie.value, 10);
+      blokSkupienie.style.display = (v && v < 4) ? '' : 'none';
+    }
+    radia.forEach(function (r) { r.addEventListener('change', odswiez); });
+    if (skupienie) skupienie.addEventListener('change', odswiezSkupienie);
+    odswiez();
+    odswiezSkupienie();
+  })();
+</script>
+{% endblock %}

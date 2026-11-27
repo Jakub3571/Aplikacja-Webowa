@@ -63,6 +63,9 @@
           {% for lekcja in dzien.lekcje %}
           <span class="zakres-pigulka pigulka-lekcja{% if lekcja.odwolana %} pigulka-odwolana{% endif %}">
             📅 {{ lekcja.uczen }} · {{ lekcja.przedmiot }} · {{ lekcja.godzina }}–{{ lekcja.koniec }}{% if lekcja.odwolana %} (odwołana){% endif %}
+                        {% if not lekcja.odwolana %}
+            <a class="lekcja-ocena" href="{% url 'ocena_lekcji' lekcja.id %}" title="Formularz po lekcji{% if lekcja.ma_ocene %} — wypełniony{% endif %}">✎{% if lekcja.ma_ocene %} ✅{% endif %}</a>
+            {% endif %}
             {% if lekcja.odwolana %}
             <button type="button" class="lekcja-przywroc" data-lekcja-id="{{ lekcja.id }}" title="Przywróć tylko to jedno zajęcie (cykl został)">↩</button>
             {% else %}

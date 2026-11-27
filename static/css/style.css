@@ -710,6 +710,7 @@ details.wolne-godziny .wolne-lista {
 .lekcja-odwolaj { color: #ff5a4e; font-weight: 700; }
 .lekcja-przesun { color: var(--akcent); font-weight: 700; }
 .lekcja-przywroc { color: #2e9e5b; font-weight: 700; }
+.lekcja-ocena { font-size: .8rem; padding: 0 .15rem; text-decoration: none; }
 .pigulka-odwolana { opacity: .55; text-decoration: line-through; }
 #przesun-okienko { margin-top: .75rem; }
 

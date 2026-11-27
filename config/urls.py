@@ -43,7 +43,7 @@ urlpatterns = [
     path('lekcje/', views.lekcje, name='lekcje'),
     path('kalendarz/', views.kalendarz_zbiorczy, name='kalendarz_zbiorczy'),
     path('uczniowie/<int:uczen_id>/lekcja-cykliczna/', views.umow_lekcje_cykliczna, name='lekcja_cykliczna'),
-    
+    path('lekcja/<int:lekcja_id>/ocena/', views.ocena_lekcji, name='ocena_lekcji'),
     path('platnosci/', views.platnosci, name='platnosci'),
     path('zmiana-hasla/', views.zmiana_hasla, name='zmiana_hasla'),
     path('uzytkownicy/', views.uzytkownicy, name='uzytkownicy'),
