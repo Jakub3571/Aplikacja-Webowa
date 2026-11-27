@@ -2581,12 +2581,19 @@ def kalendarz_zbiorczy(request):
     siatka_dnia = []
     kolumny = []
     if wybrany_dzien:
+        # tylko korepetytorzy, którzy tego dnia pracują (mają zaznaczony zakres lub lekcję)
         for n in nauczyciele:
-            przedmioty_txt = ', '.join(sorted({p.przedmiot for p in n.przedmioty.all()}))
-            kolumny.append({'id': n.id, 'nazwa': f'{n.imie} {n.nazwisko}'.strip(), 'przedmioty': przedmioty_txt})
+            if not zakresy_dni.get((n.id, wybrany_dzien)) and not lekcje_dni.get((n.id, wybrany_dzien)):
+                continue
+            przedmioty = [
+                {'przedmiot': p.przedmiot, 'klasa': _klasa_poziomu(p.poziom)}
+                for p in sorted(n.przedmioty.all(), key=lambda p: p.przedmiot)
+            ]
+            kolumny.append({'n': n, 'nazwa': f'{n.imie} {n.nazwisko}'.strip(), 'przedmioty': przedmioty})
         for h in range(6, 22):
             wiersz = {'etykieta': f'{h:02d}:00', 'kolumny': []}
-            for n in nauczyciele:
+            for kol in kolumny:
+                n = kol['n']
                 kom = {'typ': '', 'tekst': '', 'cykliczna': False}
                 lekcje_h = [
                     l for l in lekcje_dni.get((n.id, wybrany_dzien), [])
@@ -2608,7 +2615,7 @@ def kalendarz_zbiorczy(request):
                 else:
                     h_dt = datetime.combine(wybrany_dzien, time(h, 0))
                     if any(st <= h_dt < e for st, e in zakresy_dni.get((n.id, wybrany_dzien), [])):
-                        kom = {'typ': 'wolny', 'tekst': 'wolny', 'cykliczna': False}
+                        kom = {'typ': 'wolny', 'tekst': '', 'cykliczna': False} # szara komórka zakresu, bez napisu
                 wiersz['kolumny'].append(kom)
             siatka_dnia.append(wiersz)
     poprzedni_dzien = nastepny_dzien = None

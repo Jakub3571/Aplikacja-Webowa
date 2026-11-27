@@ -11,8 +11,8 @@
     <h2>📅 {{ wybrany_dzien|date:"d.m.Y" }} ({{ wybrany_dzien|date:"D" }})</h2>
     <a class="strzalka" href="?rok={{ nastepny_dzien.year }}&miesiac={{ nastepny_dzien.month }}&dzien={{ nastepny_dzien.day }}">&rarr;</a>
   </div>
-  <p class="podpowiedz">
-    <span class="chip chip-wolny">szary: korepetytor wolny (godziny pracy)</span>
+    <p class="podpowiedz">
+    <span class="chip chip-wolny">szary: zaznaczony zakres godzin</span>
     <span class="chip chip-lekcja">zielony: lekcja nowa (jednorazowa)</span>
     <span class="chip chip-lekcja-cykliczna">jasnoniebieski: lekcja cykliczna</span>
   </p>
@@ -22,7 +22,7 @@
       {% for kol in kolumny %}
       <div class="dzien-kolumna-naglowek">
         <strong>{{ kol.nazwa }}</strong>
-        {% if kol.przedmioty %}<span class="podpowiedz">{{ kol.przedmioty }}</span>{% endif %}
+        {% if kol.przedmioty %}<span class="podpowiedz">{% for p in kol.przedmioty %}<span class="przedmiot-poziom {{ p.klasa }}">{{ p.przedmiot }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}
       </div>
       {% endfor %}
     </div>
@@ -38,6 +38,13 @@
       {% endfor %}
     </div>
     {% endfor %}
+    </div>
+  <div class="legenda-poziomow">
+    <strong>Legenda poziomów:</strong>
+    <span class="przedmiot-poziom poziom-podstawowka">podstawówka</span>
+    <span class="przedmiot-poziom poziom-srednia-podstawa">średnia podstawa</span>
+    <span class="przedmiot-poziom poziom-srednia-rozszerzenie">średnia rozszerzenie</span>
+    <span class="przedmiot-poziom poziom-studia">studia</span>
   </div>
 </section>
 {% else %}

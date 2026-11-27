@@ -2285,6 +2285,7 @@ class KalendarzZbiorczyTests(TestCase):
 
     def test_dzien_siatka_kolumny_korepetytorow(self):
         # widok dnia = siatka: kolumny to korepetytorzy (imię nazwisko + przedmioty), wiersze 6:00–21:00
+        PrzedmiotNauczyciela.objects.create(nauczyciel=self.n, przedmiot='matematyka', poziom='podstawowka')
         self.client.force_login(self.admin)
         dzis = date.today()
         r = self.client.get(f'/kalendarz/?dzien={dzis.day}')
@@ -2295,7 +2296,11 @@ class KalendarzZbiorczyTests(TestCase):
         self.assertContains(r, '21:00')              # ostatnia godzina (okno 6–21)
         self.assertContains(r, 'z Kasia Nowak')      # lekcja w komórce
         self.assertContains(r, 'komorka-lekcja')     # zielona komórka lekcji 17:00
-        self.assertContains(r, 'komorka-wolny')      # szare wolne (zakres 16:00–20:00)
+        self.assertContains(r, 'komorka-wolny')      # szara komórka zakresu 16:00–20:00
+        self.assertNotContains(r, '>wolny<')         # w szarych komórkach nie ma napisu „wolny”
+        self.assertNotContains(r, 'Anna Nowak')      # tego dnia nie pracuje -> nie ma jej kolumny
+        self.assertContains(r, 'przedmiot-poziom poziom-podstawowka">matematyka')  # przedmiot w kolorze poziomu
+        self.assertContains(r, 'legenda-poziomow')   # legenda pod spodem
 
 
 class PrzypomnieniaJutroTests(TestCase):
