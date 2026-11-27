@@ -3,7 +3,6 @@
 „Umówieni uczniowie” (etap 2). Uruchom w folderze projektu:
     .venv\\Scripts\\activate
     python fix_tests_etap2.py
-Skrypt jest idempotentny — jak zmiana już jest, pomija ją.
 """
 import sys
 from pathlib import Path
@@ -100,7 +99,7 @@ zamiany.append((
 zrobione = 0
 for stary, nowy in zamiany:
     if nowy in s:
-        continue  # już zastosowane
+        continue
     assert s.count(stary) == 1, f'niejednoznaczny lub brak wzorca: {stary[:60]!r} (wystąpień: {s.count(stary)})'
     s = s.replace(stary, nowy)
     zrobione += 1
