@@ -354,6 +354,39 @@ def _zakresy_wolne_dnia(nauczyciel, dzien, wolne):
         wynik.extend(f'{g[0]:%H:%M}–{g[-1]:%H:%M}' for g in grupy)
     return wynik
 
+def _tekst_liczby_godzin(n):
+    """Polska odmiana liczby wolnych godzin: 'wolna 1 godzina', 'wolne 2 godziny',
+    'wolnych 5 godzin' (panel dostępności)."""
+    if n == 1:
+        return 'wolna 1 godzina'
+    if n % 10 in (2, 3, 4) and not 12 <= n % 100 <= 14:
+        return f'wolne {n} godziny'
+    return f'wolnych {n} godzin'
+
+
+def _zakresy_wolne_dnia(nauczyciel, dzien, wolne):
+    """Wolne podzakresy każdego zakresu dostępności dnia (panel 'Kalendarz dostępności'):
+    rytm zakresu (60 min + przerwa dnia) bez zajętych slotów, wolne sloty sklejane
+    w ciągłe grupy 'od–do' (pierwszy i ostatni wolny slot, np. 6:00–10:40 i 13:00–14:10,
+    gdy 11:50 jest zajęte). Gdy WSZYSTKIE sloty zakresu są zajęte — 'zajęte'."""
+    przerwa = _przerwa_dnia(nauczyciel, dzien)
+    krok = timedelta(minutes=GODZINA_LEKCJI + przerwa)
+    wolne_set = set(wolne)
+    wynik = []
+    for s, e in _zakresy_dnia(nauczyciel, dzien):
+        sloty = _rytm_zakresu(s, e, krok)
+        wolne_sloty = [t for t in sloty if t.strftime('%H:%M') in wolne_set]
+        if not wolne_sloty:
+            wynik.append('zajęte')
+            continue
+        grupy = []
+        for t in wolne_sloty:
+            if grupy and t - grupy[-1][-1] == krok:
+                grupy[-1].append(t)
+            else:
+                grupy.append([t])
+        wynik.extend(f'{g[0]:%H:%M}–{g[-1]:%H:%M}' for g in grupy)
+    return wynik
 
 def godzina_w_przerwie(nauczyciel, dzien, godzina_start, uczen_id=None):
     """Sprawdza, czy slot (60 min) wypada w luce przerwy dnia nauczyciela.
