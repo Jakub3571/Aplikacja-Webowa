@@ -48,7 +48,7 @@
         <div class="dzien-zakresy">
           {% for zakres in dzien.zakresy %}
           <span class="zakres-pigulka">
-                        <strong>{{ zakres.od }}–{{ zakres.do }}</strong>{% if zakres.ostatnia %} → koniec zajęć {{ zakres.koniec }}{% endif %}
+            <strong>{{ zakres.od }}–{{ zakres.do }}</strong>{% if zakres.ostatnia %} → koniec zajęć {{ zakres.koniec }}{% endif %}
            {% if zakres.cykliczny %} 🔁 co tydzień{% endif %}
             {% if dzien.przerwa %} · przerwa {{ dzien.przerwa }} min{% endif %}
             <button type="button" class="zakres-usun" data-dzien="{{ dzien.data|date:'Y-m-d' }}" data-od="{{ zakres.od }}" data-do="{{ zakres.do }}" title="Usuń ten zakres tylko w tym dniu (cykl zostaje)">✖</button>

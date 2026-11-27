@@ -259,7 +259,7 @@ def _zakresy_dnia(nauczyciel, dzien):
             zakresy[-1] = (zakresy[-1][0], max(zakresy[-1][1], e))
         else:
             zakresy.append((s, e))
-        return zakresy
+    return zakresy
 
 
 def _rytm_zakresu(s, e, krok):
@@ -2571,7 +2571,7 @@ def kalendarz_zbiorczy(request):
             })
 
     # rozwinięty dzień z podziałem na godziny (jak w zwykłym kalendarzu)
-        godziny_dnia = []
+    godziny_dnia = []
     if wybrany_dzien:
         # wiersze godzinowe: godziny 6:00–20:00 PLUS każda godzina, w której zaczyna się
         # lekcja lub zakres (np. 17:05 z rytmu 60 min + przerwa) — lekcja ląduje w wierszu
